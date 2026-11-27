@@ -22,7 +22,7 @@ const sources = [
 <template>
   <div class="space-y-6">
     <div>
-      <h2 class="text-xl-semibold text-ink-gray-9">{{ __('Where are your products right now?') }}</h2>
+      <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Where are your products right now?') }}</h2>
       <p class="mt-1.5 text-p-base text-ink-gray-6">{{ __('You can import again later from the other one.') }}</p>
     </div>
 

@@ -43,6 +43,17 @@ watch(
   () => body.value?.scrollTo({ top: 0 }),
 )
 const stepKey = computed(() => steps.value[imp.step]?.key)
+
+// "Step 2 of 5 · Match columns". The source step has no total and no step bar: picking ERPNext or a
+// spreadsheet decides how many steps follow, and a total that jumps from 6 to 3 reads like a mistake.
+const isSourceStep = computed(() => stepKey.value === 'source')
+const stepLine = computed(() => {
+  if (!isReady.value) return __('Loading…')
+  if (imp.phase === 'running') return __('Import running…')
+  const label = steps.value[imp.step]?.label
+  if (isSourceStep.value) return __('Step 1 · {0}', [label])
+  return __('Step {0} of {1} · {2}', [imp.step + 1, steps.value.length, label])
+})
 const current = computed(() => stepComponents[imp.source][stepKey.value])
 
 const erpnextSelected = computed(() => imp.erpnext.selected.length)
@@ -69,7 +80,7 @@ const blockedReason = computed(() => {
   if (stepKey.value === 'upload' && !imp.parsed) return __('Upload a file to continue.')
   if (stepKey.value === 'map') return mapStepBlocker()
   // run_import with nothing ready writes nothing.
-  if (stepKey.value === 'review' && !imp.counts.ready) return __('No rows are ready. Fix your file and upload it again.')
+  if (stepKey.value === 'review' && !imp.counts.ready) return __('Fix the skipped rows in your file to import.')
   if (stepKey.value === 'pick' && !imp.erpnext.selectionReady) return __('Loading your items…')
   if (stepKey.value === 'pick' && !erpnextSelected.value) return __('Pick at least one item.')
   return ''
@@ -117,53 +128,49 @@ function close() {
          dialog's own margins take 8rem, everything else is the body's scroll. dvh, not vh: on a
          phone vh is the height with the address bar hidden, which would push the footer off. -->
     <div class="flex max-h-[calc(100dvh-8rem)] flex-col">
-      <div class="space-y-3 border-b border-outline-gray-1 px-6 pb-4 pt-3">
-        <div class="flex items-center gap-3">
-          <!-- bare drops frappe-ui's own header, so the title and description are wired to the
-               dialog through the same reka primitives it would have used. -->
-          <DialogTitle as="h2" class="text-base-semibold text-ink-gray-8">{{ __('Import products') }}</DialogTitle>
-          <span v-if="imp.phase === 'running'" class="text-sm text-ink-gray-5">{{ __('Import running…') }}</span>
-          <Button class="ms-auto" variant="ghost" icon="lucide-x" :label="__('Close')" @click="close" />
+      <!-- FormDialog's header: bare drops frappe-ui's own, so the title and the step line are wired
+           to the dialog through the same reka primitives. The step bar stays put above the body. -->
+      <div class="space-y-4 px-4 pb-4 pt-5 sm:px-6">
+        <div class="flex items-start gap-3">
+          <div class="min-w-0 flex-1">
+            <DialogTitle class="text-2xl-semibold text-ink-gray-8">{{ __('Import products') }}</DialogTitle>
+            <DialogDescription class="mt-1 text-p-sm text-ink-gray-5">{{ stepLine }}</DialogDescription>
+          </div>
+          <Button class="-mt-0.5" variant="ghost" icon="lucide-x" :aria-label="__('Close')" @click="close" />
         </div>
-        <ImportStepNav v-if="isReady" />
-        <DialogDescription class="sr-only">
-          {{ isReady ? __('Step {0} of {1}: {2}', [imp.step + 1, steps.length, steps[imp.step]?.label]) : __('Loading…') }}
-        </DialogDescription>
+        <ImportStepNav v-if="isReady && !isSourceStep" />
       </div>
 
-      <div ref="body" v-scroll-fade class="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+      <div ref="body" v-scroll-fade class="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-2 sm:px-6">
         <component :is="current" v-if="isReady" @next="next" />
         <div v-else class="flex justify-center py-14"><Spinner class="size-5" /></div>
       </div>
 
+      <!-- FormDialog's footer: the reason (or, from sm, the idle hint) on the left, Back + the primary on the right. -->
       <div
         v-if="isReady && !onLastStep"
-        class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-outline-gray-1 bg-surface-gray-1 px-6 py-4"
+        class="flex flex-col gap-3 border-t border-outline-gray-1 px-4 py-4 sm:flex-row sm:items-center sm:px-6"
       >
-        <Button
-          v-if="imp.step > 0"
-          icon-left="lucide-arrow-left rtl:-scale-x-100"
-          :label="__('Back')"
-          :disabled="!canChangeStep"
-          @click="back"
-        />
-        <Button
-          class="order-2 ms-auto sm:order-3"
-          variant="solid"
-          theme="gray"
-          :disabled="!canContinue"
-          :label="nextLabel"
-          :icon-right="startsImport ? undefined : 'lucide-arrow-right rtl:-scale-x-100'"
-          @click="next"
-        />
-        <!-- Below sm the reason takes its own line under the buttons, so a long one never
-             squeezes the primary action off the panel; the idle hint is left out there. -->
-        <span
-          class="order-3 w-full text-p-sm sm:order-2 sm:block sm:w-auto sm:min-w-0 sm:flex-1 sm:text-end"
-          :class="blockedReason ? 'text-ink-gray-7' : 'hidden text-ink-gray-5'"
-        >
+        <p class="min-w-0 flex-1 text-p-sm" :class="blockedReason ? 'text-ink-gray-7' : 'text-ink-gray-5 max-sm:hidden'" aria-live="polite">
           {{ blockedReason || __('Nothing is saved until the last step.') }}
-        </span>
+        </p>
+        <div class="flex items-center justify-end gap-2 sm:ms-auto">
+          <Button
+            v-if="imp.step > 0"
+            icon-left="lucide-arrow-left rtl:-scale-x-100"
+            :label="__('Back')"
+            :disabled="!canChangeStep"
+            @click="back"
+          />
+          <Button
+            variant="solid"
+            theme="gray"
+            :disabled="!canContinue"
+            :label="nextLabel"
+            :icon-right="startsImport ? undefined : 'lucide-arrow-right rtl:-scale-x-100'"
+            @click="next"
+          />
+        </div>
       </div>
     </div>
   </Dialog>

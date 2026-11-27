@@ -59,7 +59,7 @@ async function pick(event) {
 <template>
   <div class="space-y-6">
     <div>
-      <h2 class="text-xl-semibold text-ink-gray-9">{{ __('Upload your product file') }}</h2>
+      <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Upload your product file') }}</h2>
       <p class="mt-1.5 text-p-base text-ink-gray-6">
         {{ __('A CSV or Excel file with one row per product, or per color and size of it. Only a title and a price are needed, and the columns can have any names.') }}
       </p>

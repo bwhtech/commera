@@ -56,7 +56,7 @@ const tabs = computed(() => [
 <template>
   <div class="space-y-6">
     <div>
-      <h2 class="text-xl-semibold text-ink-gray-9">{{ __('Pick the items to bring in') }}</h2>
+      <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Pick the items to bring in') }}</h2>
       <p class="mt-1.5 text-p-base text-ink-gray-6">
         {{ __('Each one becomes a draft product. Prices and stock keep coming from ERPNext, and nothing in ERPNext changes.') }}
       </p>

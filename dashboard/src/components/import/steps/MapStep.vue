@@ -55,7 +55,7 @@ const hasOwnChanges = computed(() => !isSameMapping(imp.mapping, imp.suggestedMa
   <div class="space-y-6">
     <div class="flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
       <div class="min-w-0 flex-1">
-        <h2 class="text-xl-semibold text-ink-gray-9">{{ __('Match your columns') }}</h2>
+        <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Match your columns') }}</h2>
         <p class="mt-1.5 text-p-base text-ink-gray-6">
           {{ __("We matched {0} of {1} columns for you. Columns set to Don't import are left out.", [mapped, imp.headers.length]) }}
         </p>

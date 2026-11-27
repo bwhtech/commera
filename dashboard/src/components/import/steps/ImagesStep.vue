@@ -140,7 +140,7 @@ onMounted(() => {
 
     <div class="flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
       <div class="min-w-0 flex-1">
-        <h2 class="text-xl-semibold text-ink-gray-9">{{ __('Add product photos') }}</h2>
+        <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Add product photos') }}</h2>
         <p class="mt-1 text-p-base text-ink-gray-6">
           {{ __('Products sell far better with a photo. You can also skip this and add them from each product page later.') }}
         </p>
