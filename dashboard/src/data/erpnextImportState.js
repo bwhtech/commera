@@ -21,6 +21,18 @@ export function selectedAfter(items, pageSelection, selected) {
   return [...selected.filter((itemCode) => !pageCodes.has(itemCode)), ...pageSelection]
 }
 
+// While a search is on, the toggle acts on the matching items on screen only: selecting the whole
+// unsearched list there imported items the seller never saw.
+export function toggledSelection({ selected, allCodes, shownCodes, isSearching }) {
+  if (!isSearching) return selected.length === allCodes.length ? [] : [...allCodes]
+  if (isEveryShownSelected(selected, shownCodes)) return selected.filter((code) => !shownCodes.includes(code))
+  return [...new Set([...selected, ...shownCodes])]
+}
+
+export function isEveryShownSelected(selected, shownCodes) {
+  return shownCodes.length > 0 && shownCodes.every((code) => selected.includes(code))
+}
+
 export function itemCodesToImport(selected, importableCount) {
   return selected.length === importableCount ? null : selected
 }

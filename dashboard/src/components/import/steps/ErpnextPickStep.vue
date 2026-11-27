@@ -4,7 +4,13 @@ import { Badge, Button, Checkbox, Skeleton, TabButtons } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import { imp } from '../../../data/importFlow'
 import { loadErpnextPreview, loadErpnextSelection, previewRequest } from '../../../data/erpnextImport'
-import { KIND_LABELS, selectedAfter, selectionOnPage } from '../../../data/erpnextImportState'
+import {
+  KIND_LABELS,
+  isEveryShownSelected,
+  selectedAfter,
+  selectionOnPage,
+  toggledSelection,
+} from '../../../data/erpnextImportState'
 import { money } from '../../../data/format'
 import { __ } from '../../../data/translation'
 import { useIsMobile } from '../../../utils/useIsMobile'
@@ -52,8 +58,24 @@ const factsOf = (item) => [
   { label: __('{0} in stock', [item.stock || 0]), class: 'tabular-nums' },
 ]
 
+const isSearching = computed(() => Boolean(imp.erpnext.search))
+const shownCodes = computed(() => imp.erpnext.items.map((item) => item.item_code))
+
+const toggleLabel = computed(() => {
+  if (!isSearching.value) return allSelected.value ? __('Clear selection') : __('Select all')
+  const shown = shownCodes.value.length
+  return isEveryShownSelected(imp.erpnext.selected, shownCodes.value)
+    ? __('Clear {0} shown', [shown])
+    : __('Select {0} shown', [shown])
+})
+
 function toggleAll() {
-  imp.erpnext.selected = allSelected.value ? [] : [...imp.erpnext.allItemCodes]
+  imp.erpnext.selected = toggledSelection({
+    selected: imp.erpnext.selected,
+    allCodes: imp.erpnext.allItemCodes,
+    shownCodes: shownCodes.value,
+    isSearching: isSearching.value,
+  })
 }
 
 const tabs = computed(() => [
@@ -89,8 +111,8 @@ const tabs = computed(() => [
         <Button
           class="ms-auto"
           variant="ghost"
-          :label="allSelected ? __('Clear selection') : __('Select all')"
-          :disabled="!imp.erpnext.selectionReady"
+          :label="toggleLabel"
+          :disabled="!imp.erpnext.selectionReady || (isSearching && !shownCodes.length)"
           @click="toggleAll"
         />
       </div>
