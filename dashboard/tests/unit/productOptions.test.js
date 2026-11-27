@@ -63,3 +63,8 @@ test('an unticked pair is neither added nor kept', () => {
   })
   assert.deepEqual([changes.added, changes.removed], [[], pairs([['Red', 'M']])])
 })
+
+test('a color that skips sizes does not reorder them', () => {
+  const product = { variants: [variant('Black', ['M', 'L']), variant('White', ['S', 'M', 'L'])] }
+  assert.deepEqual(productOptions(product).sizes, ['S', 'M', 'L'])
+})

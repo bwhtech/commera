@@ -45,8 +45,8 @@ function cellTone(option, size) {
 
 function cellLabel(option, size) {
   const tone = cellTone(option, size)
-  if (tone === 'bg-surface-red-2') return __('{0} in size {1}, coming off sale', [option, size])
-  if (tone === 'bg-surface-green-2') return __('{0} in size {1}, new', [option, size])
+  if (tone === 'bg-surface-red-2') return __('{0} in size {1}, will leave the store', [option, size])
+  if (tone === 'bg-surface-green-2') return __('{0} in size {1}, will be added', [option, size])
   return __('{0} in size {1}', [option, size])
 }
 
@@ -112,11 +112,11 @@ function toggle(option, size, selected) {
     <p v-if="props.live" class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-gray-5">
       <span class="flex items-center gap-1.5">
         <span class="size-3 rounded-1 bg-surface-green-2" aria-hidden="true" />
-        {{ __('New') }}
+        {{ __('Will be added') }}
       </span>
       <span class="flex items-center gap-1.5">
         <span class="size-3 rounded-1 bg-surface-red-2" aria-hidden="true" />
-        {{ __('Coming off sale') }}
+        {{ __('Will leave the store') }}
       </span>
     </p>
   </div>

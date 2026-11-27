@@ -65,11 +65,28 @@ export const PLACEHOLDER_SIZE = 'One Size'
 
 export function productOptions(product) {
   const options = [...new Set(product.variants.map((variant) => variant.option))]
-  const sizes = [...new Set(product.variants.flatMap((variant) => variant.sizes.map((size) => size.size)))]
   return {
     options: options.filter((option) => option !== PLACEHOLDER_OPTION),
-    sizes: sizes.filter((size) => size !== PLACEHOLDER_SIZE),
+    sizes: mergeOrderedSizes(product.variants.map((variant) => variant.sizes.map((size) => size.size))).filter(
+      (size) => size !== PLACEHOLDER_SIZE,
+    ),
   }
+}
+
+// Each color lists its sizes in the Size attribute's order, but a sparse color skips some. A plain
+// union would put White's S after Black's M and L; slotting each unseen size in just after the size
+// it follows in its own list keeps the attribute order across all colors.
+export function mergeOrderedSizes(lists) {
+  const merged = []
+  for (const list of lists) {
+    let cursor = 0
+    for (const size of list) {
+      const index = merged.indexOf(size)
+      if (index === -1) merged.splice(cursor++, 0, size)
+      else cursor = index + 1
+    }
+  }
+  return merged
 }
 
 // A catalog.get_products row's variants: every colour × size a shopper can buy. A product with no

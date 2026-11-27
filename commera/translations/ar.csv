@@ -1943,7 +1943,6 @@ Not found.,غير موجود.
 Review,التقييم,Product review
 Checkout,إتمام الطلب,Storefront checkout
 Footer,التذييل,Storefront navigation
-Not now,ليس الآن
 Delivery and return options are shown at checkout.,تُعرض خيارات التوصيل والإرجاع عند إتمام الطلب.
 Unknown analytics event,حدث تحليلات غير معروف
 sort_by must be revenue or units,يجب أن تكون قيمة sort_by هي revenue أو units
@@ -2498,7 +2497,6 @@ Set discounted price on {0} items,تحديد السعر بعد الخصم لـ {
 Shoppers pay this and see Price crossed out when it is higher.,يدفع المتسوقون هذا السعر ويرون السعر الأصلي مشطوبًا عندما يكون أعلى.
 Set discounted price,تحديد السعر بعد الخصم
 Discounted price,السعر بعد الخصم
-Optional,اختياري
 Price must be higher than the discounted price.,يجب أن يكون السعر أعلى من السعر بعد الخصم.
 Enter 0 to remove the crossed-out price.,أدخل 0 لإزالة السعر المشطوب.
 Enter a discounted price above zero.,أدخل سعرًا بعد الخصم أكبر من صفر.
@@ -2537,3 +2535,188 @@ This deletes only the demo products. Your own products stay as they are.,يحذ�
 Demo products removed,أُزيلت المنتجات التجريبية
 Demo products are in your catalogue. Remove them when you add your own.,توجد منتجات تجريبية في كتالوجك. أزِلها عندما تضيف منتجاتك.
 Demo products are already in your catalogue.,المنتجات التجريبية موجودة بالفعل في كتالوجك.
+"Collections group products in your store, like T-shirts or Candles.",تجمع المجموعات المنتجات في متجرك، مثل القمصان أو الشموع.
+Add collection,إضافة مجموعة
+Adds an option every product in your store can use.,يضيف خيارًا يمكن لكل منتج في متجرك استخدامه.
+Material,الخامة
+"Cotton, Linen",قطن، كتان
+1 {0},{0} واحد
+{0} {1} values,{0} من قيم {1}
+1 color,لون واحد
+{0} colors,{0} ألوان
+1 size,مقاس واحد
+{0} sizes,{0} مقاسات
+"{0}: {1} × {2}, {3} unticked",{0}: {1} × {2}، مع إلغاء تحديد {3}
+{0}: {1} × {2},{0}: {1} × {2}
+"{0}, one for each {1}",{0}، واحد لكل {1}
+"{0}, one for each size",{0}، واحد لكل مقاس
+Enter a price above zero to continue.,أدخل سعرًا أكبر من صفر للمتابعة.
+A product with this title already exists.,يوجد منتج بهذا العنوان بالفعل.
+Saved as a draft. You add photos next.,يُحفظ كمسودة. تضيف الصور بعد ذلك.
+Original price,السعر الأصلي
+Shown crossed out next to the price. Must be higher than the price.,يظهر مشطوبًا بجانب السعر. يجب أن يكون أعلى من السعر.
+Add original price,إضافة السعر الأصلي
+Each color and size pair is a variant you sell and stock.,كل لون ومقاس معًا هو متغير تبيعه وتخزّنه.
+"Use another option, like Material",استخدم خيارًا آخر، مثل الخامة
+Add “{0}”,إضافة “{0}”
+Color,اللون
+"Add your first product, or import the ones you already sell.",أضف منتجك الأول، أو استورد المنتجات التي تبيعها بالفعل.
+Change the filters or the search.,غيّر عوامل التصفية أو البحث.
+Original price must be higher than the price.,يجب أن يكون السعر الأصلي أعلى من السعر.
+Name every color that has sizes.,سمِّ كل لون له مقاسات.
+ERPNext's preset collections could not be read.,تعذرت قراءة المجموعات المعدّة مسبقًا في ERPNext.
+{0} · {1} in stock,{0} · {1} في المخزون
+{0} in stock → {1},{0} في المخزون ← {1}
+{0} more,{0} أخرى
+"{0} ordered, not shipped",{0} مطلوبة ولم تُشحن
+Add a size before you publish.,أضف مقاسًا قبل النشر.
+Added {0}.,تمت إضافة {0}.
+Added {0} across {1} sizes.,تمت إضافة {0} على {1} مقاسات.
+Adds to what you already have.,تُضاف إلى ما لديك بالفعل.
+Archived. Shoppers cannot see this product.,مؤرشف. لا يمكن للمتسوقين رؤية هذا المنتج.
+Back to draft. Shoppers cannot see it.,عاد إلى مسودة. لا يمكن للمتسوقين رؤيته.
+Cost per item for {0},تكلفة القطعة لـ {0}
+Cost per item (optional),تكلفة القطعة (اختياري)
+Draft. Shoppers cannot see this product until you publish it.,مسودة. لا يمكن للمتسوقين رؤية هذا المنتج حتى تنشره.
+Each {0} has its own photos. The first one is the cover. Photos save as you add them.,لكل {0} صوره الخاصة. الصورة الأولى هي الغلاف. تُحفظ الصور فور إضافتها.
+Enter a price above zero.,أدخل سعرًا أكبر من صفر.
+Enter a quantity to add.,أدخل كمية لإضافتها.
+Enter a title.,أدخل عنوانًا.
+Fix the highlighted fields to save,صحّح الحقول المميزة للحفظ
+"Live, except {0}: add a size to publish it.",منشور، باستثناء {0}: أضف مقاسًا لنشره.
+Live on your store,منشور في متجرك
+Live. Shoppers can find and buy this product.,منشور. يمكن للمتسوقين العثور على هذا المنتج وشراؤه.
+No sales yet.,لا توجد مبيعات بعد.
+On your store,في متجرك
+"Ordered, not shipped",مطلوبة ولم تُشحن
+Preview on store,معاينة في المتجر
+Price and stock,السعر والمخزون
+Quantity to add for {0},الكمية المراد إضافتها لـ {0}
+Restore,استعادة
+Store,المتجر
+The changes to this product have not been saved.,لم تُحفظ التغييرات على هذا المنتج.
+The first photo is the cover. Photos save as you add them.,الصورة الأولى هي الغلاف. تُحفظ الصور فور إضافتها.
+The starred collection is the main one. Your store shows it in the product’s breadcrumb.,المجموعة المميزة بنجمة هي الرئيسية. يعرضها متجرك في مسار التنقل الخاص بالمنتج.
+To publish: {0},للنشر: {0}
+Needs stock,يحتاج إلى مخزون
+1 variant.,متغيّر واحد.
+1 will leave the store,سيغادر واحد المتجر
+A new size takes the price of its {0}. A new {0} takes the product price and starts as a draft.,يأخذ المقاس الجديد سعر {0} الخاص به. يأخذ {0} الجديد سعر المنتج ويبدأ كمسودة.
+Add options,إضافة خيارات
+Add photos,إضافة صور
+Adding options replaces the current item,إضافة الخيارات تستبدل الصنف الحالي
+All sizes,كل المقاسات
+Cover photo changed,تم تغيير صورة الغلاف
+Drop images here or click to choose.,أفلت الصور هنا أو انقر للاختيار.
+Each {0} has one price for all its sizes.,لكل {0} سعر واحد لجميع مقاساته.
+Hide sizes of {0},إخفاء مقاسات {0}
+Like color or material. Sizes are picked below.,مثل اللون أو الخامة. تُختار المقاسات أدناه.
+Make cover,تعيين كغلاف
+Nothing has changed yet.,لم يتغير شيء بعد.
+Past orders keep them. Tick one again to bring it back with its stock and price.,تحتفظ بها الطلبات السابقة. حدّد أحدها مجددًا لإعادته بمخزونه وسعره.
+Photo actions,إجراءات الصورة
+Photo removed.,تمت إزالة الصورة.
+Photos save as you add them.,تُحفظ الصور فور إضافتها.
+Price updated for 1 color,تم تحديث السعر للون واحد
+Price updated for {0},تم تحديث السعر لـ {0}
+Price updated for {0} colors,تم تحديث السعر لـ {0} ألوان
+Price updated for {0} of {1} colors. {2} failed,تم تحديث السعر لـ {0} من {1} ألوان. فشل {2}
+Remove original price,إزالة السعر الأصلي
+Same price for every size of {0}.,السعر نفسه لكل مقاسات {0}.
+Same price for every size.,السعر نفسه لكل المقاسات.
+Save changes,حفظ التغييرات
+Save price,حفظ السعر
+Sell this in more than one size or color.,بِع هذا المنتج بأكثر من مقاس أو لون.
+Show sizes of {0},عرض مقاسات {0}
+The current item goes off sale and keeps its past orders. The new variants start with no stock.,يتوقف بيع الصنف الحالي ويحتفظ بطلباته السابقة. تبدأ المتغيّرات الجديدة بلا مخزون.
+The current item goes off sale and keeps its {0} in stock and its past orders. The new variants start with no stock: use Add stock after saving.,يتوقف بيع الصنف الحالي ويحتفظ بمخزونه البالغ {0} وطلباته السابقة. تبدأ المتغيّرات الجديدة بلا مخزون: استخدم إضافة مخزون بعد الحفظ.
+Undo,تراجع
+"Unticked variants leave the store, they are not deleted",المتغيّرات غير المحددة تغادر المتجر ولا تُحذف
+{0} back in the store,{0} عاد إلى المتجر
+{0} is now a draft,{0} أصبح مسودة الآن
+{0} taken out of the store,{0} أُزيل من المتجر
+{0} variants.,{0} متغيّرات.
+{0} will leave the store,سيغادر {0} المتجر
+Checking your columns…,جارٍ التحقق من أعمدتك…
+Your columns could not be checked. Try again.,تعذّر التحقق من أعمدتك. حاول مرة أخرى.
+Pick a collection for your products.,اختر مجموعة لمنتجاتك.
+Match a column to {0} to continue.,طابق عمودًا مع {0} للمتابعة.
+Reading your file…,جارٍ قراءة ملفك…
+Adding your photos…,جارٍ إضافة صورك…
+Upload a file to continue.,ارفع ملفًا للمتابعة.
+No rows are ready. Fix your file and upload it again.,لا توجد صفوف جاهزة. أصلح ملفك وارفعه مرة أخرى.
+Loading your items…,جارٍ تحميل أصنافك…
+Pick at least one item.,اختر صنفًا واحدًا على الأقل.
+Skip photos,تخطَّ الصور
+Products sell far better with a photo. You can also skip this and add them from each product page later.,تُباع المنتجات بشكل أفضل بكثير مع صورة. يمكنك أيضًا تخطي هذه الخطوة وإضافتها لاحقًا من صفحة كل منتج.
+Several at once,عدة صور معًا
+{0} of {1} photos matched.,طوبقت {0} من {1} صور.
+{0} of {1} still need a photo.,{0} من {1} ما زالت تحتاج إلى صورة.
+"Name each photo after the product and its color, like oversized-tee-black.jpg, and add -1, -2, -3 for extra shots. The first photo for a color becomes its main photo.",سمِّ كل صورة باسم المنتج ولونه، مثل oversized-tee-black.jpg، وأضف ‎-1 و‎-2 و‎-3 للصور الإضافية. تصبح أول صورة للون صورته الرئيسية.
+Many products to go,ما زالت منتجات كثيرة
+"For {0} products and colors, adding several named photos at once is far quicker.",مع {0} من المنتجات والألوان، إضافة عدة صور مسمّاة معًا أسرع بكثير.
+{0} could not go live yet. Open them from your products to finish them.,تعذّر نشر {0} بعد. افتحها من منتجاتك لإكمالها.
+Customers can find them on your store now.,يمكن للعملاء العثور عليها في متجرك الآن.
+"Fix the rows below in your file, then import it again.",أصلح الصفوف أدناه في ملفك، ثم استورده مرة أخرى.
+"Drafts are not on your store yet. Publish them now, or later from each product page.",المسودات ليست في متجرك بعد. انشرها الآن، أو لاحقًا من صفحة كل منتج.
+Importing your products,جارٍ استيراد منتجاتك
+Adding 1 product as a draft…,جارٍ إضافة منتج واحد كمسودة…
+Adding {0} products as drafts…,جارٍ إضافة {0} منتجات كمسودات…
+"This is taking longer than usual. It is still running: you can close this window, and the products appear in your catalog when it finishes.",يستغرق هذا وقتًا أطول من المعتاد. ما زال يعمل: يمكنك إغلاق هذه النافذة، وستظهر المنتجات في كتالوجك عند انتهائه.
+{0} added to them.,أُضيفت إليها {0}.
+View products,عرض المنتجات
+1 row was skipped,تم تخطي صف واحد
+{0} rows were skipped,تم تخطي {0} صفوف
+Photos that did not attach,صور لم تُرفق
+Add them from each product page.,أضفها من صفحة كل منتج.
+1 product added as a draft,أُضيف منتج واحد كمسودة
+{0} products added as drafts,أُضيفت {0} منتجات كمسودات
+"A CSV or Excel file with one row per product, or per color and size of it. Only a title and a price are needed, and the columns can have any names.",ملف CSV أو Excel فيه صف لكل منتج، أو لكل لون ومقاس منه. لا يلزم إلا العنوان والسعر، ويمكن أن تحمل الأعمدة أي أسماء.
+.csv or .xlsx,.csv أو ‎.xlsx
+1 row,صف واحد
+Remove it and try another file.,أزله وجرّب ملفًا آخر.
+"The first {0} of {1} rows, as they are in your file.",أول {0} من {1} صفوف، كما هي في ملفك.
+"A CSV or Excel file, exported from anywhere or filled in from our template.",ملف CSV أو Excel، مُصدَّر من أي مكان أو مملوء من قالبنا.
+You can import again later from the other one.,يمكنك الاستيراد لاحقًا من المصدر الآخر.
+"Shopify, WooCommerce and more are coming soon.",Shopify وWooCommerce وغيرها قريبًا.
+Check before importing,راجع قبل الاستيراد
+"Nothing is saved yet. Every product is added as a draft, so nothing is on your store until you publish it. Rows with an error are skipped.",لم يُحفظ شيء بعد. يُضاف كل منتج كمسودة، فلا يظهر شيء في متجرك حتى تنشره. تُتخطى الصفوف التي فيها خطأ.
+No rows here.,لا توجد صفوف هنا.
+We matched {0} of {1} columns for you. Columns set to Don't import are left out.,طابقنا لك {0} من {1} أعمدة. تُترك الأعمدة المضبوطة على «لا تستورد».
+Use our suggestions,استخدم اقتراحاتنا
+Pick the column that holds it in the list next to that column.,اختره من القائمة بجوار العمود الذي يحتويه.
+Field for {0},حقل {0}
+Check this,تحقق من هذا
+Your file has no collection column. Put every product in:,لا يحتوي ملفك على عمود للمجموعة. ضع كل المنتجات في:
+You can move products to other collections later.,يمكنك نقل المنتجات إلى مجموعات أخرى لاحقًا.
+<1 KB,أقل من 1 ك.ب
+{0} KB,{0} ك.ب
+{0} MB,{0} م.ب
+Import 1 product (1 variant),استيراد منتج واحد (متغيّر واحد)
+Import 1 product ({0} variants),استيراد منتج واحد ({0} متغيّرات)
+Import {0} products (1 variant),استيراد {0} منتجات (متغيّر واحد)
+Import {0} products ({1} variants),استيراد {0} منتجات ({1} متغيّرات)
+1 warning,تحذير واحد
+{0} warnings,{0} تحذيرات
+1 row skipped,تم تخطي صف واحد
+{0} rows skipped,تم تخطي {0} صفوف
+No products were added,لم تُضف أي منتجات
+Color and size,اللون والمقاس
+Color only,اللون فقط
+Match a column to {0} first,طابق عمودًا مع {0} أولًا
+These are not fields a product can be imported into: {0},هذه ليست حقولًا يمكن استيراد منتج إليها: {0}
+"{0} ""{1}"" is not a number",{0} «{1}» ليس رقمًا
+Product title is missing,عنوان المنتج مفقود
+Collection is missing,المجموعة مفقودة
+"Collection ""{0}"" does not exist. Create it first",المجموعة «{0}» غير موجودة. أنشئها أولًا
+Price is missing,السعر مفقود
+"Duplicate of row {0} (same title, color and size)",مكرر للصف {0} (العنوان واللون والمقاس نفسها)
+"Collection does not match row {0} for ""{1}"" ({2})",المجموعة لا تطابق الصف {0} لـ«{1}» ({2})
+"Price does not match row {0} for ""{1}"". One price applies to the whole product",السعر لا يطابق الصف {0} لـ«{1}». ينطبق سعر واحد على المنتج كله
+"Row {0} of ""{1}"" differs: give every row of a product a color, or none",الصف {0} من «{1}» مختلف: أعطِ كل صفوف المنتج لونًا، أو لا تعطِ أيًّا منها
+"Row {0} of ""{1}"" differs: give every row of a product a size, or none",الصف {0} من «{1}» مختلف: أعطِ كل صفوف المنتج مقاسًا، أو لا تعطِ أيًّا منها
+Will be added,ستُضاف
+Will leave the store,ستغادر المتجر
+"{0} in size {1}, will be added",{0} بالمقاس {1}، ستُضاف
+"{0} in size {1}, will leave the store",{0} بالمقاس {1}، ستغادر المتجر
+"Image not found on this variant: {0}","الصورة غير موجودة في هذا المتغيّر: {0}"
