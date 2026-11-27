@@ -281,16 +281,16 @@ function collectionSummary(product) {
     </div>
 
     <div class="mt-3 overflow-x-auto">
-      <!-- 54rem is the width the five columns need; a phone gets two of them, because a scroll the
+      <!-- 57rem is the width the five columns need; a phone gets two of them, because a scroll the
            reader cannot see reads as a rendering fault. Price is the one kept, and status and stock
            move under the title. Do not lower the `min-w`: below the columns' own sum the 1fr track
            collapses to zero and the product cell disappears. -->
       <List
       v-model:selection="selection"
-      class="sm:min-w-[54rem]"
+      class="sm:min-w-[57rem]"
       :selectable="selecting"
       :row-height="Math.max(ia.density, 44)"
-      :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['1fr', '7rem', '8rem', '8rem', '7rem'] }"
+      :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['1fr', '7rem', '11rem', '8rem', '7rem'] }"
     >
       <ListHeader>
         <ListHeaderCellSort :direction="directionFor('title')" @click="toggleSort('title')">
