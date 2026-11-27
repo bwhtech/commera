@@ -2,8 +2,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Alert, Badge, Button, Progress, Spinner } from 'frappe-ui'
-import { closeImport, imp } from '../../../data/importFlow'
-import { stepIndex } from '../../../data/importSteps'
+import { closeImport, goToStep, imp } from '../../../data/importFlow'
 import {
   publishAction,
   publishErpnextImport,
@@ -22,7 +21,7 @@ const needsSize = computed(() => imp.erpnext.published?.needs_size ?? [])
 const router = useRouter()
 
 function backToPick() {
-  imp.step = stepIndex('erpnext', 'pick')
+  goToStep('pick')
 }
 
 function finish(path) {
@@ -35,7 +34,7 @@ function finish(path) {
   <div class="space-y-6">
     <template v-if="imp.phase === 'running'">
       <div>
-        <h2 class="text-xl text-ink-gray-9">{{ __('Importing your ERPNext items') }}</h2>
+        <h2 class="text-xl-semibold text-ink-gray-9">{{ __('Importing your ERPNext items') }}</h2>
         <p class="mt-1 text-p-base text-ink-gray-6">{{ __('You can close this window. The import keeps running.') }}</p>
       </div>
 
@@ -63,8 +62,8 @@ function finish(path) {
         <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-red-2 text-ink-red-6">
           <span class="lucide-triangle-alert size-6" aria-hidden="true" />
         </div>
-        <h2 class="mt-4 text-xl text-ink-gray-9">{{ __('The import could not finish') }}</h2>
-        <p class="mx-auto mt-1.5 max-w-[460px] text-p-base text-ink-gray-6">
+        <h2 class="mt-4 text-xl-semibold text-ink-gray-9">{{ __('The import could not finish') }}</h2>
+        <p class="mx-auto mt-1.5 max-w-md text-p-base text-ink-gray-6">
           {{
             imp.erpnext.error ||
             __('It stopped before the end. The products it already made are kept, so running it again picks up the rest.')
@@ -83,39 +82,38 @@ function finish(path) {
           <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-gray-2 text-ink-gray-7">
             <span class="lucide-package-check size-6" aria-hidden="true" />
           </div>
-          <h2 class="mt-4 text-2xl text-ink-gray-9">{{ status?.created === 1 ? __('1 product is ready as a draft') : __('{0} products are ready as drafts', [status?.created ?? 0]) }}</h2>
-          <p class="mx-auto mt-1.5 max-w-[460px] text-p-base text-ink-gray-6">
-            {{ __('Publish them to put them on your storefront.') }}
+          <h2 class="mt-4 text-xl-semibold text-ink-gray-9">{{ status?.created === 1 ? __('1 product added as a draft') : __('{0} products added as drafts', [status?.created ?? 0]) }}</h2>
+          <p class="mx-auto mt-1.5 max-w-md text-p-base text-ink-gray-6">
+            {{ __('Drafts are not on your store yet. Publish them now, or later from each product page.') }}
           </p>
           <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
             <Button
               variant="solid"
               theme="gray"
-              icon-left="lucide-rocket"
               :label="__('Publish all')"
               :loading="publishAction.loading"
               @click="publishErpnextImport"
             />
-            <Button :label="__('View my products')" @click="finish('/products')" />
+            <Button :label="__('View products')" @click="finish('/products')" />
           </div>
         </template>
 
         <template v-else>
           <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-green-2 text-ink-green-7">
-            <span class="lucide-party-popper size-6" aria-hidden="true" />
+            <span class="lucide-circle-check size-6" aria-hidden="true" />
           </div>
-          <h2 class="mt-4 text-2xl text-ink-gray-9">{{ imp.erpnext.published.published === 1 ? __('1 product is live') : __('{0} products are live', [imp.erpnext.published.published]) }}</h2>
-          <p class="mx-auto mt-1.5 max-w-[460px] text-p-base text-ink-gray-6">
+          <h2 class="mt-4 text-xl-semibold text-ink-gray-9">{{ imp.erpnext.published.published === 1 ? __('1 product is live') : __('{0} products are live', [imp.erpnext.published.published]) }}</h2>
+          <p class="mx-auto mt-1.5 max-w-md text-p-base text-ink-gray-6">
             {{
               needsSize.length === 1
                 ? __('1 product needs a size before it can go live.')
                 : needsSize.length
                   ? __('{0} need a size before they can go live.', [needsSize.length])
-                  : __('Every imported product is on your storefront.')
+                  : __('Customers can find them on your store now.')
             }}
           </p>
           <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
-            <Button variant="solid" theme="gray" :label="__('View my products')" @click="finish('/products')" />
+            <Button variant="solid" theme="gray" :label="__('View products')" @click="finish('/products')" />
             <Button :label="__('Back to overview')" @click="finish('/')" />
           </div>
         </template>

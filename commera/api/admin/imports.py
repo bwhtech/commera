@@ -10,263 +10,72 @@ import re
 import frappe
 from frappe import _
 from frappe.utils import create_batch
-from frappe.utils.csvutils import read_csv_content
 from frappe.utils.data import cint, cstr, flt
-from frappe.utils.xlsxutils import build_xlsx_response, read_xlsx_file_from_attached_file
+from frappe.utils.xlsxutils import build_xlsx_response
 
-from commera.api.admin.catalog import create_product
+from commera.api.admin.catalog import (
+	DEFAULT_OPTION_VALUE,
+	DEFAULT_SIZE_VALUE,
+	create_product,
+	get_collections,
+)
+from commera.api.admin.import_rows import (
+	FIELD_LABELS,
+	TEMPLATE_HEADERS,
+	get_image_group_key,
+	group_valid_rows,
+	parse_and_validate,
+)
+from commera.commera_ecommerce.doctype.bulk_publish_variants.bulk_publish_variants import publish_variants
+from commera.commera_ecommerce.doctype.commera_settings.editor_input import parse_list
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
-TEMPLATE_HEADERS = [
-	"Product Title",
-	"Collection",
-	"Color",
-	"Size",
-	"Price",
-	"Discounted price",
-	"Stock",
-]
-
-# Every field an importer accepts, in TEMPLATE_HEADERS order, with the synonyms an uploaded file's
-# own header row is matched against (case/space/punctuation-insensitive) — see suggest_mapping().
-FIELD_SYNONYMS = {
-	"title": ["product title", "title", "product name", "name"],
-	"collection": ["collection", "category", "item group"],
-	"color": ["color", "colour"],
-	"size": ["size"],
-	"compare_at_price": ["price", "compare at price", "mrp", "compare at", "list price", "regular price"],
-	"sale_price": ["discounted price", "selling price", "sale price"],
-	"stock": ["stock", "quantity", "qty", "stock quantity", "qty on hand"],
-}
-FIELD_LABELS = dict(zip(FIELD_SYNONYMS, TEMPLATE_HEADERS, strict=True))
-REQUIRED_FIELDS = ["title", "collection", "color", "size", "sale_price"]
-
-# Every product this importer creates uses this store's own Color/Size attributes — the same two
-# create_product's own Trap 2 guard requires (generate_variants() depends on the exact name "Size").
+# Products with a color use this store's own Color attribute.
 OPTION_ATTRIBUTE = "Color"
-SIZE_ATTRIBUTE = "Size"
-
-
-def normalize_header(text):
-	return "".join(ch for ch in cstr(text).strip().casefold() if ch.isalnum() or ch == " ").strip()
 
 
 @frappe.whitelist()
 def download_product_template():
-	"""A ready-to-fill spreadsheet whose header row matches parse_and_validate() column for column."""
+	"""A ready-to-fill spreadsheet whose header row matches parse_and_validate() column for column. The
+	mug row shows that color and size are optional."""
 	frappe.has_permission("Item", ptype="create", throw=True)
 
-	example_collection = frappe.db.get_value("Item Group", {"is_group": 0}) or "Apparel"
+	collections = get_collections()
+	example_collection = collections[0] if collections else ""
 	example_rows = [
-		["Cotton Oversized Tee", example_collection, "Black", "M", 1299, 999, 24],
-		["Cotton Oversized Tee", example_collection, "Black", "L", 1299, 999, 18],
-		["Cotton Oversized Tee", example_collection, "Sand", "M", 1299, 999, 12],
+		["Cotton Oversized Tee", example_collection, "Black", "M", 999, 1299, 24],
+		["Cotton Oversized Tee", example_collection, "Black", "L", 999, 1299, 18],
+		["Cotton Oversized Tee", example_collection, "Sand", "M", 999, 1299, 12],
+		["Ceramic Mug", example_collection, "", "", 450, "", 10],
 	]
 	build_xlsx_response([TEMPLATE_HEADERS, *example_rows], "Product import template")
 
 
-def read_uploaded_rows(file_url):
-	"""The file's raw grid, header row included, blank rows dropped."""
-	file_doc = frappe.get_doc("File", {"file_url": file_url})
-	if cstr(file_doc.file_name).lower().endswith(".csv"):
-		rows = read_csv_content(file_doc.get_content())
-	else:
-		rows = read_xlsx_file_from_attached_file(file_url=file_url)
-	return [row for row in rows if any(cstr(cell).strip() for cell in row)]
+def get_product_options(rows):
+	"""What create_product needs for one product: (option attribute, option_sizes)."""
+	if any(row["color"] for row in rows):
+		sizes_by_color = {}
+		for row in rows:
+			sizes = sizes_by_color.setdefault(row["color"], [])
+			if row["size"]:
+				sizes.append(row["size"])
+		return OPTION_ATTRIBUTE, [
+			{"option": color, "sizes": sizes} for color, sizes in sizes_by_color.items()
+		]
+	sizes = [row["size"] for row in rows if row["size"]]
+	if not sizes:
+		return None, []
+	# No attribute: create_product hangs sizes alone on its own hidden option, as it does for no options.
+	return None, [{"option": DEFAULT_OPTION_VALUE, "sizes": sizes}]
 
 
-def suggest_mapping(headers):
-	"""Best-guess header -> field, so a file built from download_product_template() maps itself."""
-	mapping = {}
-	confidence = {}
-	for header in headers:
-		normalized = normalize_header(header)
-		field, level = "", "none"
-		for candidate, synonyms in FIELD_SYNONYMS.items():
-			if normalized == synonyms[0]:
-				field, level = candidate, "high"
-				break
-			if normalized in synonyms:
-				field, level = candidate, "medium"
-				break
-		mapping[header] = field
-		confidence[header] = level
-	return mapping, confidence
+def get_variant_option(row):
+	"""The option value a row's variant carries, casefolded as Style Attribute Variant lookups are."""
+	return cstr(row["color"] or DEFAULT_OPTION_VALUE).casefold()
 
 
-def parse_and_validate(file_url: str, column_mapping: dict | None = None):
-	"""One dry-run pass over the file: every row comes back with its own issue, or none. Nothing is
-	written here — this is what both the Review step and run_import()'s own safety check share."""
-	rows = read_uploaded_rows(file_url)
-	if not rows:
-		frappe.throw(_("The file has no rows"))
-
-	headers = [cstr(cell) for cell in rows[0]]
-	data_rows = rows[1:]
-
-	suggested_mapping, confidence = suggest_mapping(headers)
-	mapping = (
-		{header: column_mapping.get(header, "") for header in headers}
-		if column_mapping
-		else suggested_mapping
-	)
-
-	# A sheet with one price column is what the shopper pays, never a crossed-out price on its own.
-	if "sale_price" not in mapping.values():
-		mapping = {
-			header: "sale_price" if field == "compare_at_price" else field
-			for header, field in mapping.items()
-		}
-
-	missing_required = [FIELD_LABELS[field] for field in REQUIRED_FIELDS if field not in mapping.values()]
-	if missing_required:
-		frappe.throw(_("These columns are not mapped: {0}").format(", ".join(missing_required)))
-
-	column_index_by_field = {}
-	for index, header in enumerate(headers):
-		field = mapping.get(header)
-		if field:
-			column_index_by_field.setdefault(field, index)
-
-	def cell(row, field):
-		index = column_index_by_field.get(field)
-		return row[index] if index is not None and index < len(row) else None
-
-	def as_amount(raw, label, issue_holder):
-		# flt() swallows a bad string down to 0.0 instead of raising, which would silently turn
-		# "not-a-number" into an unpriced row — parse strictly here so that surfaces as an error.
-		if raw in (None, ""):
-			return 0
-		try:
-			return flt(float(cstr(raw).replace(",", "").strip()))
-		except (TypeError, ValueError):
-			issue_holder.setdefault("issue", {"level": "error", "text": f'{label} "{raw}" is not a number'})
-			return 0
-
-	parsed_rows = []
-	seen_variants = {}
-	product_first_row = {}
-	for offset, row in enumerate(data_rows):
-		row_number = offset + 2  # +1 for the header row, +1 for 1-indexed row numbers
-		title = cstr(cell(row, "title")).strip()
-		collection = cstr(cell(row, "collection")).strip()
-		color = cstr(cell(row, "color")).strip()
-		size = cstr(cell(row, "size")).strip()
-
-		holder = {}
-		compare_at_price = as_amount(cell(row, "compare_at_price"), "Price", holder)
-		sale_price = as_amount(cell(row, "sale_price"), "Discounted price", holder)
-		stock = as_amount(cell(row, "stock"), "Stock", holder)
-		issue = holder.get("issue")
-
-		if not issue and not title:
-			issue = {"level": "error", "text": "Product title is missing"}
-		if not issue and not collection:
-			issue = {"level": "error", "text": "Collection is missing"}
-		elif not issue and not frappe.db.exists("Item Group", collection):
-			issue = {"level": "error", "text": f'Collection "{collection}" does not exist. Create it first'}
-		if not issue and not color:
-			issue = {"level": "error", "text": "Color is missing"}
-		if not issue and not size:
-			issue = {"level": "error", "text": "Size is missing"}
-
-		if not issue and title:
-			variant_key = (title.casefold(), color.casefold(), size.casefold())
-			if variant_key in seen_variants:
-				issue = {
-					"level": "error",
-					"text": f"Duplicate of row {seen_variants[variant_key]} (same title, colour and size)",
-				}
-			else:
-				seen_variants[variant_key] = row_number
-
-		if not issue and title:
-			first = product_first_row.get(title.casefold())
-			if first is None:
-				product_first_row[title.casefold()] = {
-					"row": row_number,
-					"collection": collection,
-					"compare_at_price": compare_at_price,
-					"sale_price": sale_price,
-				}
-			elif collection and collection != first["collection"]:
-				issue = {
-					"level": "error",
-					"text": f'Collection does not match row {first["row"]} for "{title}" ({first["collection"]})',
-				}
-			elif compare_at_price != first["compare_at_price"] or sale_price != first["sale_price"]:
-				issue = {
-					"level": "error",
-					"text": (
-						f'Price does not match row {first["row"]} for "{title}". '
-						"One price applies to the whole product"
-					),
-				}
-
-		if not issue and not sale_price:
-			issue = {"level": "error", "text": "Discounted price is missing"}
-		if not issue and compare_at_price and compare_at_price <= sale_price:
-			issue = {"level": "error", "text": "Price must be higher than the discounted price"}
-
-		parsed_rows.append(
-			{
-				"row": row_number,
-				"title": title,
-				"collection": collection,
-				"color": color,
-				"size": size,
-				"compare_at_price": compare_at_price,
-				"sale_price": sale_price,
-				"stock": stock,
-				"issue": issue,
-			}
-		)
-
-	groups = group_valid_rows(parsed_rows)
-	counts = {
-		"total": len(parsed_rows),
-		"errors": sum(1 for row in parsed_rows if row["issue"] and row["issue"]["level"] == "error"),
-		"warnings": sum(1 for row in parsed_rows if row["issue"] and row["issue"]["level"] == "warning"),
-		"ready": sum(1 for row in parsed_rows if not row["issue"] or row["issue"]["level"] == "warning"),
-		"products": len(groups),
-	}
-
-	return {
-		"headers": headers,
-		"mapping": mapping,
-		"confidence": confidence,
-		"rows": parsed_rows,
-		"counts": counts,
-	}
-
-
-def group_valid_rows(parsed_rows):
-	"""One entry per product title with zero error rows — only these are ever written. A title
-	whose every row errors, or whose only clean rows are duplicates of an error, never groups."""
-	groups = {}
-	order = []
-	for row in parsed_rows:
-		if row["issue"] and row["issue"]["level"] == "error":
-			continue
-		key = row["title"].casefold()
-		if key not in groups:
-			groups[key] = {
-				"title": row["title"],
-				"collection": row["collection"],
-				"compare_at_price": row["compare_at_price"],
-				"sale_price": row["sale_price"],
-				"rows": [],
-			}
-			order.append(key)
-		groups[key]["rows"].append(row)
-	return [groups[key] for key in order]
-
-
-def group_to_option_sizes(rows):
-	option_sizes = {}
-	for row in rows:
-		option_sizes.setdefault(row["color"], []).append(row["size"])
-	return [{"option": option, "sizes": sizes} for option, sizes in option_sizes.items()]
+def get_variant_size(row):
+	return cstr(row["size"] or DEFAULT_SIZE_VALUE).casefold()
 
 
 def slugify(text):
@@ -275,14 +84,9 @@ def slugify(text):
 	return re.sub(r"[^a-z0-9]+", "-", cstr(text).casefold()).strip("-")
 
 
-def get_image_group_key(title, color):
-	"""Photos hang off the colour-level Style Attribute Variant, not off a size, so the unit a photo
-	belongs to is one colour of one product group — group_valid_rows' own key plus the colour."""
-	return f"{cstr(title).casefold()}::{cstr(color).casefold()}"
-
-
 def get_image_groups(parsed_rows):
-	"""One entry per colour of every product group that validated clean — what a photo can land on."""
+	"""One entry per color of every product group that validated clean, which is what a photo can land on.
+	A product without colors is one group, named by its title alone."""
 	groups = {}
 	for group in group_valid_rows(parsed_rows):
 		for row in group["rows"]:
@@ -292,7 +96,7 @@ def get_image_groups(parsed_rows):
 					"key": key,
 					"title": group["title"],
 					"color": row["color"],
-					"slug": f"{slugify(group['title'])}-{slugify(row['color'])}",
+					"slug": "-".join(filter(None, [slugify(group["title"]), slugify(row["color"])])),
 				}
 	return list(groups.values())
 
@@ -381,17 +185,36 @@ def read_uploaded_image_files(image_files):
 	return uploaded_files
 
 
+def read_column_mapping(column_mapping):
+	return frappe.parse_json(column_mapping) if isinstance(column_mapping, str) else column_mapping
+
+
+def parse_complete_file(file_url, column_mapping, default_collection):
+	"""Refuses a file whose required fields are still unmatched: the dashboard cannot leave the Map step
+	that way, so reaching here with one missing is a bug, not a merchant mistake."""
+	result = parse_and_validate(file_url, column_mapping, default_collection)
+	if result["missing"]:
+		frappe.throw(
+			_("Match a column to {0} first").format(
+				", ".join(_(FIELD_LABELS[field]) for field in result["missing"])
+			)
+		)
+	return result
+
+
 @frappe.whitelist(methods=["POST"])
 def match_import_images(
-	file_url: str, column_mapping: dict | str | None = None, image_files: list | str | None = None
+	file_url: str,
+	column_mapping: dict | str | None = None,
+	image_files: list | str | None = None,
+	default_collection: str | None = None,
 ):
-	"""Which uploaded photo belongs to which product colour, by file name. Nothing is written."""
+	"""Which uploaded photo belongs to which product color, by file name. Nothing is written."""
 	frappe.has_permission("Item", ptype="create", throw=True)
-	if isinstance(column_mapping, str):
-		column_mapping = frappe.parse_json(column_mapping)
+	column_mapping = read_column_mapping(column_mapping)
 
 	uploaded_files = read_uploaded_image_files(image_files)
-	result = parse_and_validate(file_url, column_mapping)
+	result = parse_complete_file(file_url, column_mapping, default_collection)
 	groups = get_image_groups(result["rows"])
 	matched, unmatched = match_files_to_groups(groups, uploaded_files)
 
@@ -434,65 +257,61 @@ def read_image_assignments(image_assignments):
 	return file_urls_by_key
 
 
-def attach_group_images(item_template, group, file_urls_by_key):
-	"""Hand one product's photos to the colour-level variants they were assigned to, and say how many
-	landed. Every write goes through Style Attribute Variant.add_images, which owns the child rows."""
-	file_urls_by_color = {}
-	for row in group["rows"]:
-		key = get_image_group_key(group["title"], row["color"])
-		# Keyed casefolded, exactly as the group key is: a CSV mixing "Black" and "black" describes
-		# one colour and one variant, and two entries here would attach its photos twice.
-		color = cstr(row["color"]).casefold()
-		if file_urls_by_key.get(key) and color not in file_urls_by_color:
-			file_urls_by_color[color] = file_urls_by_key[key]
-	if not file_urls_by_color:
-		return 0
-
+def get_variant_by_option(item_template):
+	"""{casefolded option value: Style Attribute Variant name} for a just-created product."""
 	configurator = frappe.db.get_value("Style Attribute Configurator", {"item_template": item_template})
 	variants = frappe.get_all(
 		"Style Attribute Variant", filters={"configurator": configurator}, fields=["name", "attribute_value"]
 	)
-	variant_by_option = {cstr(variant.attribute_value).casefold(): variant.name for variant in variants}
+	return {cstr(variant.attribute_value).casefold(): variant.name for variant in variants}
 
+
+def attach_group_images(item_template, group, file_urls_by_key):
+	"""Hand one product's photos to the color-level variants they were assigned to, and say how many
+	landed. Every write goes through Style Attribute Variant.add_images, which owns the child rows."""
+	file_urls_by_option = {}
+	for row in group["rows"]:
+		key = get_image_group_key(group["title"], row["color"])
+		# Keyed casefolded, exactly as the group key is: a CSV mixing "Black" and "black" describes
+		# one color and one variant, and two entries here would attach its photos twice.
+		option = get_variant_option(row)
+		if file_urls_by_key.get(key) and option not in file_urls_by_option:
+			file_urls_by_option[option] = file_urls_by_key[key]
+	if not file_urls_by_option:
+		return 0
+
+	variant_by_option = get_variant_by_option(item_template)
 	attached = 0
-	for color, file_urls in file_urls_by_color.items():
-		variant_name = variant_by_option.get(color)
+	for option, file_urls in file_urls_by_option.items():
+		variant_name = variant_by_option.get(option)
 		if not variant_name:
-			frappe.throw(_("{0} has no {1} to put photos on").format(group["title"], color))
-		# ponytail: one get_doc per colour because add_images validates and saves the variant,
-		# revisit if a single import ever carries more colours than a page of variants.
+			frappe.throw(_("{0} has no {1} to put photos on").format(group["title"], option))
+		# ponytail: one get_doc per color because add_images validates and saves the variant,
+		# revisit if a single import ever carries more colors than a page of variants.
 		frappe.get_doc("Style Attribute Variant", variant_name).add_images(file_urls)
 		attached += len(file_urls)
 	return attached
 
 
 def receive_group_stock(item_template, rows):
-	"""Opening stock for a just-created product, one grouped read plus one receipt per colour —
+	"""Opening stock for a just-created product, one grouped read plus one receipt per color,
 	not one query per row regardless of how many size rows the file had for this product."""
 	rows_with_stock = [row for row in rows if flt(row["stock"]) > 0]
 	if not rows_with_stock:
 		return
 
-	configurator = frappe.db.get_value("Style Attribute Configurator", {"item_template": item_template})
-	variants = frappe.get_all(
-		"Style Attribute Variant", filters={"configurator": configurator}, fields=["name", "attribute_value"]
-	)
-	variant_by_option = {cstr(variant.attribute_value).casefold(): variant.name for variant in variants}
-
+	variant_by_option = get_variant_by_option(item_template)
 	size_items = frappe.get_all(
 		"Color Size Item",
-		filters={
-			"parent": ["in", [variant.name for variant in variants]],
-			"parenttype": "Style Attribute Variant",
-		},
+		filters={"parent": ["in", list(variant_by_option.values())], "parenttype": "Style Attribute Variant"},
 		fields=["parent", "size", "item_code"],
 	)
 	item_code_by_variant_size = {(row.parent, cstr(row.size).casefold()): row.item_code for row in size_items}
 
 	quantities_by_variant = {}
 	for row in rows_with_stock:
-		variant_name = variant_by_option.get(row["color"].casefold())
-		item_code = variant_name and item_code_by_variant_size.get((variant_name, row["size"].casefold()))
+		variant_name = variant_by_option.get(get_variant_option(row))
+		item_code = variant_name and item_code_by_variant_size.get((variant_name, get_variant_size(row)))
 		if item_code:
 			quantities_by_variant.setdefault(variant_name, {})[item_code] = flt(row["stock"])
 
@@ -500,92 +319,110 @@ def receive_group_stock(item_template, rows):
 		frappe.get_doc("Style Attribute Variant", variant_name).receive_stock(quantities)
 
 
+def create_group_product(group):
+	option_attribute, option_sizes = get_product_options(group["rows"])
+	if option_attribute == OPTION_ATTRIBUTE and not frappe.db.exists("Item Attribute", OPTION_ATTRIBUTE):
+		frappe.throw(
+			_('This store has no Item Attribute named "{0}". Create it first.').format(OPTION_ATTRIBUTE)
+		)
+	created_product = create_product(
+		title=group["title"],
+		collection=group["collection"],
+		option_attribute=option_attribute,
+		option_sizes=option_sizes,
+		price=group["compare_at_price"] or group["sale_price"],
+		sale_price=group["sale_price"],
+	)
+	receive_group_stock(created_product["name"], group["rows"])
+	return created_product["name"]
+
+
+def row_messages(rows, message):
+	return [{"row": row["row"], "message": message} for row in rows]
+
+
+def import_group(group, file_urls_by_key, outcome):
+	"""Create one product and attach its photos, each inside its own savepoint, so a product that fails
+	costs only its own rows and photos that fail cost only the photos."""
+	# MariaDB refuses "rollback to savepoint 6e2e6705d9": a savepoint is an identifier, and a
+	# generated hash starts with a digit often enough, so every name here is given a letter first.
+	savepoint = f"product_{frappe.generate_hash(length=10)}"
+	try:
+		frappe.db.savepoint(savepoint)
+		item_template = create_group_product(group)
+	except Exception as creation_error:
+		frappe.db.rollback(save_point=savepoint)
+		outcome["row_errors"] += row_messages(group["rows"], str(creation_error))
+		return
+
+	outcome["created"].append({"item_template": item_template, "title": group["title"]})
+	outcome["used_image_keys"].update(
+		get_image_group_key(group["title"], row["color"]) for row in group["rows"]
+	)
+	image_savepoint = f"images_{frappe.generate_hash(length=10)}"
+	try:
+		frappe.db.savepoint(image_savepoint)
+		outcome["images_attached"] += attach_group_images(item_template, group, file_urls_by_key)
+	except Exception as image_error:
+		frappe.db.rollback(save_point=image_savepoint)
+		outcome["image_errors"] += row_messages(group["rows"], str(image_error))
+
+
+def get_orphan_image_errors(parsed_rows, file_urls_by_key, used_image_keys):
+	"""Photos assigned to a product that was never created, named by the row they came from."""
+	first_row_by_key = {}
+	for row in parsed_rows:
+		first_row_by_key.setdefault(row["image_key"], row)
+	errors = []
+	for key, file_urls in file_urls_by_key.items():
+		if key in used_image_keys or not file_urls:
+			continue
+		row = first_row_by_key.get(key, {})
+		name = " · ".join(filter(None, [row.get("title"), row.get("color")])) or key
+		errors.append(
+			{
+				"row": row.get("row"),
+				"message": _("No product was created for {0}, so its {1} photos were not attached").format(
+					name, len(file_urls)
+				),
+			}
+		)
+	return errors
+
+
 @frappe.whitelist()
-def validate_import(file_url: str, column_mapping: dict | str | None = None):
-	"""The Review step's data — a dry run, nothing written."""
+def validate_import(
+	file_url: str, column_mapping: dict | str | None = None, default_collection: str | None = None
+):
+	"""The Map and Review steps' data: a dry run, nothing written."""
 	frappe.has_permission("Item", ptype="create", throw=True)
-	if isinstance(column_mapping, str):
-		column_mapping = frappe.parse_json(column_mapping)
-	return parse_and_validate(file_url, column_mapping)
+	column_mapping = read_column_mapping(column_mapping)
+	return parse_and_validate(file_url, column_mapping, default_collection)
 
 
 @frappe.whitelist(methods=["POST"])
 def run_import(
-	file_url: str, column_mapping: dict | str | None = None, image_assignments: dict | str | None = None
+	file_url: str,
+	column_mapping: dict | str | None = None,
+	image_assignments: dict | str | None = None,
+	default_collection: str | None = None,
 ):
-	"""Commits every product group that validated clean. A group that fails while being created is rolled
-	back to its own savepoint, and photos are attached after their product exists, inside their own one."""
+	"""Commits every product group that validated clean, as drafts. Publishing is the merchant's next
+	step (publish_imported_products)."""
 	frappe.has_permission("Item", ptype="create", throw=True)
-	if isinstance(column_mapping, str):
-		column_mapping = frappe.parse_json(column_mapping)
+	column_mapping = read_column_mapping(column_mapping)
 	file_urls_by_key = read_image_assignments(image_assignments)
+	result = parse_complete_file(file_url, column_mapping, default_collection)
 
-	if not frappe.db.exists("Item Attribute", OPTION_ATTRIBUTE):
-		frappe.throw(
-			_('This store has no Item Attribute named "{0}". Create it first.').format(OPTION_ATTRIBUTE)
-		)
-	if not frappe.db.exists("Item Attribute", SIZE_ATTRIBUTE):
-		frappe.throw(
-			_('This store has no Item Attribute named "{0}". Create it first.').format(SIZE_ATTRIBUTE)
-		)
-
-	result = parse_and_validate(file_url, column_mapping)
-	groups = group_valid_rows(result["rows"])
-
-	created = []
-	creation_errors = []
-	image_errors = []
-	images_attached = 0
-	used_image_keys = set()
-	for group in groups:
-		# MariaDB refuses "rollback to savepoint 6e2e6705d9" — a savepoint is an identifier, and a
-		# generated hash starts with a digit often enough, so every name here is given a letter first.
-		savepoint = f"product_{frappe.generate_hash(length=10)}"
-		try:
-			frappe.db.savepoint(savepoint)
-			created_product = create_product(
-				title=group["title"],
-				collection=group["collection"],
-				option_attribute=OPTION_ATTRIBUTE,
-				size_attribute=SIZE_ATTRIBUTE,
-				option_sizes=group_to_option_sizes(group["rows"]),
-				price=group["compare_at_price"] or group["sale_price"],
-				sale_price=group["sale_price"],
-			)
-			receive_group_stock(created_product["name"], group["rows"])
-		except Exception as error:
-			frappe.db.rollback(save_point=savepoint)
-			message = str(error)
-			for row in group["rows"]:
-				creation_errors.append({"row": row["row"], "message": message})
-		else:
-			created.append({"item_template": created_product["name"], "title": group["title"]})
-			used_image_keys.update(get_image_group_key(group["title"], row["color"]) for row in group["rows"])
-			image_savepoint = f"images_{frappe.generate_hash(length=10)}"
-			try:
-				frappe.db.savepoint(image_savepoint)
-				images_attached += attach_group_images(created_product["name"], group, file_urls_by_key)
-			except Exception as error:
-				frappe.db.rollback(save_point=image_savepoint)
-				message = str(error)
-				for row in group["rows"]:
-					image_errors.append({"row": row["row"], "message": message})
-
-	row_number_by_key = {}
-	for row in result["rows"]:
-		row_number_by_key.setdefault(get_image_group_key(row["title"], row["color"]), row["row"])
-
-	for key, file_urls in file_urls_by_key.items():
-		if key in used_image_keys or not file_urls:
-			continue
-		image_errors.append(
-			{
-				"row": row_number_by_key.get(key),
-				"message": _("No product was created for {0}, so its {1} photos were not attached").format(
-					key, len(file_urls)
-				),
-			}
-		)
+	outcome = {
+		"created": [],
+		"row_errors": [],
+		"image_errors": [],
+		"images_attached": 0,
+		"used_image_keys": set(),
+	}
+	for group in group_valid_rows(result["rows"]):
+		import_group(group, file_urls_by_key, outcome)
 
 	# Rows that never made it into a group at all kept their own validation message from the dry run.
 	validation_errors = [
@@ -593,12 +430,33 @@ def run_import(
 		for row in result["rows"]
 		if row["issue"] and row["issue"]["level"] == "error"
 	]
+	orphan_errors = get_orphan_image_errors(result["rows"], file_urls_by_key, outcome["used_image_keys"])
 
 	return {
-		"created": created,
-		"created_count": len(created),
-		"row_errors": validation_errors + creation_errors,
+		"created": outcome["created"],
+		"created_count": len(outcome["created"]),
+		"row_errors": validation_errors + outcome["row_errors"],
 		"counts": result["counts"],
-		"images_attached": images_attached,
-		"image_errors": image_errors,
+		"images_attached": outcome["images_attached"],
+		"image_errors": outcome["image_errors"] + orphan_errors,
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def publish_imported_products(item_templates: list | str):
+	"""Publish every draft color of the products one import created: the Done step's Publish all."""
+	frappe.has_permission("Style Attribute Variant", ptype="write", throw=True)
+	item_templates = parse_list(item_templates)
+	drafts = []
+	for chunk in create_batch(item_templates, IN_CLAUSE_CHUNK_SIZE):
+		drafts += frappe.get_all(
+			"Style Attribute Variant",
+			filters={"item_style": ["in", chunk], "is_published": 0},
+			fields=["name", "item_style"],
+		)
+	published = set(publish_variants(1, names=[draft.name for draft in drafts])) if drafts else set()
+	not_published = {draft.item_style for draft in drafts if draft.name not in published}
+	return {
+		"published": len({draft.item_style for draft in drafts} - not_published),
+		"not_published": sorted(not_published),
 	}

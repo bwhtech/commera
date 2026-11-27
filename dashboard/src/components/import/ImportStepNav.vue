@@ -3,39 +3,31 @@ import { computed } from 'vue'
 import { Tooltip } from 'frappe-ui'
 import { canChangeStep, imp, steps } from '../../data/importFlow'
 
-const pct = computed(() => Math.round(((imp.step + 1) / steps.value.length) * 100))
+const percent = computed(() => Math.round(((imp.step + 1) / steps.value.length) * 100))
 
 // Only steps you have already reached are clickable, and none while a step is waiting on the
 // server or after the import landed (see importPhase.js).
-const go = (i) => {
-  if (canChangeStep.value && i <= imp.step) imp.step = i
+function goTo(index) {
+  if (canChangeStep.value && index <= imp.step) imp.step = index
 }
-const state = (i) => (i < imp.step ? 'done' : i === imp.step ? 'current' : 'todo')
 </script>
 
 <template>
-  <div class="space-y-2">
-    <!-- Not items-baseline: the label and hint truncate, and a scroll container
-         synthesizes its baseline from the border box instead of its text. -->
-    <div class="flex items-center gap-2">
-      <span class="min-w-0 truncate text-base-semibold text-ink-gray-8">{{ steps[imp.step].label }}</span>
-      <span class="hidden min-w-0 truncate text-sm text-ink-gray-5 sm:inline">{{ steps[imp.step].hint }}</span>
-      <span class="ms-auto shrink-0 text-sm text-ink-gray-5 tabular-nums">
-        {{ __('Step {0} of {1}', [imp.step + 1, steps.length]) }}
-      </span>
-    </div>
-    <div class="flex gap-1" role="progressbar" :aria-valuenow="pct">
-      <Tooltip v-for="(s, i) in steps" :key="s.key" :text="s.label">
+  <div class="flex items-center gap-3">
+    <div class="flex flex-1 gap-1" role="progressbar" :aria-valuenow="percent">
+      <Tooltip v-for="(step, index) in steps" :key="step.key" :text="step.label">
         <button
           type="button"
           class="h-1 flex-1 rounded-full transition-colors"
-          :class="state(i) === 'todo' ? 'bg-surface-gray-3' : 'bg-surface-gray-7'"
-          :aria-label="s.label"
-          :disabled="!canChangeStep || i > imp.step"
-          @click="go(i)"
+          :class="index > imp.step ? 'bg-surface-gray-3' : 'bg-surface-gray-7'"
+          :aria-label="step.label"
+          :disabled="!canChangeStep || index > imp.step"
+          @click="goTo(index)"
         />
       </Tooltip>
     </div>
+    <span class="shrink-0 text-sm tabular-nums text-ink-gray-5">
+      {{ __('Step {0} of {1}', [imp.step + 1, steps.length]) }}
+    </span>
   </div>
 </template>
-

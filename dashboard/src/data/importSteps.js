@@ -1,23 +1,24 @@
 import { __ } from './translation.js'
 
-const SOURCE_STEP = { key: 'source', label: __('Source'), icon: 'lucide-plug', hint: __('Where the products live today') }
+const SOURCE_STEP = { key: 'source', label: __('Source') }
 
 export const SOURCE_STEPS = {
   csv: [
     SOURCE_STEP,
-    { key: 'upload', label: __('Upload'), icon: 'lucide-file-up', hint: __('Your spreadsheet') },
-    { key: 'map', label: __('Match columns'), icon: 'lucide-arrow-left-right', hint: __('Your headings to ours') },
-    { key: 'images', label: __('Images'), icon: 'lucide-image', hint: __('Photos for each product') },
-    { key: 'review', label: __('Review'), icon: 'lucide-list-checks', hint: __('Check before saving') },
-    { key: 'run', label: __('Import'), icon: 'lucide-rocket', hint: __('Create everything') },
+    { key: 'upload', label: __('Upload') },
+    { key: 'map', label: __('Match columns') },
+    { key: 'images', label: __('Photos') },
+    { key: 'review', label: __('Review') },
+    { key: 'run', label: __('Import') },
   ],
-  erpnext: [
-    SOURCE_STEP,
-    { key: 'pick', label: __('Pick items'), icon: 'lucide-list-checks', hint: __('The ERPNext items to bring in') },
-    { key: 'run', label: __('Import'), icon: 'lucide-rocket', hint: __('Create and publish') },
-  ],
+  erpnext: [SOURCE_STEP, { key: 'pick', label: __('Pick items') }, { key: 'run', label: __('Import') }],
 }
 
-export const stepsFor = (source) => SOURCE_STEPS[source] ?? SOURCE_STEPS.csv
+// The source step is a choice, so it is left out when the spreadsheet is the only source there is.
+export function stepsFor(source, hasSourceChoice = true) {
+  const steps = SOURCE_STEPS[source] ?? SOURCE_STEPS.csv
+  return hasSourceChoice ? steps : steps.filter((step) => step.key !== 'source')
+}
 
-export const stepIndex = (source, key) => stepsFor(source).findIndex((step) => step.key === key)
+export const stepIndex = (source, key, hasSourceChoice = true) =>
+  stepsFor(source, hasSourceChoice).findIndex((step) => step.key === key)

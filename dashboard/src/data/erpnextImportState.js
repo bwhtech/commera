@@ -2,9 +2,9 @@ import { __ } from './translation.js'
 
 export const KIND_LABELS = {
   plain: __('No options'),
-  colour_size: __('Colour and size'),
+  colour_size: __('Color and size'),
   size_only: __('Size only'),
-  colour_only: __('Colour only'),
+  colour_only: __('Color only'),
   other_attributes: __('Other options'),
 }
 

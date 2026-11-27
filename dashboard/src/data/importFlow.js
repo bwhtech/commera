@@ -1,29 +1,14 @@
 // The product import flow: shared state for one run of it. Every step reads and writes the real
-// commera.api.admin.imports endpoints — the spreadsheet is the only source that exists, and photos
-// are matched to a product colour by file name (imports.match_import_images).
+// commera.api.admin.imports endpoints, and photos are matched to a product color by file name
+// (imports.match_import_images).
 import { computed, reactive, ref, watch } from 'vue'
-import { useAdminAction } from './api'
+import { errorMessage } from './errors'
+import { trySubmit, useAdminAction, useAdminRead } from './api'
 import { canMove, createdProducts, isBusy, nextPhase } from './importPhase'
+import { isSameMapping, remapColumn } from './importMapping'
 import { stepIndex, stepsFor } from './importSteps'
-import { __ } from './translation'
 
-export const steps = computed(() => stepsFor(imp.source))
-
-// TARGET_FIELDS/REQUIRED mirror commera.api.admin.imports.FIELD_SYNONYMS/REQUIRED_FIELDS field
-// for field — a mismatch here means a column that maps cleanly on the server shows the wrong
-// label here, not a functional bug, but it would be a confusing one.
-export const TARGET_FIELDS = [
-  { label: __("Don't import"), value: '' },
-  { label: __('Product title'), value: 'title' },
-  { label: __('Collection'), value: 'collection' },
-  { label: __('Colour'), value: 'color' },
-  { label: __('Size'), value: 'size' },
-  { label: __('Price'), value: 'compare_at_price' },
-  { label: __('Discounted price'), value: 'sale_price' },
-  { label: __('Stock'), value: 'stock' },
-]
-
-export const REQUIRED_FIELDS = ['title', 'collection', 'color', 'size']
+export const steps = computed(() => stepsFor(imp.source, imp.hasSourceChoice === true))
 
 // `open` is deliberately not part of this shape: resetImport() runs from openImport() while the
 // dialog is being shown, and clearing `open` there would tear the dialog down as it opens.
@@ -31,12 +16,16 @@ function blankImport() {
   return {
     step: 0,
     source: 'csv',
+    // null until the dialog has asked whether ERPNext has items to bring in; the Source step is
+    // only a step when there is a second source to pick.
+    hasSourceChoice: null,
     imagesMode: 'bulk',
     // See importPhase.js: the one value that says what the flow is waiting on.
     phase: 'idle',
     file: null,
     fileUrl: null,
     parsed: false,
+    fileError: '',
     // Photos: every file the browser has uploaded, the merchant's manual pick per file, what the
     // server matched back, and the {group key: [file_url]} map handed to run_import.
     imageFiles: [],
@@ -44,12 +33,23 @@ function blankImport() {
     imageMatch: null,
     imageAssignments: {},
     reviewFilter: 'all',
+    // `mapping` is what the Map step shows; `checkedMapping` is the one the rows and counts were
+    // computed from. Only when the two agree may the flow leave the Map step.
     mapping: {},
+    checkedMapping: null,
+    checkedCollection: '',
+    checkError: '',
+    suggestedMapping: {},
     confidence: {},
+    missing: [],
+    defaultCollection: '',
     headers: [],
+    preview: [],
+    samples: {},
     rows: [],
-    counts: { total: 0, ready: 0, warnings: 0, errors: 0, products: 0 },
+    counts: { total: 0, ready: 0, warnings: 0, errors: 0, products: 0, variants: 0 },
     created: [],
+    published: null,
     runRowErrors: [],
     runImageErrors: [],
     imagesAttached: 0,
@@ -122,9 +122,13 @@ export function resetImport() {
 // matches are all keyed to its rows, and run_import would otherwise get the old file's photo map.
 // The photos already uploaded are kept: they are the merchant's files, and the next match re-places them.
 export function clearImportFile() {
-  const { step, source, imagesMode, imageFiles } = imp
+  const { step, source, hasSourceChoice, imagesMode, imageFiles, erpnext } = imp
   resetImport()
-  Object.assign(imp, { step, source, imagesMode, imageFiles })
+  Object.assign(imp, { step, source, hasSourceChoice, imagesMode, imageFiles, erpnext })
+}
+
+export function goToStep(key) {
+  imp.step = stepIndex(imp.source, key, imp.hasSourceChoice === true)
 }
 
 export function openImport(source) {
@@ -134,6 +138,7 @@ export function openImport(source) {
   if (imp.phase !== 'running' && !awaitingPublish && (imp.phase === 'done' || imp.file)) resetImport()
   if (typeof source === 'string' && imp.step === 0 && imp.phase === 'idle') {
     imp.source = source
+    imp.hasSourceChoice = true
     imp.step = Math.max(0, stepIndex(source, 'pick'))
   }
   imp.open = true
@@ -143,18 +148,88 @@ export function closeImport() {
   imp.open = false
 }
 
-// One action, shared by the Upload preview, "Use suggestions" in Map, and the final commit — a
-// dry run when called from validate_import, a real write when called from run_import (see RunStep).
+// One action, shared by the Upload preview and every mapping change: a dry run of what run_import
+// would write (see RunStep).
 export const validateImportAction = useAdminAction('imports.validate_import')
 
-export function applyValidation(data) {
+// The Map step's answer, as validate_import, match_import_images and run_import all take it. The
+// collection for every row only applies while no column is matched to Collection.
+export function importParams(mapping = imp.mapping) {
+  const params = { file_url: imp.fileUrl, column_mapping: { ...mapping } }
+  if (!Object.values(mapping).includes('collection') && imp.defaultCollection) params.default_collection = imp.defaultCollection
+  return params
+}
+
+export function applyValidation(data, defaultCollection = imp.defaultCollection) {
   imp.headers = data.headers
-  imp.mapping = data.mapping
+  imp.mapping = { ...data.mapping }
+  imp.checkedMapping = { ...data.mapping }
+  imp.checkedCollection = defaultCollection
+  imp.checkError = ''
+  imp.suggestedMapping = data.suggested_mapping
   imp.confidence = data.confidence
+  imp.missing = data.missing
+  imp.preview = data.preview
+  imp.samples = data.samples
   imp.rows = data.rows
   imp.counts = data.counts
-  // Photo groups are product + colour, read through the mapping, so a new mapping means the old
+  // Photo groups are product + color, read through the mapping, so a new mapping means the old
   // match may name groups that no longer exist. Images re-matches whenever this is empty.
   imp.imageMatch = null
   imp.imageAssignments = {}
+}
+
+export const isMappingChecked = computed(
+  () =>
+    imp.checkedMapping !== null &&
+    isSameMapping(imp.mapping, imp.checkedMapping) &&
+    (Object.values(imp.mapping).includes('collection') || imp.defaultCollection === imp.checkedCollection),
+)
+
+// Checks the mapping on screen. A change made while a check is in flight is kept, and checked as
+// soon as that answer lands, so the rows Review shows are always the current mapping's.
+export async function checkMapping({ useSuggestions = false } = {}) {
+  const ticket = beginPhase('checking')
+  if (ticket === null) return
+  const sentMapping = { ...imp.mapping }
+  const sentCollection = imp.defaultCollection
+  const params = useSuggestions ? { file_url: imp.fileUrl } : importParams(sentMapping)
+  const checked = await trySubmit(validateImportAction, params)
+  if (!endPhase(ticket)) return
+  if (!checked) {
+    imp.checkError = errorMessage(validateImportAction.error)
+    return
+  }
+  const isStale = !useSuggestions && (!isSameMapping(sentMapping, imp.mapping) || sentCollection !== imp.defaultCollection)
+  if (isStale) return checkMapping()
+  applyValidation(validateImportAction.data, sentCollection)
+  await fillDefaultCollection()
+}
+
+export function setColumnField(header, field) {
+  imp.mapping = remapColumn(imp.mapping, header, field)
+  if (imp.phase !== 'checking') checkMapping()
+}
+
+export function setDefaultCollection(collection) {
+  imp.defaultCollection = collection
+  if (imp.phase !== 'checking') checkMapping()
+}
+
+const defaultCollectionRequest = useAdminRead('catalog.get_default_collection', { immediate: false, quiet: true })
+
+// A file with no collection column starts on the collection the Add product dialog starts on,
+// until the merchant picks another.
+export async function fillDefaultCollection() {
+  if (!imp.missing.includes('collection') || imp.defaultCollection) return
+  const collection = await defaultCollectionRequest.fetch()
+  if (collection && !imp.defaultCollection) setDefaultCollection(collection)
+}
+
+export const publishImportAction = useAdminAction('imports.publish_imported_products')
+
+export async function publishImported() {
+  if (imp.published || publishImportAction.loading) return
+  const itemTemplates = imp.created.map((product) => product.item_template)
+  if (await trySubmit(publishImportAction, { item_templates: itemTemplates })) imp.published = publishImportAction.data
 }

@@ -1,6 +1,6 @@
 # Copyright (c) 2026, company@bwhstudios.com and Contributors
-# Tests for imports.run_import's photo half: a product survives its own photos failing, and a
-# malformed image_assignments payload is refused instead of taking the import down with it.
+# Tests for imports: the mapping, the row rules shared with the Add product dialog, run_import's photo
+# half, and Publish all.
 
 import os
 from unittest.mock import patch
@@ -8,13 +8,16 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from commera.api.admin.import_rows import suggest_mapping
 from commera.api.admin.imports import (
 	OPTION_ATTRIBUTE,
-	SIZE_ATTRIBUTE,
 	get_image_group_key,
 	parse_and_validate,
+	publish_imported_products,
 	run_import,
 )
+
+SIZE_ATTRIBUTE = "Size"
 
 TITLE_PREFIX = "ZZ Import"
 
@@ -190,7 +193,7 @@ class TestRunImportImageAssignmentShape(RunImportTestCase):
 
 
 class TestImportPrices(RunImportTestCase):
-	def test_a_row_without_a_discounted_price_is_refused(self):
+	def test_a_row_without_a_price_is_refused(self):
 		file_url = self.make_import_file(
 			[
 				"Product Title,Collection,Color,Size,Price,Discounted price,Stock",
@@ -200,7 +203,7 @@ class TestImportPrices(RunImportTestCase):
 
 		issue = parse_and_validate(file_url)["rows"][0]["issue"]
 
-		self.assertEqual(issue, {"level": "error", "text": "Discounted price is missing"})
+		self.assertEqual(issue, {"level": "error", "text": "Price is missing"})
 
 	def test_a_single_price_column_is_what_the_shopper_pays(self):
 		file_url = self.make_import_file(
@@ -216,7 +219,7 @@ class TestImportPrices(RunImportTestCase):
 		row = result["rows"][0]
 		self.assertEqual((row["sale_price"], row["compare_at_price"], row["issue"]), (120, 0, None))
 
-	def test_a_price_below_the_discounted_price_is_refused(self):
+	def test_an_original_price_below_the_price_is_refused_in_the_add_dialog_words(self):
 		file_url = self.make_import_file(
 			[
 				"Product Title,Collection,Color,Size,Price,Discounted price,Stock",
@@ -226,4 +229,140 @@ class TestImportPrices(RunImportTestCase):
 
 		issue = parse_and_validate(file_url)["rows"][0]["issue"]
 
-		self.assertEqual(issue, {"level": "error", "text": "Price must be higher than the discounted price"})
+		self.assertEqual(issue, {"level": "error", "text": "Original price must be higher than the price."})
+
+	def test_a_plain_price_next_to_a_discounted_price_is_the_original_price(self):
+		mapping, _confidence = suggest_mapping(["Price", "Discounted price"])
+
+		self.assertEqual(mapping, {"Price": "compare_at_price", "Discounted price": "sale_price"})
+
+
+class TestImportMapping(RunImportTestCase):
+	def test_an_unknown_header_is_a_low_confidence_guess_not_a_refusal(self):
+		mapping, confidence = suggest_mapping(
+			["Title", "Variant Size", "Variant Compare At Price", "Variant Price"]
+		)
+
+		self.assertEqual(
+			mapping,
+			{
+				"Title": "title",
+				"Variant Size": "size",
+				"Variant Compare At Price": "compare_at_price",
+				"Variant Price": "sale_price",
+			},
+		)
+		self.assertEqual(confidence["Variant Size"], "low")
+
+	def test_a_file_missing_a_required_column_still_reads(self):
+		"""The Map step is where a missing column is fixed, so reading the file must not refuse it."""
+		file_url = self.make_import_file(["Name,Supplier code", f"{self.title},SUP-1"])
+
+		result = parse_and_validate(file_url)
+
+		self.assertEqual(result["missing"], ["sale_price", "collection"])
+		self.assertEqual(result["rows"], [])
+		self.assertEqual(result["counts"]["total"], 1)
+		self.assertEqual(result["preview"], [[self.title, "SUP-1"]])
+		self.assertEqual(result["samples"]["Supplier code"], "SUP-1")
+
+	def test_run_import_refuses_a_mapping_with_a_required_field_missing(self):
+		file_url = self.make_import_file(["Name,Price", f"{self.title},99"])
+
+		with self.assertRaises(frappe.ValidationError):
+			run_import(file_url)
+
+	def test_one_collection_for_every_row_fills_a_missing_collection_column(self):
+		file_url = self.make_import_file(["Name,Price", f"{self.title},99"])
+
+		result = parse_and_validate(file_url, default_collection=self.collection)
+
+		self.assertEqual(result["missing"], [])
+		self.assertEqual(result["rows"][0]["collection"], self.collection)
+		self.assertIsNone(result["rows"][0]["issue"])
+
+
+class TestImportOptions(RunImportTestCase):
+	def get_sizes(self, item_template):
+		variants = frappe.get_all(
+			"Style Attribute Variant", filters={"item_style": item_template}, pluck="name"
+		)
+		return sorted(
+			frappe.get_all(
+				"Color Size Item",
+				filters={"parent": ["in", variants], "parenttype": "Style Attribute Variant"},
+				pluck="size",
+			)
+		)
+
+	def test_counts_say_products_and_variants_not_rows(self):
+		result = parse_and_validate(self.make_import_file())
+
+		self.assertEqual((result["counts"]["products"], result["counts"]["variants"]), (1, 2))
+
+	def test_a_product_with_no_color_or_size_imports_with_no_variants(self):
+		file_url = self.make_import_file(
+			["Product Title,Collection,Price,Stock", f"{self.title},{self.collection},450,3"]
+		)
+
+		counts = parse_and_validate(file_url)["counts"]
+		result = run_import(file_url)
+
+		self.assertEqual((counts["products"], counts["variants"]), (1, 0))
+		self.assertEqual(result["row_errors"], [])
+		self.assertEqual(len(self.get_sizes(result["created"][0]["item_template"])), 1)
+
+	def test_sizes_without_a_color_become_one_variant_each(self):
+		file_url = self.make_import_file(
+			[
+				"Product Title,Collection,Size,Price",
+				f"{self.title},{self.collection},S,99",
+				f"{self.title},{self.collection},M,99",
+			]
+		)
+
+		result = run_import(file_url)
+
+		self.assertEqual(result["row_errors"], [])
+		self.assertEqual(self.get_sizes(result["created"][0]["item_template"]), ["M", "S"])
+
+	def test_a_product_mixing_rows_with_and_without_a_color_is_an_error(self):
+		file_url = self.make_import_file(
+			[
+				"Product Title,Collection,Color,Size,Price",
+				f"{self.title},{self.collection},{self.color},S,99",
+				f"{self.title},{self.collection},,M,99",
+			]
+		)
+
+		issue = parse_and_validate(file_url)["rows"][1]["issue"]
+
+		self.assertEqual(issue["level"], "error")
+		self.assertIn("color", issue["text"])
+
+	def test_photos_land_on_a_product_with_no_color(self):
+		file_url = self.make_import_file(
+			["Product Title,Collection,Price", f"{self.title},{self.collection},450"]
+		)
+
+		result = run_import(
+			file_url, image_assignments={get_image_group_key(self.title, ""): [self.make_photo()]}
+		)
+
+		self.assertEqual((result["images_attached"], result["image_errors"]), (1, []))
+
+
+class TestPublishImportedProducts(RunImportTestCase):
+	def test_publish_all_puts_every_imported_draft_live(self):
+		result = run_import(self.make_import_file())
+		item_template = result["created"][0]["item_template"]
+
+		published = publish_imported_products([item_template])
+
+		self.assertEqual(published, {"published": 1, "not_published": []})
+		self.assertEqual(
+			frappe.get_all(
+				"Style Attribute Variant", filters={"item_style": item_template}, pluck="is_published"
+			),
+			[1],
+		)
