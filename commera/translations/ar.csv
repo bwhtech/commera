@@ -2720,3 +2720,44 @@ Will leave the store,ستغادر المتجر
 "{0} in size {1}, will be added",{0} بالمقاس {1}، ستُضاف
 "{0} in size {1}, will leave the store",{0} بالمقاس {1}، ستغادر المتجر
 "Image not found on this variant: {0}","الصورة غير موجودة في هذا المتغيّر: {0}"
+Each {0} is a variant you sell and stock.,كل {0} نوع تبيعه وتخزّنه.
+Each size is a variant you sell and stock.,كل مقاس نوع تبيعه وتخزّنه.
+Each {0} and size pair is a variant you sell and stock.,كل زوج من {0} والمقاس نوع تبيعه وتخزّنه.
+Change the title to continue.,غيّر العنوان للمتابعة.
+Fix the original price to continue.,صحّح السعر الأصلي للمتابعة.
+"{0} has no sizes ticked. Tick one, or remove {0} from {1}.",لم يُحدَّد أي مقاس لـ {0}. حدّد مقاسًا واحدًا، أو أزل {0} من {1}.
+Use a different option,استخدم خيارًا آخر
+Add a price before publishing,أضف سعرًا قبل النشر
+Add price,أضف السعر
+"Live, except {0}. {1}.",منشور، باستثناء {0}. {1}.
+{0} · No stock yet,{0} · لا يوجد مخزون بعد
+Price updated,تم تحديث السعر
+Price updated for {0} of {1}. {2} failed,تم تحديث السعر لـ {0} من {1}. فشل {2}
+For {0}.,لـ {0}.
+Edit price and photos,تعديل السعر والصور
+"Unticked variants leave the store but are not deleted: past orders keep them, and ticking one again brings it back with its stock and price.",المتغيّرات غير المحددة تغادر المتجر لكنها لا تُحذف: تحتفظ بها الطلبات السابقة، وتحديد أحدها مجددًا يعيده بمخزونه وسعره.
+1 photo added,أُضيفت صورة واحدة
+{0} photos added,أُضيفت {0} صور
+"A product title cannot start with ""New Item"". Rename it in your file.","لا يمكن أن يبدأ عنوان المنتج بـ ""New Item"". غيّر اسمه في ملفك."
+"A product called ""{0}"" is already in your store. Rename it in your file to add it.","يوجد منتج باسم ""{0}"" في متجرك بالفعل. غيّر اسمه في ملفك لإضافته."
+Original price must be higher than the price. It is left out.,يجب أن يكون السعر الأصلي أعلى من السعر. لذا لن يُضاف.
+"Price does not match row {0}. Every size of {1} in ""{2}"" has the same price","السعر لا يطابق الصف {0}. لكل مقاسات {1} في ""{2}"" السعر نفسه"
+"Price does not match row {0}. Every size of ""{1}"" has the same price","السعر لا يطابق الصف {0}. لكل مقاسات ""{1}"" السعر نفسه"
+{0} has no {1} to price,لا يحتوي {0} على {1} لتسعيره
+Not ready to publish yet,غير جاهز للنشر بعد
+Your file has no product rows. Add some and upload it again.,لا يحتوي ملفك على صفوف منتجات. أضف بعضها وارفعه مرة أخرى.
+Step {0} of {1}: {2},الخطوة {0} من {1}: {2}
+Loading…,جارٍ التحميل…
+{0} of {1} colors have a photo,{0} من {1} ألوان لها صورة
+{0} of {1} products have a photo,{0} من {1} منتجات لها صورة
+{0} of {1} colors still need a photo.,{0} من {1} ألوان ما زالت تحتاج إلى صورة.
+{0} of {1} products still need a photo.,{0} من {1} منتجات ما زالت تحتاج إلى صورة.
+"For {0} colors, adding several named photos at once is far quicker.",مع {0} ألوان، تكون إضافة عدة صور مسمّاة دفعة واحدة أسرع بكثير.
+"For {0} products, adding several named photos at once is far quicker.",مع {0} منتجات، تكون إضافة عدة صور مسمّاة دفعة واحدة أسرع بكثير.
+{0} not live yet,{0} لم تُنشر بعد
+Open {0},فتح {0}
+{0} could not go live yet. Each one below says what it still needs.,تعذّر نشر {0} بعد. يوضح كل منها أدناه ما ينقصه.
+product created,منتج تم إنشاؤه
+"already a product, left alone",منتج موجود، تُرك كما هو
+item that did not import,عنصر لم يُستورد
+No price yet,لا سعر بعد
