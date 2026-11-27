@@ -7,7 +7,10 @@ import frappe
 from commera.api.admin.catalog import (
 	DEFAULT_OPTION_ATTRIBUTE,
 	DEFAULT_OPTION_VALUE,
+	DEFAULT_SIZE_VALUE,
+	SIZE_ATTRIBUTE,
 	create_product,
+	get_attribute_values,
 	get_attributes,
 	get_collections,
 	get_default_collection,
@@ -91,3 +94,24 @@ class TestAddProduct(ProductOnboardingTestCase):
 		self.assertFalse(options["Size"])
 		if DEFAULT_OPTION_ATTRIBUTE in options:
 			self.assertFalse(options[DEFAULT_OPTION_ATTRIBUTE])
+
+	def test_the_pickers_never_offer_the_placeholder_values(self):
+		# A product with no options makes the Title/Standard and Size/One Size values it sells on.
+		self.add_product()
+		self.add_product(option_attribute="Color", option_sizes=[{"option": "", "sizes": ["S"]}])
+		self.assertTrue(
+			frappe.db.exists(
+				"Item Attribute Value", {"parent": SIZE_ATTRIBUTE, "attribute_value": DEFAULT_SIZE_VALUE}
+			)
+		)
+
+		offered_sizes = [row["value"] for row in get_attribute_values(SIZE_ATTRIBUTE)]
+		self.assertIn("S", offered_sizes)
+		self.assertNotIn(DEFAULT_SIZE_VALUE, offered_sizes)
+		self.assertNotIn(
+			DEFAULT_OPTION_VALUE, [row["value"] for row in get_attribute_values(DEFAULT_OPTION_ATTRIBUTE)]
+		)
+
+		values = {row["name"]: [value["value"] for value in row["values"]] for row in get_attributes()}
+		self.assertNotIn(DEFAULT_SIZE_VALUE, values[SIZE_ATTRIBUTE])
+		self.assertNotIn(DEFAULT_OPTION_VALUE, values.get(DEFAULT_OPTION_ATTRIBUTE, []))

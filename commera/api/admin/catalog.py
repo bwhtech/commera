@@ -1039,6 +1039,7 @@ def get_attribute_values(attribute: str):
 		order_by="idx asc",
 		pluck="attribute_value",
 	)
+	values = [value for value in values if not is_placeholder_value(attribute, value)]
 	swatches = get_swatch_map(attribute)
 	usage = get_value_usage_counts([attribute])
 
@@ -1095,7 +1096,8 @@ def get_attributes():
 	)
 	values_by_attribute = {}
 	for row in value_rows:
-		values_by_attribute.setdefault(row.parent, []).append(row.attribute_value)
+		if not is_placeholder_value(row.parent, row.attribute_value):
+			values_by_attribute.setdefault(row.parent, []).append(row.attribute_value)
 
 	usage_by_attribute = get_attribute_usage_counts(attribute_names)
 	usage_by_value = get_value_usage_counts(attribute_names)
@@ -1118,6 +1120,15 @@ def get_attributes():
 		}
 		for name in attribute_names
 	]
+
+
+def is_placeholder_value(attribute: str, value: str) -> bool:
+	"""The hidden value a product with no sizes (One Size) or no options (Standard) sells on. Never offered
+	as a pick: chosen next to real sizes it makes a variant the product page then hides."""
+	return (attribute, value) in (
+		(SIZE_ATTRIBUTE, DEFAULT_SIZE_VALUE),
+		(DEFAULT_OPTION_ATTRIBUTE, DEFAULT_OPTION_VALUE),
+	)
 
 
 def is_option_attribute(name: str, attribute_names: list) -> bool:
