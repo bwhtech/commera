@@ -40,12 +40,15 @@ async function addFiles(files) {
 
   const added = await trySubmit(addAction, { style_attribute_variant: props.variant.name, file_urls: uploaded })
   if (!added) return
-  toast.success(
-    uploaded.length === 1
-      ? __('1 photo added to {0}', [props.variant.option])
-      : __('{0} photos added to {1}', [uploaded.length, props.variant.option]),
-  )
+  toast.success(addedMessage(uploaded.length))
   emit('saved')
+}
+
+function addedMessage(count) {
+  if (isPlaceholder.value) return count === 1 ? __('1 photo added') : __('{0} photos added', [count])
+  return count === 1
+    ? __('1 photo added to {0}', [props.variant.option])
+    : __('{0} photos added to {1}', [count, props.variant.option])
 }
 
 function onFilePicked(event) {

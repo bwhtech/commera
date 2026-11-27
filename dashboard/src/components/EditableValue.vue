@@ -6,7 +6,7 @@
  */
 import { ref, watch } from 'vue'
 import { Button, FormControl, Popover } from 'frappe-ui'
-import { money } from '../data/format'
+import { money, symbolFor } from '../data/format'
 
 const props = defineProps({
   modelValue: { type: Number, required: true },
@@ -21,6 +21,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
+const currency = symbolFor()
 const draft = ref(props.modelValue)
 watch(() => props.modelValue, (value) => (draft.value = value))
 
@@ -65,7 +66,11 @@ function cancel(close) {
           :label="label"
           :description="description"
           @keyup.enter="save(close)"
-        />
+        >
+          <template v-if="format === 'money'" #prefix>
+            <span class="text-base text-ink-gray-5">{{ currency }}</span>
+          </template>
+        </FormControl>
         <div class="flex justify-end gap-2">
           <Button :label="__('Cancel')" @click="cancel(close)" />
           <Button :label="__('Save')" variant="solid" theme="gray" @click="save(close)" />

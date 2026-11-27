@@ -30,7 +30,7 @@ const chosenAttribute = ref('')
 const attributesRequest = useAdminRead('catalog.get_attributes', { immediate: false })
 const attributeOptions = computed(() =>
   (attributesRequest.data ?? [])
-    .filter((attribute) => ![PLACEHOLDER_ATTRIBUTE, 'Size'].includes(attribute.name))
+    .filter((attribute) => attribute.is_option)
     .map((attribute) => ({ label: attribute.name, value: attribute.name })),
 )
 const optionLabel = computed(() =>
@@ -94,11 +94,18 @@ const hasChanges = computed(() => Boolean(addedCount.value || removedCount.value
 const canSave = computed(() => hasChanges.value && !emptyError.value)
 const blockedReason = computed(() => (hasChanges.value ? emptyError.value : __('Nothing has changed yet.')))
 
-const removedHint = __('Past orders keep them. Tick one again to bring it back with its stock and price.')
-const addedHint = computed(() =>
-  __('A new size takes the price of its {0}. A new {0} takes the product price and starts as a draft.', [
-    optionLabel.value.toLowerCase(),
-  ]),
+// What saving does, in one quiet paragraph under the summary rather than a stack of alerts.
+const consequenceHint = computed(() =>
+  [
+    removedCount.value &&
+      __('Unticked variants leave the store but are not deleted: past orders keep them, and ticking one again brings it back with its stock and price.'),
+    addedCount.value &&
+      __('A new size takes the price of its {0}. A new {0} takes the product price and starts as a draft.', [
+        optionLabel.value.toLowerCase(),
+      ]),
+  ]
+    .filter(Boolean)
+    .join(' '),
 )
 
 const currentStock = computed(() =>
@@ -176,7 +183,7 @@ async function save() {
         v-model="sizes"
         v-model:open="sizesOpen"
         attribute="Size"
-        :label="__('Sizes')"
+        :label="__('Size')"
         :placeholder="__('Pick or type a size')"
       />
 
@@ -190,14 +197,10 @@ async function save() {
         :live="[...livePairs]"
       />
 
-      <p v-if="summary" class="text-sm text-ink-gray-5">{{ summary }}</p>
-
-      <Alert
-        v-if="removedCount && !firstOption"
-        :title="__('Unticked variants leave the store, they are not deleted')"
-        :description="removedHint"
-      />
-      <Alert v-if="addedCount && !firstOption" :title="__('Prices are filled in for you')" :description="addedHint" />
+      <div v-if="summary" class="space-y-1">
+        <p class="text-p-sm text-ink-gray-7">{{ summary }}</p>
+        <p v-if="!firstOption && consequenceHint" class="text-p-sm text-ink-gray-5">{{ consequenceHint }}</p>
+      </div>
     </div>
   </FormDialog>
 </template>

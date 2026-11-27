@@ -1,12 +1,33 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { colorLabel, groupSizes, stockRows, totalStock } from '../../src/data/variants.js'
+import {
+  colorLabel,
+  groupSizes,
+  isSizesOnly,
+  priceScopeHint,
+  priceUpdatedMessage,
+  stockRows,
+  totalStock,
+} from '../../src/data/variants.js'
 
 const size = (name, itemCode, stock = 0) => ({ size: name, item_code: itemCode, stock })
 
-test('a color is named by its value, and the hidden color of a sizes-only product reads All sizes', () => {
+test('a color is named by its value, and the hidden color of a sizes-only product has no name', () => {
   assert.equal(colorLabel({ option: 'Black' }), 'Black')
-  assert.equal(colorLabel({ option: 'Standard' }), 'All sizes')
+  assert.equal(colorLabel({ option: 'Standard' }), '')
+  assert.equal(isSizesOnly({ option: 'Standard' }), true)
+  assert.equal(isSizesOnly({ option: 'Black' }), false)
+})
+
+test('the price hint names the color only when it has sizes to share the price', () => {
+  assert.equal(priceScopeHint({ option: 'Black', sizes: [size('S', 'A'), size('M', 'B')] }), 'Same price for every size of Black.')
+  assert.equal(priceScopeHint({ option: 'Standard', sizes: [size('S', 'A')] }), 'Same price for every size.')
+  assert.equal(priceScopeHint({ option: 'Black', sizes: [size('One Size', 'A')] }), '')
+})
+
+test('a price toast never names the hidden color', () => {
+  assert.equal(priceUpdatedMessage({ option: 'Black' }), 'Price updated for Black')
+  assert.equal(priceUpdatedMessage({ option: 'Standard' }), 'Price updated')
 })
 
 test('the hidden One Size is not a size the seller sees', () => {
