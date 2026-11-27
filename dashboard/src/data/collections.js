@@ -15,11 +15,21 @@ const collectionOptions = computed(() =>
   (collectionsRequest.data ?? []).map((name) => ({ label: name, value: name })),
 )
 
+// Callers that ask while a load is in flight share it: a second fetch would abort the first
+// mid-read, and frappe-ui logs that abort as a console error.
+let loading = null
+export function loadCollections() {
+  loading ??= collectionsRequest.fetch().finally(() => {
+    loading = null
+  })
+  return loading
+}
+
 export function useCollections() {
   return {
     collectionOptions,
     loading: computed(() => addAction.loading || removeAction.loading),
-    load: () => collectionsRequest.fetch(),
+    load: loadCollections,
   }
 }
 
@@ -51,7 +61,7 @@ const MODES = {
 export async function pickCollectionFor(itemTemplates, { label, mode = 'add', onDone } = {}) {
   if (!itemTemplates.length) return
 
-  await collectionsRequest.fetch()
+  await loadCollections()
   if (collectionsRequest.error) return
   if (!collectionOptions.value.length) {
     toast.info(__('There are no collections yet. Create one first.'))
