@@ -1,4 +1,5 @@
 import { computed, unref } from 'vue'
+import { __ } from './translation.js'
 
 // What a shopper is actually charged for a priced row (a size, or a pricing-screen row): the
 // storefront reads the sale price list and only falls back to the default one when there is no
@@ -17,23 +18,45 @@ export function compareAtPrice(rated) {
   return compareAt != null && compareAt > shownPrice(rated) ? compareAt : null
 }
 
-export function priceFields(rated) {
-  return { price: compareAtPrice(rated), discountedPrice: rated?.sale_rate ?? rated?.default_rate ?? null }
+// The two price inputs a seller edits: Price, what the customer pays (sale_rate), and the optional
+// Original price shown crossed out next to it (default_rate). Every price form reads and writes
+// through these three, so the label-to-rate mapping lives here only.
+export function priceInputs(rated) {
+  return { price: rated?.sale_rate ?? rated?.default_rate ?? null, originalPrice: compareAtPrice(rated) }
 }
 
 export function hasPrice(rate) {
   return rate != null && rate !== '' && Number(rate) > 0
 }
 
-export function isPriceValid({ price, discountedPrice }) {
-  return !hasPrice(price) || Number(price) > Number(discountedPrice)
+export function isOriginalPriceValid({ price, originalPrice }) {
+  return !hasPrice(originalPrice) || Number(originalPrice) > Number(price)
 }
 
-// An empty Price writes the discounted price to both lists: Item Prices cannot be deleted through
+export function originalPriceError(inputs) {
+  return isOriginalPriceValid(inputs) ? '' : __('Original price must be higher than the price.')
+}
+
+// An empty Original price writes the price to both lists: Item Prices cannot be deleted through
 // the API, and equal rates show nothing crossed out.
+export function priceInputRates({ price, originalPrice }) {
+  const charged = Number(price)
+  return { default_rate: hasPrice(originalPrice) ? Number(originalPrice) : charged, sale_rate: charged }
+}
+
+// ponytail: the pre-rename shape ({ price: crossed-out, discountedPrice: charged }) for the screens
+// not yet moved to priceInputs; delete these three once nothing imports them.
+export function priceFields(rated) {
+  const inputs = priceInputs(rated)
+  return { price: inputs.originalPrice, discountedPrice: inputs.price }
+}
+
+export function isPriceValid({ price, discountedPrice }) {
+  return isOriginalPriceValid({ price: discountedPrice, originalPrice: price })
+}
+
 export function priceRates({ price, discountedPrice }) {
-  const charged = Number(discountedPrice)
-  return { default_rate: hasPrice(price) ? Number(price) : charged, sale_rate: charged }
+  return priceInputRates({ price: discountedPrice, originalPrice: price })
 }
 
 export const PLACEHOLDER_ATTRIBUTE = 'Title'
@@ -47,6 +70,14 @@ export function productOptions(product) {
     options: options.filter((option) => option !== PLACEHOLDER_OPTION),
     sizes: sizes.filter((size) => size !== PLACEHOLDER_SIZE),
   }
+}
+
+// A catalog.get_products row's variants: every colour × size a shopper can buy. A product with no
+// options is the one hidden Standard row with its one hidden size, and has none.
+export function listedVariantCount(product) {
+  const rows = product.variants ?? []
+  const isSingleItem = rows.length === 1 && rows[0].option === PLACEHOLDER_OPTION && rows[0].size_count <= 1
+  return isSingleItem ? 0 : rows.reduce((total, row) => total + row.size_count, 0)
 }
 
 // Everything the product screen needs to summarise a product at a glance,

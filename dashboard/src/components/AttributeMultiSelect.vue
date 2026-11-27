@@ -1,7 +1,7 @@
 <script setup>
 /**
- * Pick attribute values (colours, sizes) from the ones this store already uses, or type
- * one it does not have yet and add it from the search row — catalog.create_product
+ * Pick attribute values (colors, sizes) from the ones this store already uses, or type
+ * one it does not have yet and add it from the list's footer — catalog.create_product
  * appends anything new to the Item Attribute on the way in.
  */
 import { computed, ref, watch } from 'vue'
@@ -36,6 +36,7 @@ watch(
 
 // A value the owner types lives only in this picker until the product is created, so it is held here.
 const addedValues = ref([])
+const query = ref('')
 
 watch(
   () => props.attribute,
@@ -60,11 +61,11 @@ function canAdd(query) {
   return Boolean(typed) && !options.value.some((option) => option.value.toLowerCase() === typed.toLowerCase())
 }
 
-function addTypedValue(query, setQuery) {
-  const typed = query.trim()
+function addTypedValue() {
+  const typed = query.value.trim()
   addedValues.value.push(typed)
   selected.value = [...selected.value, typed]
-  setQuery('')
+  query.value = ''
 }
 </script>
 
@@ -72,6 +73,7 @@ function addTypedValue(query, setQuery) {
   <MultiSelect
     v-model="selected"
     v-model:open="open"
+    v-model:query="query"
     :label="props.label"
     :placeholder="props.placeholder"
     :description="props.description"
@@ -85,14 +87,19 @@ function addTypedValue(query, setQuery) {
     <template #item-prefix="{ item }">
       <SwatchDot v-if="item.color || item.image" :color="item.color" :image="item.image" size="sm" />
     </template>
-    <template #search-suffix="{ query, setQuery }">
-      <Button
-        v-if="canAdd(query)"
-        variant="ghost"
-        icon="lucide-plus"
-        :aria-label="__('Add {0}', [query.trim()])"
-        @click="addTypedValue(query, setQuery)"
-      />
+    <!-- Replaces frappe-ui's Clear All / Select All row: a size list is picked, never bulk-selected. -->
+    <template #footer="{ clear }">
+      <div v-if="canAdd(query) || selected.length" class="border-t border-outline-gray-1 p-1.5">
+        <Button
+          v-if="canAdd(query)"
+          class="w-full justify-start"
+          variant="ghost"
+          icon-left="lucide-plus"
+          :label="__('Add “{0}”', [query.trim()])"
+          @click="addTypedValue"
+        />
+        <Button v-else variant="ghost" size="sm" :label="__('Clear')" @click="clear" />
+      </div>
     </template>
   </MultiSelect>
 </template>

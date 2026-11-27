@@ -24,7 +24,12 @@ from commera.product_collections import (
 	get_product_collections,
 	set_collections,
 )
-from commera.swatches import COLOUR_ATTRIBUTE, ensure_default_swatch, get_swatch_map
+from commera.swatches import (
+	COLOUR_ATTRIBUTE,
+	DUPLICATE_COLOUR_ATTRIBUTE,
+	ensure_default_swatch,
+	get_swatch_map,
+)
 from commera.utils import (
 	IN_CLAUSE_CHUNK_SIZE,
 	get_first_option_photos,
@@ -783,7 +788,7 @@ def get_publish_blockers(sizes):
 @frappe.whitelist()
 def get_collections(search_text: str | None = None):
 	"""The collections a product can be filed under, for the pickers. Leaf Item Groups only, the same
-	rule get_collection enforces on save."""
+	rule get_collection enforces on save, minus the ones ERPNext's setup wizard seeds."""
 	frappe.has_permission("Item Group", ptype="read", throw=True)
 
 	item_group = frappe.qb.DocType("Item Group")
@@ -793,12 +798,65 @@ def get_collections(search_text: str | None = None):
 		frappe.qb.from_(item_group)
 		.select(item_group.name)
 		.where(item_group.rgt == item_group.lft + 1)
+		.where(item_group.name.notin(get_seeded_item_groups()))
 		.orderby(item_group.name)
 		.limit(100)
 	)
 	if search_text:
 		query = query.where(item_group.name.like(f"%{cstr(search_text)}%"))
 	return query.run(pluck=True)
+
+
+@frappe.whitelist()
+def get_default_collection() -> str | None:
+	"""Where a new product most likely goes: the collection the last product was filed under, else the
+	collection the store made last."""
+	frappe.has_permission("Item Group", ptype="read", throw=True)
+
+	item_group = frappe.qb.DocType("Item Group")
+	item = frappe.qb.DocType("Item")
+	sac = frappe.qb.DocType("Style Attribute Configurator")
+	offered = (item_group.rgt == item_group.lft + 1) & item_group.name.notin(get_seeded_item_groups())
+
+	last_used = (
+		frappe.qb.from_(item)
+		.join(sac)
+		.on(sac.item_template == item.name)
+		.join(item_group)
+		.on(item_group.name == item.item_group)
+		.select(item.item_group)
+		.where(offered)
+		.orderby(item.creation, order=Order.desc)
+		.limit(1)
+	).run(pluck=True)
+	if last_used:
+		return last_used[0]
+
+	newest = (
+		frappe.qb.from_(item_group)
+		.select(item_group.name)
+		.where(offered)
+		.orderby(item_group.creation, order=Order.desc)
+		.limit(1)
+	).run(pluck=True)
+	return newest[0] if newest else None
+
+
+def get_seeded_item_groups() -> list:
+	"""Products, Raw Material, Services, Sub Assemblies, Consumable: ERPNext's setup wizard files them
+	for stock-keeping, not a storefront, so a shop owner never picked them. Read from ERPNext's own
+	preset list, in English and in the site language the wizard may have used."""
+	from erpnext.setup.setup_wizard.operations.install_fixtures import get_preset_records
+
+	country = frappe.db.get_single_value("System Settings", "country") or ""
+	names = [
+		record["item_group_name"]
+		for record in get_preset_records(country)
+		if record["doctype"] == "Item Group"
+	]
+	if not names:
+		frappe.throw(_("ERPNext's preset collections could not be read."))
+	return list({*names, *(_(name) for name in names)})
 
 
 @frappe.whitelist()
@@ -1026,9 +1084,18 @@ def get_attributes():
 			],
 			"used_by": usage_by_attribute.get(name, 0),
 			"is_colour": name == COLOUR_ATTRIBUTE,
+			"is_option": is_option_attribute(name, attribute_names),
 		}
 		for name in attribute_names
 	]
+
+
+def is_option_attribute(name: str, attribute_names: list) -> bool:
+	"""Whether a product can vary by this attribute. Size is the fixed second axis, the placeholder only
+	holds products with no options, and ERPNext's British "Colour" is a second spelling of Color."""
+	if name in (SIZE_ATTRIBUTE, DEFAULT_OPTION_ATTRIBUTE):
+		return False
+	return not (name == DUPLICATE_COLOUR_ATTRIBUTE and COLOUR_ATTRIBUTE in attribute_names)
 
 
 def get_swatches_for_attributes(attribute_names):
@@ -1291,12 +1358,19 @@ def create_product(
 		)
 
 	if frappe.db.exists("Item", title):
-		frappe.throw(_("A product called {0} already exists. Give this one a different title.").format(title))
+		frappe.throw(
+			_("A product called {0} already exists. Give this one a different title.").format(title),
+			frappe.DuplicateEntryError,
+		)
 
 	# A book has neither a colour nor a size, so both axes fall back to a single hidden value - an owner who
-	# named no options hangs on the fallback axis, not on whichever attribute the form had selected.
-	option_rows = frappe.parse_json(option_sizes) if isinstance(option_sizes, str) else (option_sizes or [])
-	option_attribute = (cstr(option_attribute).strip() if option_rows else "") or ensure_attribute_exists(
+	# named no options (sizes alone included) hangs on the fallback axis, not on whichever attribute the
+	# form had selected.
+	option_sizes = parse_option_sizes(option_sizes)
+	names_an_option = any(
+		option.casefold() != DEFAULT_OPTION_VALUE.casefold() for option, _sizes in option_sizes
+	)
+	option_attribute = (cstr(option_attribute).strip() if names_an_option else "") or ensure_attribute_exists(
 		DEFAULT_OPTION_ATTRIBUTE, DEFAULT_OPTION_VALUE, "STD"
 	)
 	size_attribute = cstr(size_attribute).strip() or SIZE_ATTRIBUTE
@@ -1312,8 +1386,6 @@ def create_product(
 				size_attribute
 			)
 		)
-
-	option_sizes = parse_option_sizes(option_sizes)
 
 	collections = parse_collections(collections if collections is not None else [collection])
 
@@ -1368,9 +1440,17 @@ def parse_option_sizes(option_sizes: list | str):
 	if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
 		frappe.throw(_("Colours and sizes could not be read"))
 
+	# Sizes with no colour are one size each on the hidden option, never dropped; beside named colours
+	# a blank row is a colour the owner forgot to name.
+	named = [row for row in rows if cstr(row.get("option")).strip()]
+	if named and any(row.get("sizes") for row in rows if row not in named):
+		frappe.throw(_("Name every color that has sizes."))
+
 	merged = {}
 	for row in rows:
-		option = cstr(row.get("option")).strip()
+		option = cstr(row.get("option")).strip() or (
+			DEFAULT_OPTION_VALUE if not named and row.get("sizes") else ""
+		)
 		if not option:
 			continue
 
