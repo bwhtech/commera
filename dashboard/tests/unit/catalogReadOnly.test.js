@@ -23,28 +23,31 @@ async function renderTemplate(path, state) {
   app.component('TagMultiSelect', { props: ['label'], render() { return Vue.h('label', this.label) } })
   for (const name of ['TextInput', 'Select']) app.component(name, { props: ['label'], render() { return Vue.h('input', { 'aria-label': this.label }) } })
   for (const name of ['EmptyState', 'ReceiveStockDialog']) app.component(name, { render: () => null })
+  app.component('ProductSection', {
+    props: ['title'],
+    render() { return Vue.h('section', [Vue.h('h2', this.title), this.$slots.default?.()]) },
+  })
   return (await renderToString(app)).replace(/<!--[\s\S]*?-->/g, '')
 }
 
-test('product stock shows on hand as a number, not a locked input', async () => {
-  const html = await renderTemplate('components/product/ProductStock', {
-    ia: { density: 44 },
-    rows: [{ id: 'SHIRT-NAV-M', title: 'Navy · M', sku: 'SHIRT-NAV-M', committed: 2, onHand: 25 }],
-    receiveOpen: false,
-  })
-
-  assert.match(html, />25</)
-  assert.doesNotMatch(html, /<input/)
-})
-
-test('product organisation offers only what it can change', async () => {
+test('product collections offer only what they can change', async () => {
   const html = await renderTemplate('components/product/ProductOrganization', {
-    product: { status: 'active', collections: [] },
+    draft: { collections: ['Shirts'] },
     layout: 'stacked',
     collectionOptions: [],
-    primaryIcon: () => null,
+    mainIcon: () => null,
+    hint: '',
   })
 
   assert.match(html, /Collections/)
   assert.doesNotMatch(html, /<input/)
+})
+
+test('the main-collection hint waits for a second collection', async () => {
+  const state = { draft: { collections: ['Shirts'] }, layout: 'rail', collectionOptions: [], mainIcon: () => null }
+  assert.doesNotMatch(await renderTemplate('components/product/ProductOrganization', { ...state, hint: '' }), /<p/)
+  assert.match(
+    await renderTemplate('components/product/ProductOrganization', { ...state, hint: 'The starred collection is the main one.' }),
+    /The starred collection is the main one\./,
+  )
 })

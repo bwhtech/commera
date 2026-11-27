@@ -1,40 +1,33 @@
 <script setup>
 import { computed } from 'vue'
-import { Badge, Button } from 'frappe-ui'
+import { Button } from 'frappe-ui'
+import ProductSection from './ProductSection.vue'
+import { copyProductLink, storefrontUrl } from '../../ia/productActions'
+import { __ } from '../../data/translation'
 
-const props = defineProps({ product: { type: Object, required: true } })
+const props = defineProps({
+  product: { type: Object, required: true },
+  isLive: { type: Boolean, required: true },
+})
 
-// The storefront address belongs to the option, not the product: each
-// colour is its own page, and Style Attribute Variant.route is generated
-// server-side from its name. There is nothing to type here.
-const listings = computed(() => props.product.variants.filter((variant) => variant.storefront_url))
+const url = computed(() => storefrontUrl(props.product))
+
+const hint = computed(() => {
+  if (props.product.status === 'archived') return __('Archived. Shoppers cannot see this product.')
+  if (props.isLive) return __('Live. Shoppers can find and buy this product.')
+  return __('Draft. Shoppers cannot see this product until you publish it.')
+})
 </script>
 
 <template>
-  <section id="product-storefront">
-    <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Storefront listing') }}</h2>
-    <p class="mt-1 text-p-sm text-ink-gray-5">
-      {{ __('Every option has its own page on the store. These are the live addresses.') }}
-    </p>
-
-    <div
-      v-if="listings.length"
-      class="mt-4 divide-y divide-outline-gray-1 rounded-5 border border-outline-gray-1"
-    >
-      <div v-for="variant in listings" :key="variant.name" class="flex items-center gap-3 px-4 py-3">
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2">
-            <span class="text-base text-ink-gray-8">{{ variant.option }}</span>
-            <Badge v-if="!variant.is_published" :label="__('Not published')" theme="amber" variant="subtle" />
-          </div>
-          <p class="mt-0.5 truncate text-sm text-ink-gray-5">{{ variant.storefront_url }}</p>
-        </div>
-        <Button :label="__('Open')" icon-right="lucide-external-link" :href="variant.storefront_url" />
-      </div>
-    </div>
-
-    <p v-else class="mt-4 text-p-base text-ink-gray-5">
-      {{ __('No option has a storefront address yet. One is generated when an option is first saved.') }}
-    </p>
-  </section>
+  <ProductSection id="product-storefront" :title="__('On your store')" :hint="hint">
+    <template v-if="url" #actions>
+      <Button :label="__('Copy link')" icon-left="lucide-link" @click="copyProductLink(url)" />
+      <Button
+        :label="isLive ? __('View on store') : __('Preview')"
+        icon-right="lucide-external-link"
+        :href="url"
+      />
+    </template>
+  </ProductSection>
 </template>
