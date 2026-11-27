@@ -40,7 +40,7 @@ const title = computed(() => {
   return sizesOnly.value ? props.product.title : colorLabel(props.variant)
 })
 const description = computed(() => {
-  if (sizesOnly.value) return ''
+  if (sizesOnly.value) return __('All sizes of {0}', [props.product.title])
   return __('{0} of {1}', [props.product.option_attribute, props.product.title])
 })
 const priceHint = computed(() => (props.variant ? priceScopeHint(props.variant) : ''))
@@ -102,8 +102,7 @@ function addStock(rows) {
           <thead>
             <tr class="border-b border-outline-gray-1 text-sm text-ink-gray-5">
               <th class="py-1.5 pe-3 text-start font-normal">{{ __('Size') }}</th>
-              <th class="py-1.5 pe-3 text-end font-normal">{{ __('In stock') }}</th>
-              <th class="py-1.5 text-start font-normal max-sm:hidden">{{ __('SKU') }}</th>
+              <th class="py-1.5 text-end font-normal">{{ __('In stock') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -111,8 +110,7 @@ function addStock(rows) {
               <td class="py-2 pe-3 text-base text-ink-gray-8">
                 {{ size.size }}
               </td>
-              <td class="py-2 pe-3 text-end text-base tabular-nums text-ink-gray-8">{{ size.stock ?? 0 }}</td>
-              <td class="py-2 text-sm text-ink-gray-5 max-sm:hidden">{{ size.item_code }}</td>
+              <td class="py-2 text-end text-base tabular-nums text-ink-gray-8">{{ size.stock ?? 0 }}</td>
             </tr>
           </tbody>
         </table>

@@ -17,6 +17,8 @@ const props = defineProps({
   // (see callers for why), shown as the same tabular-nums text either way.
   readonly: { type: Boolean, default: false },
   emptyLabel: { type: String, default: undefined },
+  // The trigger's accessible name; its visible text is only the value, such as "₹899".
+  triggerLabel: { type: String, default: undefined },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -46,6 +48,7 @@ function cancel(close) {
       <button
         class="group flex items-center gap-1 rounded-4 px-1.5 py-0.5 tabular-nums"
         :class="open ? 'bg-surface-gray-3 text-ink-gray-8' : 'text-ink-gray-7 hover:bg-surface-gray-2'"
+        :aria-label="triggerLabel"
         @click.stop.prevent
       >
         <span v-if="emptyLabel && !modelValue" class="text-base text-ink-gray-4">{{ emptyLabel }}</span>

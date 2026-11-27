@@ -70,6 +70,8 @@ const variantCount = computed(() => props.product.variants.reduce((sum, variant)
 const variantsHint = computed(() => {
   const count = variantCount.value === 1 ? __('1 variant.') : __('{0} variants.', [variantCount.value])
   if (!hasColors.value) return `${count} ${__('Same price for every size.')}`
+  // Colors with no sizes: each color is one variant with its own price, so there is no scope to explain.
+  if (!options.value.sizes.length) return count
   return `${count} ${__('Each {0} has one price for all its sizes.', [optionName.value.toLowerCase()])}`
 })
 
@@ -345,6 +347,7 @@ const sizeColumns = {
                   :model-value="priceInputs(size).price ?? 0"
                   :label="__('Price')"
                   :description="priceScopeHint(sizesOnlyVariant)"
+                  :trigger-label="__('Edit price of {0}', [product.title])"
                   format="money"
                   @update:model-value="(price) => setPrice(sizesOnlyVariant, price)"
                 />
@@ -413,6 +416,7 @@ const sizeColumns = {
                   :model-value="priceInputs(item.sizes[0]).price ?? 0"
                   :label="__('Price')"
                   :description="priceScopeHint(item) || undefined"
+                  :trigger-label="__('Edit price of {0}', [colorLabel(item)])"
                   format="money"
                   @update:model-value="(price) => setPrice(item, price)"
                 />

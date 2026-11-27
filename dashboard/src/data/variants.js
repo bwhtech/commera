@@ -45,6 +45,6 @@ export function stockRows(variants) {
   return variants.flatMap((variant) =>
     variant.sizes
       .filter((size) => size.item_code)
-      .map((size) => ({ id: size.item_code, title: sizeTitle(variant, size), sku: size.item_code, onHand: size.stock ?? 0 })),
+      .map((size) => ({ id: size.item_code, title: sizeTitle(variant, size), onHand: size.stock ?? 0 })),
   )
 }
