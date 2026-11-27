@@ -59,6 +59,8 @@ function blankImport() {
       skipped: [],
       total: 0,
       search: '',
+      // The search the rows in `items` answer; differs from `search` while a new one loads.
+      itemsSearch: '',
       page: 1,
       pageSize: 50,
       tab: 'items',

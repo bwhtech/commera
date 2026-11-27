@@ -60,6 +60,7 @@ const factsOf = (item) => [
 
 const isSearching = computed(() => Boolean(imp.erpnext.search))
 const shownCodes = computed(() => imp.erpnext.items.map((item) => item.item_code))
+const isShowingCurrentSearch = computed(() => imp.erpnext.itemsSearch === (imp.erpnext.search || ''))
 
 const toggleLabel = computed(() => {
   if (!isSearching.value) return allSelected.value ? __('Clear selection') : __('Select all')
@@ -108,11 +109,14 @@ const tabs = computed(() => [
         <span class="text-sm text-ink-gray-6 tabular-nums">
           {{ __('{0} of {1} selected', [imp.erpnext.selected.length, imp.erpnext.importableCount]) }}
         </span>
+        <!-- Disabled while a search loads: the rows on screen still belong to the previous search, so
+             "Select N shown" would pick items the new search hides. -->
         <Button
+          v-if="!isSearching || shownCodes.length"
           class="ms-auto"
           variant="ghost"
           :label="toggleLabel"
-          :disabled="!imp.erpnext.selectionReady || (isSearching && !shownCodes.length)"
+          :disabled="!imp.erpnext.selectionReady || !isShowingCurrentSearch"
           @click="toggleAll"
         />
       </div>

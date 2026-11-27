@@ -34,7 +34,10 @@ export async function loadErpnextPreview() {
   previewParams.value = { search: search || undefined, start: (page - 1) * pageSize, page_length: pageSize }
   const data = await previewRequest.fetch()
   if (!data) return
+  // A slower, older search can answer last; keep only the answer for what the box holds now.
+  if ((search || '') !== (imp.erpnext.search || '')) return
   imp.erpnext.items = data.items
+  imp.erpnext.itemsSearch = search || ''
   imp.erpnext.skipped = data.skipped
   imp.erpnext.total = data.total
   if (!search) imp.erpnext.importableCount = data.total
