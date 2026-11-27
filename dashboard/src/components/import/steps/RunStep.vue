@@ -14,7 +14,7 @@ import {
   publishImported,
 } from '../../../data/importFlow'
 import { useAdminAction, trySubmit } from '../../../data/api'
-import { doneTitle, photoCount, productCount } from '../../../data/importCounts'
+import { doneTitle, photoCount, publishedBody } from '../../../data/importCounts'
 import { __ } from '../../../data/translation'
 import { productRoute } from '../../../ia/routes'
 import ImportResult from '../ImportResult.vue'
@@ -70,11 +70,7 @@ const published = computed(() => imp.published?.published ?? null)
 const notPublished = computed(() => imp.published?.not_published ?? [])
 
 const doneBody = computed(() => {
-  if (published.value != null) {
-    return notPublished.value.length
-      ? __('{0} could not go live yet. Each one below says what it still needs.', [productCount(notPublished.value.length)])
-      : __('Customers can find them on your store now.')
-  }
+  if (published.value != null) return publishedBody(published.value, notPublished.value.length)
   if (!imp.created.length) return __('Fix the rows below in your file, then import it again.')
   return __('Drafts are not on your store yet. Publish them now, or later from each product page.')
 })

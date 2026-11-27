@@ -4,7 +4,7 @@ import { Button, Dialog, Spinner, toast } from 'frappe-ui'
 import { DialogDescription, DialogTitle } from 'reka-ui'
 import { canChangeStep, closeImport, imp, isMappingChecked, steps } from '../../data/importFlow'
 import { loadErpnextPreview } from '../../data/erpnextImport'
-import { importLabel } from '../../data/importCounts'
+import { erpnextImportLabel, importLabel } from '../../data/importCounts'
 import { fieldLabel, stillNeeded } from '../../data/importMapping'
 import ImportStepNav from './ImportStepNav.vue'
 import SourceStep from './steps/SourceStep.vue'
@@ -91,7 +91,7 @@ const canContinue = computed(() => canChangeStep.value && !blockedReason.value)
 const nextLabel = computed(() => {
   if (stepKey.value === 'images') return assignedPhotos.value ? __('Continue') : __('Skip photos')
   if (stepKey.value === 'review') return importLabel(imp.counts)
-  if (stepKey.value === 'pick') return erpnextSelected.value === 1 ? __('Import 1 item') : __('Import {0} items', [erpnextSelected.value])
+  if (stepKey.value === 'pick') return erpnextImportLabel(erpnextSelected.value)
   return __('Continue')
 })
 

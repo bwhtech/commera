@@ -11,7 +11,7 @@ import {
 } from '../../../data/erpnextImport'
 import { runPercent } from '../../../data/erpnextImportState'
 import { productRoute } from '../../../ia/routes'
-import { doneTitle, productCount } from '../../../data/importCounts'
+import { doneTitle, publishedBody } from '../../../data/importCounts'
 import ImportResult from '../ImportResult.vue'
 import NotPublishedList from '../NotPublishedList.vue'
 import { __ } from '../../../data/translation'
@@ -26,11 +26,7 @@ const skipped = computed(() => status.value?.skipped ?? 0)
 const published = computed(() => imp.erpnext.published?.published ?? null)
 
 const doneBody = computed(() => {
-  if (published.value != null) {
-    return notPublished.value.length
-      ? __('{0} could not go live yet. Each one below says what it still needs.', [productCount(notPublished.value.length)])
-      : __('Customers can find them on your store now.')
-  }
+  if (published.value != null) return publishedBody(published.value, notPublished.value.length)
   if (!created.value) return __('Fix the items below in ERPNext, then import them again.')
   return __('Drafts are not on your store yet. Publish them now, or later from each product page.')
 })

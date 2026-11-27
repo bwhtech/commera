@@ -14,6 +14,7 @@ import ListSkeleton from '../../ListSkeleton.vue'
 import SearchInput from '../../SearchInput.vue'
 import Thumb from '../../Thumb.vue'
 import CoachTip from '../CoachTip.vue'
+import DotList from '../../DotList.vue'
 
 const isMobile = useIsMobile()
 
@@ -42,6 +43,14 @@ function toggleItem(itemCode, isSelected) {
 }
 
 const kindLabel = (item) => KIND_LABELS[item.kind] ?? item.kind
+
+const factsOf = (item) => [
+  kindLabel(item),
+  item.price
+    ? { label: money(item.price), class: 'tabular-nums text-ink-gray-7' }
+    : { label: __('No price yet'), class: 'text-ink-amber-7' },
+  { label: __('{0} in stock', [item.stock || 0]), class: 'tabular-nums' },
+]
 
 function toggleAll() {
   imp.erpnext.selected = allSelected.value ? [] : [...imp.erpnext.allItemCodes]
@@ -105,16 +114,7 @@ const tabs = computed(() => [
             <Thumb :image="item.image" />
             <div class="min-w-0 flex-1">
               <div class="truncate text-base text-ink-gray-8">{{ item.item_name }}</div>
-              <!-- Each part carries its own leading dot, so a wrapped line never ends on a separator. -->
-              <div class="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-sm text-ink-gray-5">
-                <span>{{ kindLabel(item) }}</span>
-                <span class="whitespace-nowrap">
-                  <span aria-hidden="true">· </span>
-                  <span v-if="item.price" class="tabular-nums text-ink-gray-7">{{ money(item.price) }}</span>
-                  <span v-else class="text-ink-amber-7">{{ __('No price yet') }}</span>
-                </span>
-                <span class="whitespace-nowrap tabular-nums"><span aria-hidden="true">· </span>{{ __('{0} in stock', [item.stock || 0]) }}</span>
-              </div>
+              <DotList class="mt-0.5 text-sm text-ink-gray-5" :parts="factsOf(item)" />
             </div>
           </label>
         </template>

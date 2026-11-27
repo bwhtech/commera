@@ -17,6 +17,12 @@ export function importLabel({ products, variants }) {
     : __('Import {0} products ({1} variants)', [products, variants])
 }
 
+// The ERPNext pick step's button. With nothing picked it is off, and it must not offer to import nothing.
+export function erpnextImportLabel(selected) {
+  if (!selected) return __('Nothing to import')
+  return selected === 1 ? __('Import 1 item') : __('Import {0} items', [selected])
+}
+
 // The Review step's one-line summary, problems last and only when there are any.
 export function reviewSummary({ products, variants, warnings, errors }) {
   // "0 products" says nothing the disabled button and its reason do not already say.
@@ -32,6 +38,14 @@ export function doneTitle(created, published) {
   if (published != null) return published === 1 ? __('1 product is live') : __('{0} products are live', [published])
   if (!created) return __('No products were added')
   return created === 1 ? __('1 product added as a draft') : __('{0} products added as drafts', [created])
+}
+
+// The line under the result title once Publish all has run.
+export function publishedBody(published, notPublished) {
+  if (notPublished) {
+    return __('{0} could not go live yet. Each one below says what it still needs.', [productCount(notPublished)])
+  }
+  return published === 1 ? __('Customers can find it on your store now.') : __('Customers can find them on your store now.')
 }
 
 export const photoCount = (count) => (count === 1 ? __('1 photo') : __('{0} photos', [count]))

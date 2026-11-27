@@ -2,9 +2,11 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   doneTitle,
+  erpnextImportLabel,
   importLabel,
   photoGroupsHavePhoto,
   photoGroupsNeedPhoto,
+  publishedBody,
   reviewSummary,
   showsOriginalPrice,
   visibleFilter,
@@ -60,4 +62,16 @@ test('one photo group is counted in the singular', () => {
   assert.equal(photoGroupsNeedPhoto(1, 1, false), '1 product still needs a photo.')
   assert.equal(photoGroupsNeedPhoto(1, 1, true), '1 color still needs a photo.')
   assert.equal(photoGroupsHavePhoto(1, 1, false), '1 of 1 product has a photo')
+})
+
+test('the ERPNext pick button never offers to import 0 items', () => {
+  assert.equal(erpnextImportLabel(0), 'Nothing to import')
+  assert.equal(erpnextImportLabel(1), 'Import 1 item')
+  assert.equal(erpnextImportLabel(4), 'Import 4 items')
+})
+
+test('the published line agrees with the number of live products', () => {
+  assert.equal(publishedBody(1, 0), 'Customers can find it on your store now.')
+  assert.equal(publishedBody(3, 0), 'Customers can find them on your store now.')
+  assert.equal(publishedBody(0, 2), '2 products could not go live yet. Each one below says what it still needs.')
 })

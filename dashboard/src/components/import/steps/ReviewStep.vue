@@ -7,6 +7,7 @@ import { reviewSummary, showsOriginalPrice, visibleFilter } from '../../../data/
 import { money } from '../../../data/format'
 import { __ } from '../../../data/translation'
 import { useIsMobile } from '../../../utils/useIsMobile'
+import DotList from '../../DotList.vue'
 import Thumb from '../../Thumb.vue'
 
 const isMobile = useIsMobile()
@@ -33,12 +34,19 @@ const activeFilter = computed({
 })
 const filtered = computed(() => imp.rows.filter(filters[activeFilter.value]))
 
-const summary = computed(() => reviewSummary(imp.counts))
+// The skipped count is always last, and red.
+const summary = computed(() => {
+  const parts = reviewSummary(imp.counts)
+  if (!imp.counts.errors) return parts
+  return [...parts.slice(0, -1), { label: parts.at(-1), class: 'text-ink-red-6' }]
+})
 
 const optionsOf = (row) => [row.color, row.size].filter(Boolean).join(' · ')
 const coverOf = (row) => imp.imageAssignments[row.image_key]?.[0] ?? null
 const priceOf = (row) => (row.sale_price ? money(row.sale_price) : '—')
 const originalPriceOf = (row) => (showsOriginalPrice(row) ? money(row.compare_at_price) : '')
+const mobileFactsOf = (row) =>
+  [row.color, row.size, { label: priceOf(row), original: originalPriceOf(row) }, __('Row {0}', [row.row])].filter(Boolean)
 const statusTheme = (row) => (!row.issue ? 'green' : row.issue.level === 'error' ? 'red' : 'amber')
 const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'error' ? __('Skipped') : __('Warning'))
 </script>
@@ -52,12 +60,7 @@ const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'er
       </p>
     </div>
 
-    <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-base text-ink-gray-8">
-      <template v-for="(part, index) in summary" :key="part">
-        <span v-if="index" class="text-ink-gray-4" aria-hidden="true">·</span>
-        <span :class="index === summary.length - 1 && imp.counts.errors ? 'text-ink-red-6' : ''">{{ part }}</span>
-      </template>
-    </p>
+    <DotList class="text-base text-ink-gray-8" :parts="summary" />
 
     <TabButtons v-if="filterOptions.length > 2" v-model="activeFilter" :options="filterOptions" />
 
@@ -72,11 +75,9 @@ const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'er
               <div class="min-w-0 flex-1 truncate text-base text-ink-gray-8">{{ item.title || '—' }}</div>
               <Badge class="shrink-0" :label="statusLabel(item)" :theme="statusTheme(item)" variant="subtle" />
             </div>
-            <div class="mt-0.5 text-sm text-ink-gray-5">
-              {{ [optionsOf(item), priceOf(item)].filter(Boolean).join(' · ') }}
-              <s v-if="originalPriceOf(item)" class="ms-1 text-ink-gray-4">{{ originalPriceOf(item) }}</s>
-              · {{ __('Row {0}', [item.row]) }}
-            </div>
+            <DotList class="mt-0.5 text-sm text-ink-gray-5" :parts="mobileFactsOf(item)" v-slot="{ part }">
+              {{ part.label ?? part }}<s v-if="part.original" class="ms-1 text-ink-gray-4">{{ part.original }}</s>
+            </DotList>
             <p v-if="item.issue" class="mt-1 text-p-sm text-ink-gray-7">{{ item.issue.text }}</p>
           </div>
         </div>

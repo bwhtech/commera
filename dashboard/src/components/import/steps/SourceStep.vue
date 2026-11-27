@@ -26,12 +26,14 @@ const sources = [
       <p class="mt-1.5 text-p-base text-ink-gray-6">{{ __('You can import again later from the other one.') }}</p>
     </div>
 
+    <!-- The grid stretches both cards to one height, and a button centers its content vertically;
+         flex-col puts each card's text at the top, so the two titles share a baseline. -->
     <div class="grid gap-4 sm:grid-cols-2">
       <button
         v-for="source in sources"
         :key="source.value"
         type="button"
-        class="rounded-5 border p-5 text-start transition hover:bg-surface-gray-1"
+        class="flex flex-col rounded-5 border p-5 text-start transition hover:bg-surface-gray-1"
         :class="imp.source === source.value ? 'border-outline-gray-4 bg-surface-gray-1' : 'border-outline-gray-1'"
         :aria-pressed="imp.source === source.value"
         @click="imp.source = source.value"
