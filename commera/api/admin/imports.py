@@ -2,8 +2,10 @@
 # For license information, please see license.txt
 
 """Bulk product import: a spreadsheet template, and the importer that reads one back. One row is one
-colour/size; rows sharing a Product Title become one product, priced once, via catalog.create_product."""
+colour/size; rows sharing a Product Title become one product via catalog.create_product, priced once
+per colour."""
 
+import math
 import os
 import re
 
@@ -18,6 +20,7 @@ from commera.api.admin.catalog import (
 	DEFAULT_SIZE_VALUE,
 	create_product,
 	get_collections,
+	get_publish_blockers,
 )
 from commera.api.admin.import_rows import (
 	FIELD_LABELS,
@@ -26,6 +29,7 @@ from commera.api.admin.import_rows import (
 	group_valid_rows,
 	parse_and_validate,
 )
+from commera.api.variant_pricing import set_variant_prices
 from commera.commera_ecommerce.doctype.bulk_publish_variants.bulk_publish_variants import publish_variants
 from commera.commera_ecommerce.doctype.commera_settings.editor_input import parse_list
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
@@ -319,20 +323,50 @@ def receive_group_stock(item_template, rows):
 		frappe.get_doc("Style Attribute Variant", variant_name).receive_stock(quantities)
 
 
+def get_option_prices(rows):
+	"""{casefolded option value: (original price, price)}. The dry run already refused a price at or
+	below zero; the write path refuses it again rather than create a product nobody can buy."""
+	prices = {}
+	for row in rows:
+		sale_price = flt(row["sale_price"])
+		if not (math.isfinite(sale_price) and sale_price > 0):
+			frappe.throw(_("Enter a price above zero."))
+		prices.setdefault(get_variant_option(row), (flt(row["compare_at_price"]), sale_price))
+	return prices
+
+
+def price_group_variants(item_template, prices_by_option):
+	"""Every size of a colour shares its price, and colours may differ: one set_variant_prices call per
+	distinct price, over the colours that carry it."""
+	variant_by_option = get_variant_by_option(item_template)
+	variants_by_prices = {}
+	for option, prices in prices_by_option.items():
+		if option not in variant_by_option:
+			frappe.throw(_("{0} has no {1} to price").format(item_template, option))
+		variants_by_prices.setdefault(prices, []).append(variant_by_option[option])
+	for (compare_at_price, sale_price), variant_names in variants_by_prices.items():
+		set_variant_prices(
+			item_template,
+			default_rate=compare_at_price or sale_price,
+			sale_rate=sale_price,
+			style_attribute_variant_list=variant_names,
+		)
+
+
 def create_group_product(group):
 	option_attribute, option_sizes = get_product_options(group["rows"])
 	if option_attribute == OPTION_ATTRIBUTE and not frappe.db.exists("Item Attribute", OPTION_ATTRIBUTE):
 		frappe.throw(
 			_('This store has no Item Attribute named "{0}". Create it first.').format(OPTION_ATTRIBUTE)
 		)
+	prices_by_option = get_option_prices(group["rows"])
 	created_product = create_product(
 		title=group["title"],
 		collection=group["collection"],
 		option_attribute=option_attribute,
 		option_sizes=option_sizes,
-		price=group["compare_at_price"] or group["sale_price"],
-		sale_price=group["sale_price"],
 	)
+	price_group_variants(created_product["name"], prices_by_option)
 	receive_group_stock(created_product["name"], group["rows"])
 	return created_product["name"]
 
@@ -452,11 +486,50 @@ def publish_imported_products(item_templates: list | str):
 		drafts += frappe.get_all(
 			"Style Attribute Variant",
 			filters={"item_style": ["in", chunk], "is_published": 0},
-			fields=["name", "item_style"],
+			fields=["name", "item_style", "attribute_value"],
 		)
-	published = set(publish_variants(1, names=[draft.name for draft in drafts])) if drafts else set()
-	not_published = {draft.item_style for draft in drafts if draft.name not in published}
+	return publish_drafts(drafts)
+
+
+def publish_drafts(drafts):
+	"""Publish all, for both import sources: every draft color that catalog.get_publish_blockers clears
+	goes live, and each product with a color left behind comes back with what it still needs."""
+	blockers = get_publish_blockers([draft.name for draft in drafts])
+	ready = [draft.name for draft in drafts if not blockers[draft.name]]
+	published = set(publish_variants(1, names=ready)) if ready else set()
+
+	reasons_by_product = {}
+	for draft in drafts:
+		if draft.name in published:
+			continue
+		reasons = reasons_by_product.setdefault(draft.item_style, [])
+		# A product without colors sells on a hidden placeholder, which is never named to the seller.
+		is_named = cstr(draft.attribute_value).casefold() != DEFAULT_OPTION_VALUE.casefold()
+		for blocker in blockers[draft.name] or [_("Not ready to publish yet")]:
+			reason = f"{draft.attribute_value}: {blocker}" if is_named else blocker
+			if reason not in reasons:
+				reasons.append(reason)
+
+	titles = get_product_titles(list(reasons_by_product))
 	return {
-		"published": len({draft.item_style for draft in drafts} - not_published),
-		"not_published": sorted(not_published),
+		"published": len({draft.item_style for draft in drafts} - set(reasons_by_product)),
+		"not_published": [
+			{
+				"item_template": item_template,
+				"title": titles.get(item_template, item_template),
+				"reasons": reasons,
+			}
+			for item_template, reasons in reasons_by_product.items()
+		],
 	}
+
+
+def get_product_titles(item_templates):
+	titles = {}
+	for chunk in create_batch(item_templates, IN_CLAUSE_CHUNK_SIZE):
+		titles.update(
+			frappe.get_all(
+				"Item", filters={"name": ["in", chunk]}, fields=["name", "item_name"], as_list=True
+			)
+		)
+	return titles

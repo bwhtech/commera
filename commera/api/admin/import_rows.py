@@ -1,6 +1,8 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
+import math
+
 import frappe
 from frappe import _
 from frappe.utils.csvutils import read_csv_content
@@ -207,9 +209,13 @@ def error(text):
 	return {"level": "error", "text": text}
 
 
+def warning(text):
+	return {"level": "warning", "text": text}
+
+
 class RowChecker:
 	"""Reads one row at a time and gives it its first problem. Rows sharing a title are one product,
-	so each row is also checked against the first clean row of its product."""
+	so each row is also checked against the first clean row of its product and of its color."""
 
 	def __init__(self, headers, mapping, default_collection):
 		self.default_collection = default_collection
@@ -219,7 +225,9 @@ class RowChecker:
 				self.column_index_by_field.setdefault(mapping[header], index)
 		self.seen_variants = {}
 		self.product_first_row = {}
+		self.color_first_row = {}
 		self.collection_exists = {}
+		self.title_taken = {}
 
 	def cell(self, row, field):
 		index = self.column_index_by_field.get(field)
@@ -237,15 +245,19 @@ class RowChecker:
 			"size": self.text(row, "size"),
 		}
 		issue = self.read_amounts(row, parsed)
-		issue = issue or self.check_required(parsed) or self.check_price(parsed)
-		issue = issue or self.check_duplicate(parsed) or self.check_against_product(parsed)
+		issue = issue or self.check_required(row, parsed) or self.check_title(parsed)
+		# The original price is settled before the per-color check, so two sizes compare what is
+		# actually written; a warning is given only when no row error follows it.
+		price_warning = self.check_original_price(parsed)
+		issue = issue or self.check_duplicate(parsed) or self.check_against_product(parsed) or price_warning
 		parsed["issue"] = issue
 		parsed["image_key"] = get_image_group_key(parsed["title"], parsed["color"])
 		return parsed
 
 	def read_amounts(self, row, parsed):
 		"""flt() swallows a bad string down to 0.0, which would silently turn "not-a-number" into an
-		unpriced row, so amounts are parsed strictly and a bad one is the row's error."""
+		unpriced row, and float() reads "inf" and "nan", so amounts are parsed strictly and a bad one
+		is the row's error."""
 		issue = None
 		for field, label in (
 			("sale_price", _("Price")),
@@ -253,32 +265,56 @@ class RowChecker:
 			("stock", _("Stock")),
 		):
 			raw = self.cell(row, field)
-			try:
-				parsed[field] = flt(float(cstr(raw).replace(",", "").strip())) if raw not in (None, "") else 0
-			except (TypeError, ValueError):
+			parsed[field] = read_amount(raw)
+			if parsed[field] is None:
 				parsed[field] = 0
 				issue = issue or error(_('{0} "{1}" is not a number').format(label, raw))
 		return issue
 
-	def check_required(self, parsed):
+	def check_required(self, row, parsed):
 		if not parsed["title"]:
 			return error(_("Product title is missing"))
 		if not parsed["collection"]:
 			return error(_("Collection is missing"))
 		if not self.has_collection(parsed["collection"]):
 			return error(_('Collection "{0}" does not exist. Create it first').format(parsed["collection"]))
-		if not parsed["sale_price"]:
+		if not self.text(row, "sale_price"):
 			return error(_("Price is missing"))
+		# The same rule, in the same words, as the Add product dialog.
+		if parsed["sale_price"] <= 0:
+			return error(_("Enter a price above zero."))
+
+	def check_title(self, parsed):
+		"""The titles catalog.create_product refuses, caught here so Review never calls a row Ready
+		that the run then turns down."""
+		title = parsed["title"]
+		if title.startswith("New Item"):
+			return error(_('A product title cannot start with "New Item". Rename it in your file.'))
+		if self.is_title_taken(title):
+			return error(
+				_(
+					'A product called "{0}" is already in your store. Rename it in your file to add it.'
+				).format(title)
+			)
+
+	def is_title_taken(self, title):
+		key = title.casefold()
+		if key not in self.title_taken:
+			# An Item is named after its title, and names compare case-insensitively.
+			self.title_taken[key] = bool(frappe.db.exists("Item", title))
+		return self.title_taken[key]
 
 	def has_collection(self, collection):
 		if collection not in self.collection_exists:
 			self.collection_exists[collection] = bool(frappe.db.exists("Item Group", collection))
 		return self.collection_exists[collection]
 
-	def check_price(self, parsed):
-		# The same rule, in the same words, as the Add product dialog.
+	def check_original_price(self, parsed):
+		"""An optional field never costs the seller a product: a bad original price is dropped with a
+		warning, in the Add product dialog's words."""
 		if parsed["compare_at_price"] and parsed["compare_at_price"] <= parsed["sale_price"]:
-			return error(_("Original price must be higher than the price."))
+			parsed["compare_at_price"] = 0
+			return warning(_("Original price must be higher than the price. It is left out."))
 
 	def check_duplicate(self, parsed):
 		key = (parsed["title"].casefold(), parsed["color"].casefold(), parsed["size"].casefold())
@@ -291,20 +327,11 @@ class RowChecker:
 	def check_against_product(self, parsed):
 		first = self.product_first_row.setdefault(parsed["title"].casefold(), parsed)
 		if first is parsed:
-			return None
+			return self.check_against_color(parsed)
 		title, row = parsed["title"], first["row"]
 		if parsed["collection"] != first["collection"]:
 			return error(
 				_('Collection does not match row {0} for "{1}" ({2})').format(row, title, first["collection"])
-			)
-		if (parsed["sale_price"], parsed["compare_at_price"]) != (
-			first["sale_price"],
-			first["compare_at_price"],
-		):
-			return error(
-				_('Price does not match row {0} for "{1}". One price applies to the whole product').format(
-					row, title
-				)
 			)
 		if bool(parsed["color"]) != bool(first["color"]):
 			return error(
@@ -314,6 +341,40 @@ class RowChecker:
 			return error(
 				_('Row {0} of "{1}" differs: give every row of a product a size, or none').format(row, title)
 			)
+		return self.check_against_color(parsed)
+
+	def check_against_color(self, parsed):
+		"""Each color has one price for all its sizes (the product model); colors may differ."""
+		key = (parsed["title"].casefold(), parsed["color"].casefold())
+		first = self.color_first_row.setdefault(key, parsed)
+		if first is parsed or get_prices(parsed) == get_prices(first):
+			return None
+		if parsed["color"]:
+			return error(
+				_('Price does not match row {0}. Every size of {1} in "{2}" has the same price').format(
+					first["row"], parsed["color"], parsed["title"]
+				)
+			)
+		return error(
+			_('Price does not match row {0}. Every size of "{1}" has the same price').format(
+				first["row"], parsed["title"]
+			)
+		)
+
+
+def read_amount(raw):
+	"""A finite number, 0 for an empty cell, or None for anything else."""
+	if raw in (None, ""):
+		return 0
+	try:
+		amount = float(cstr(raw).replace(",", "").strip())
+	except (TypeError, ValueError):
+		return None
+	return flt(amount) if math.isfinite(amount) else None
+
+
+def get_prices(row):
+	return (row["sale_price"], row["compare_at_price"])
 
 
 def group_valid_rows(parsed_rows):
@@ -324,13 +385,7 @@ def group_valid_rows(parsed_rows):
 			continue
 		group = groups.setdefault(
 			row["title"].casefold(),
-			{
-				"title": row["title"],
-				"collection": row["collection"],
-				"compare_at_price": row["compare_at_price"],
-				"sale_price": row["sale_price"],
-				"rows": [],
-			},
+			{"title": row["title"], "collection": row["collection"], "rows": []},
 		)
 		group["rows"].append(row)
 	return list(groups.values())

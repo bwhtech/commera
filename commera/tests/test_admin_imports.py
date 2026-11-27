@@ -8,9 +8,11 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from commera.api.admin.catalog import get_selling_rates
 from commera.api.admin.import_rows import suggest_mapping
 from commera.api.admin.imports import (
 	OPTION_ATTRIBUTE,
+	create_group_product,
 	get_image_group_key,
 	parse_and_validate,
 	publish_imported_products,
@@ -18,6 +20,35 @@ from commera.api.admin.imports import (
 )
 
 SIZE_ATTRIBUTE = "Size"
+
+
+def get_size_items_by_color(item_template):
+	variants = dict(
+		frappe.get_all(
+			"Style Attribute Variant",
+			filters={"item_style": item_template},
+			fields=["name", "attribute_value"],
+			as_list=True,
+		)
+	)
+	items = {}
+	for row in frappe.get_all(
+		"Color Size Item",
+		filters={"parent": ["in", list(variants)], "parenttype": "Style Attribute Variant"},
+		fields=["parent", "item_code"],
+	):
+		items.setdefault(variants[row.parent], []).append(row.item_code)
+	return items
+
+
+def get_rate_by_color(item_template):
+	"""{color: the one rate a shopper pays for every size of it}."""
+	rate_by_color = {}
+	for color, item_codes in get_size_items_by_color(item_template).items():
+		rates = set(get_selling_rates(item_codes).values())
+		rate_by_color[color] = rates.pop() if len(rates) == 1 else rates
+	return rate_by_color
+
 
 TITLE_PREFIX = "ZZ Import"
 
@@ -219,7 +250,8 @@ class TestImportPrices(RunImportTestCase):
 		row = result["rows"][0]
 		self.assertEqual((row["sale_price"], row["compare_at_price"], row["issue"]), (120, 0, None))
 
-	def test_an_original_price_below_the_price_is_refused_in_the_add_dialog_words(self):
+	def test_an_original_price_below_the_price_is_left_out_in_the_add_dialog_words(self):
+		"""An optional field never costs the seller the product: the row imports without it."""
 		file_url = self.make_import_file(
 			[
 				"Product Title,Collection,Color,Size,Price,Discounted price,Stock",
@@ -227,9 +259,71 @@ class TestImportPrices(RunImportTestCase):
 			]
 		)
 
-		issue = parse_and_validate(file_url)["rows"][0]["issue"]
+		row = parse_and_validate(file_url)["rows"][0]
 
-		self.assertEqual(issue, {"level": "error", "text": "Original price must be higher than the price."})
+		self.assertEqual(
+			row["issue"],
+			{"level": "warning", "text": "Original price must be higher than the price. It is left out."},
+		)
+		self.assertEqual(row["compare_at_price"], 0)
+
+	def get_price_issue(self, price):
+		file_url = self.make_import_file(
+			["Product Title,Collection,Price", f"{self.title},{self.collection},{price}"]
+		)
+		return parse_and_validate(file_url)["rows"][0]["issue"]
+
+	def test_a_price_must_be_a_finite_number_above_zero(self):
+		above_zero = {"level": "error", "text": "Enter a price above zero."}
+		self.assertEqual(self.get_price_issue("0"), above_zero)
+		self.assertEqual(self.get_price_issue("-5"), above_zero)
+		self.assertEqual(self.get_price_issue("abc")["text"], 'Price "abc" is not a number')
+		self.assertEqual(self.get_price_issue("inf")["text"], 'Price "inf" is not a number')
+		self.assertEqual(self.get_price_issue("nan")["text"], 'Price "nan" is not a number')
+		self.assertIsNone(self.get_price_issue("12.50"))
+
+	def test_the_write_path_refuses_a_price_at_or_below_zero(self):
+		"""The dry run is not the only guard: a group that reaches the writer unpriced is refused."""
+		row = {"color": "", "size": "", "sale_price": -5, "compare_at_price": 0, "stock": 0}
+		group = {"title": self.title, "collection": self.collection, "rows": [row]}
+
+		with self.assertRaisesRegex(frappe.ValidationError, "Enter a price above zero."):
+			create_group_product(group)
+
+		self.assertEqual(self.get_created_titles(), [])
+
+	def test_each_color_keeps_its_own_price(self):
+		blue = f"Blue{self.suffix}"
+		file_url = self.make_import_file(
+			[
+				"Product Title,Collection,Color,Size,Price",
+				f"{self.title},{self.collection},{self.color},S,80",
+				f"{self.title},{self.collection},{self.color},M,80",
+				f"{self.title},{self.collection},{blue},S,90",
+			]
+		)
+
+		self.assertEqual([row["issue"] for row in parse_and_validate(file_url)["rows"]], [None] * 3)
+		item_template = run_import(file_url)["created"][0]["item_template"]
+
+		self.assertEqual(get_rate_by_color(item_template), {self.color: 80, blue: 90})
+
+	def test_sizes_of_one_color_share_a_price(self):
+		file_url = self.make_import_file(
+			[
+				"Product Title,Collection,Color,Size,Price",
+				f"{self.title},{self.collection},{self.color},S,80",
+				f"{self.title},{self.collection},{self.color},M,85",
+			]
+		)
+
+		issue = parse_and_validate(file_url)["rows"][1]["issue"]
+
+		self.assertEqual(issue["level"], "error")
+		self.assertEqual(
+			issue["text"],
+			f'Price does not match row 2. Every size of {self.color} in "{self.title}" has the same price',
+		)
 
 	def test_a_plain_price_next_to_a_discounted_price_is_the_original_price(self):
 		mapping, _confidence = suggest_mapping(["Price", "Discounted price"])
@@ -352,6 +446,33 @@ class TestImportOptions(RunImportTestCase):
 		self.assertEqual((result["images_attached"], result["image_errors"]), (1, []))
 
 
+class TestImportExistingTitles(RunImportTestCase):
+	def test_a_title_already_in_the_store_is_skipped_at_review_not_refused_by_the_run(self):
+		file_url = self.make_import_file()
+		run_import(file_url)
+
+		result = parse_and_validate(file_url)
+		second_run = run_import(file_url)
+
+		expected = (
+			f'A product called "{self.title}" is already in your store. Rename it in your file to add it.'
+		)
+		self.assertEqual([row["issue"]["text"] for row in result["rows"]], [expected] * 2)
+		self.assertEqual((result["counts"]["ready"], result["counts"]["products"]), (0, 0))
+		self.assertEqual(second_run["created_count"], 0)
+		self.assertEqual({error["message"] for error in second_run["row_errors"]}, {expected})
+
+	def test_a_title_the_store_reserves_is_skipped_at_review(self):
+		file_url = self.make_import_file(
+			["Product Title,Collection,Price", f"New Item {self.suffix},{self.collection},99"]
+		)
+
+		issue = parse_and_validate(file_url)["rows"][0]["issue"]
+
+		self.assertEqual(issue["level"], "error")
+		self.assertIn("New Item", issue["text"])
+
+
 class TestPublishImportedProducts(RunImportTestCase):
 	def test_publish_all_puts_every_imported_draft_live(self):
 		result = run_import(self.make_import_file())
@@ -366,3 +487,32 @@ class TestPublishImportedProducts(RunImportTestCase):
 			),
 			[1],
 		)
+
+	def test_publish_all_leaves_an_unpriced_color_as_a_draft_and_says_why(self):
+		"""The rule lives in catalog.get_publish_blockers; Publish all must not route around it."""
+		blue = f"Blue{self.suffix}"
+		file_url = self.make_import_file(
+			[
+				"Product Title,Collection,Color,Size,Price",
+				f"{self.title},{self.collection},{self.color},S,80",
+				f"{self.title},{self.collection},{blue},S,90",
+			]
+		)
+		item_template = run_import(file_url)["created"][0]["item_template"]
+		frappe.db.delete("Item Price", {"item_code": ["in", get_size_items_by_color(item_template)[blue]]})
+
+		published = publish_imported_products([item_template])
+
+		self.assertEqual(published["published"], 0)
+		[product] = published["not_published"]
+		self.assertEqual((product["item_template"], product["title"]), (item_template, self.title))
+		self.assertEqual(product["reasons"], [f"{blue}: Add a price before publishing"])
+		is_published = dict(
+			frappe.get_all(
+				"Style Attribute Variant",
+				filters={"item_style": item_template},
+				fields=["attribute_value", "is_published"],
+				as_list=True,
+			)
+		)
+		self.assertEqual(is_published, {self.color: 1, blue: 0})

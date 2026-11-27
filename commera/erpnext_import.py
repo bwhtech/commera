@@ -17,7 +17,7 @@ from commera.api.admin.catalog import (
 	get_ecommerce_stock,
 	get_selling_rates,
 )
-from commera.commera_ecommerce.doctype.bulk_publish_variants.bulk_publish_variants import publish_variants
+from commera.api.admin.imports import publish_drafts
 from commera.commera_ecommerce.doctype.commera_settings.commera_settings import create_configurator_log
 from commera.product_collections import COLLECTIONS_FIELD, PRODUCT_COLLECTION
 from commera.swatches import COLOUR_ATTRIBUTE, DUPLICATE_COLOUR_ATTRIBUTE
@@ -429,6 +429,7 @@ def add_first_child_rows(
 
 
 def publish_imported_products(log: str) -> dict:
+	"""Publish all for one ERPNext import, by the same rules as the spreadsheet import's."""
 	if not frappe.db.exists(LOG_DOCTYPE, log):
 		frappe.throw(_("No such import."), frappe.DoesNotExistError)
 	configurators = frappe.get_all(
@@ -442,25 +443,12 @@ def publish_imported_products(log: str) -> dict:
 			PRODUCT_DOCTYPE,
 			"configurator",
 			configurators,
-			["name", "item_style"],
+			["name", "item_style", "attribute_value"],
 			filters={"is_published": 0},
 		).values()
 		for variant in variants
 	]
-	published = set(publish_variants(1, names=[variant.name for variant in drafts])) if drafts else set()
-
-	published_products = {variant.item_style for variant in drafts if variant.name in published}
-	unpublished_products = list(
-		dict.fromkeys(variant.item_style for variant in drafts if variant.name not in published)
-	)
-	item_names = get_rows("Item", "name", unpublished_products, ["item_name"])
-	return {
-		"published": len(published_products),
-		"needs_size": [
-			{"item_code": item_code, "item_name": item_names[item_code][0].item_name}
-			for item_code in unpublished_products
-		],
-	}
+	return publish_drafts(drafts)
 
 
 def get_new_progress(status: str, log_name: str, total: int = 0) -> dict:

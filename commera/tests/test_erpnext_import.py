@@ -222,11 +222,7 @@ class TestErpnextImport(ProductOnboardingTestCase):
 
 	def test_products_list_shows_imports_with_price_and_stock(self):
 		plain = self.make_plain_item()
-		item_price = frappe.new_doc("Item Price")
-		item_price.item_code = plain
-		item_price.price_list = self.default_price_list
-		item_price.price_list_rate = 499
-		item_price.insert()
+		self.price_item(plain)
 		make_stock_entry(item_code=plain, qty=3, to_warehouse=self.warehouse, rate=100)
 
 		self.run_import([plain])
@@ -261,18 +257,44 @@ class TestErpnextImport(ProductOnboardingTestCase):
 		self.assertTrue(frappe.db.exists("Style Attribute Configurator", {"item_template": good}))
 		self.assertFalse(frappe.db.exists("Style Attribute Configurator", {"item_template": bad}))
 
+	def price_item(self, item_code, rate=499):
+		item_price = frappe.new_doc("Item Price")
+		item_price.item_code = item_code
+		item_price.price_list = self.default_price_list
+		item_price.price_list_rate = rate
+		item_price.insert()
+
 	def test_publish_all_publishes_products_with_and_without_a_photo(self):
 		with_photo = self.make_plain_item()
 		frappe.db.set_value("Item", with_photo, "image", self.make_file())
 		without_photo = self.make_plain_item()
+		for item_code in (with_photo, without_photo):
+			self.price_item(item_code)
 		log, _status = self.run_import([with_photo, without_photo])
 
 		result = publish_imported_products(log)
 
 		self.assertEqual(result["published"], 2)
-		self.assertEqual(result["needs_size"], [])
+		self.assertEqual(result["not_published"], [])
 		self.assertEqual(
 			frappe.db.get_value("Style Attribute Variant", {"item_style": without_photo}, "is_published"), 1
+		)
+
+	def test_publish_all_leaves_an_unpriced_item_as_a_draft_and_says_why(self):
+		"""Publish all goes through catalog.get_publish_blockers, like every other publish path."""
+		priced, unpriced = self.make_plain_item(), self.make_plain_item()
+		self.price_item(priced)
+		log, _status = self.run_import([priced, unpriced])
+
+		result = publish_imported_products(log)
+
+		self.assertEqual(result["published"], 1)
+		self.assertEqual(
+			result["not_published"],
+			[{"item_template": unpriced, "title": unpriced, "reasons": ["Add a price before publishing"]}],
+		)
+		self.assertEqual(
+			frappe.db.get_value("Style Attribute Variant", {"item_style": unpriced}, "is_published"), 0
 		)
 
 	def test_an_imported_plain_item_reaches_checkout(self):
