@@ -1,28 +1,34 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, Dropdown, Tooltip, dialog, toast } from 'frappe-ui'
+import { Badge, Button, Dropdown, FormControl, Tooltip, toast } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
 import Thumb from './Thumb.vue'
 import EditableValue from './EditableValue.vue'
-import EmptyState from './EmptyState.vue'
+import FormDialog from './FormDialog.vue'
 import VariantDialog from './VariantDialog.vue'
 import EditOptionsDialog from './EditOptionsDialog.vue'
+import ReceiveStockDialog from './product/ReceiveStockDialog.vue'
 import SwatchDot from './SwatchDot.vue'
 import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
-import { stockTone } from '../data/format'
-import { hasPrice, isPriceValid, priceFields, priceRates, productOptions } from '../data/product'
+import { money, symbolFor } from '../data/format'
+import {
+  PLACEHOLDER_ATTRIBUTE,
+  hasPrice,
+  originalPriceError,
+  priceInputRates,
+  priceInputs,
+  productOptions,
+} from '../data/product'
 import { __ } from '../data/translation'
-import { ia } from '../ia/store'
 import { useBulkAction } from '../utils/useBulkAction'
+import { colorLabel, groupSizes, stockRows, totalStock } from '../data/variants'
 
 const props = defineProps({ product: { type: Object, required: true } })
 const emit = defineEmits(['saved'])
 
 const selection = ref([])
 
-// A row opens the variant rather than navigating: a variant is a small record,
-// and you are usually working down the matrix, not away from it.
 // Held by name: a save reloads the product with new variant objects, and the
 // open dialog has to follow them rather than keep showing the old photos.
 const editingName = ref(null)
@@ -49,41 +55,61 @@ watch(
 const showEditOptions = ref(false)
 
 const options = computed(() => productOptions(props.product))
+const hasOptions = computed(() => Boolean(options.value.options.length || options.value.sizes.length))
+// Sizes alone keep the hidden "Standard" option, so its one group has no name a seller chose.
+const hasColors = computed(() => Boolean(options.value.options.length))
+const optionName = computed(() =>
+  props.product.option_attribute && props.product.option_attribute !== PLACEHOLDER_ATTRIBUTE
+    ? props.product.option_attribute
+    : '',
+)
+
+const variantCount = computed(() => props.product.variants.reduce((sum, variant) => sum + variant.sizes.length, 0))
+const variantsHint = computed(() => {
+  const count = variantCount.value === 1 ? __('1 variant.') : __('{0} variants.', [variantCount.value])
+  if (!hasColors.value) return `${count} ${__('Same price for every size.')}`
+  return `${count} ${__('Each {0} has one price for all its sizes.', [optionName.value.toLowerCase()])}`
+})
+
+// Collapsed by default so the colors read as a short list; one group has nothing to collapse into.
+const expanded = ref(new Set())
+const isExpanded = (variant) => props.product.variants.length === 1 || expanded.value.has(variant.name)
+function toggleExpanded(variant) {
+  const next = new Set(expanded.value)
+  if (next.has(variant.name)) next.delete(variant.name)
+  else next.add(variant.name)
+  expanded.value = next
+}
 
 const optionValuesRequest = useAdminRead('catalog.get_attribute_values', {
   params: () => ({ attribute: props.product.option_attribute }),
-  immediate: Boolean(props.product.option_attribute),
+  immediate: Boolean(optionName.value),
   refetch: true,
 })
 
 const swatches = computed(() =>
   Object.fromEntries(
-    (optionValuesRequest.data ?? []).map((entry) => [
-      entry.value,
-      { color: entry.color, image: entry.image },
-    ]),
+    (optionValuesRequest.data ?? []).map((entry) => [entry.value, { color: entry.color, image: entry.image }]),
   ),
 )
 
 const priceAction = useAdminAction('catalog.set_variant_price')
 
-function repricingError(variant, discountedPrice) {
-  if (!hasPrice(discountedPrice)) return __('Enter a discounted price above zero.')
-  const fields = { ...priceFields(variant.sizes[0]), discountedPrice }
-  return isPriceValid(fields) ? '' : __('Price must be higher than the discounted price.')
+function repricingError(variant, price) {
+  if (!hasPrice(price)) return __('Enter a price above zero.')
+  return originalPriceError({ ...priceInputs(variant.sizes[0]), price })
 }
 
-function repriced(variant, discountedPrice) {
-  return priceRates({ ...priceFields(variant.sizes[0]), discountedPrice })
+function repriced(variant, price) {
+  return priceInputRates({ ...priceInputs(variant.sizes[0]), price })
 }
 
-async function setPrice(variant, rate) {
-  const error = repricingError(variant, rate)
+async function setPrice(variant, price) {
+  const error = repricingError(variant, price)
   if (error) return toast.error(error)
-  const rates = repriced(variant, rate)
-  const saved = await trySubmit(priceAction, { style_attribute_variant: variant.name, ...rates })
+  const saved = await trySubmit(priceAction, { style_attribute_variant: variant.name, ...repriced(variant, price) })
   if (!saved) return
-  toast.success(__('Price updated for {0} ({1} sizes)', [variant.option, variant.sizes.length]))
+  toast.success(__('Price updated for {0}', [colorLabel(variant)]))
   emit('saved')
 }
 
@@ -91,49 +117,43 @@ async function setPrice(variant, rate) {
 const bulkPriceAction = useAdminAction('catalog.set_variant_price', { quiet: true })
 const { running: bulkRunning, run: runBulk } = useBulkAction()
 
-async function bulkSetPrice() {
-  const selected = props.product.variants.filter((variant) => selection.value.includes(variant.name))
-  if (!selected.length) return
+const currency = symbolFor()
+const bulkPriceOpen = ref(false)
+const bulkPrice = ref(null)
+const bulkSelected = computed(() => props.product.variants.filter((variant) => selection.value.includes(variant.name)))
+const bulkPriceError = computed(() => (hasPrice(bulkPrice.value) ? '' : __('Enter a price above zero.')))
 
-  dialog.prompt({
-    title: selected.length === 1 ? __('Set price on 1 variant') : __('Set price on {0} variants', [selected.length]),
-    message: __('Sets the price for every size under each selected variant.'),
-    fields: [{ name: 'value', label: __('Discounted price'), type: 'number', required: true }],
-    onConfirm: async ({ values }) => {
-      const rate = Math.max(0, Number(values.value) || 0)
-      await runBulk(
-        'Set price',
-        selected,
-        (variant) => {
-          const error = repricingError(variant, rate)
-          if (error) return Promise.reject(new Error(error))
-          return bulkPriceAction.submit({ style_attribute_variant: variant.name, ...repriced(variant, rate) })
-        },
-        {
-          sentences: {
-            all: (count) => (count === 1 ? __('1 variant repriced') : __('{0} variants repriced', [count])),
-            some: (done, total, failed) => __('{0} of {1} variants repriced. {2} failed', [done, total, failed]),
-          },
-          after: ({ failed }) => {
-            selection.value = failed.map(({ item }) => item.name)
-            emit('saved')
-          },
-        },
-      )
+function openBulkPrice() {
+  bulkPrice.value = null
+  bulkPriceOpen.value = true
+}
+
+async function bulkSetPrice() {
+  if (bulkPriceError.value) return
+  const price = Number(bulkPrice.value)
+  bulkPriceOpen.value = false
+  await runBulk(
+    'Set price',
+    bulkSelected.value,
+    (variant) => {
+      const error = repricingError(variant, price)
+      if (error) return Promise.reject(new Error(error))
+      return bulkPriceAction.submit({ style_attribute_variant: variant.name, ...repriced(variant, price) })
     },
-  })
+    {
+      sentences: {
+        all: (count) => (count === 1 ? __('Price updated for 1 color') : __('Price updated for {0} colors', [count])),
+        some: (done, total, failed) => __('Price updated for {0} of {1} colors. {2} failed', [done, total, failed]),
+      },
+      after: ({ failed }) => {
+        selection.value = failed.map(({ item }) => item.name)
+        emit('saved')
+      },
+    },
+  )
 }
 
 const publishAction = useAdminAction('catalog.set_variant_published')
-const receiveAction = useAdminAction('inventory.receive_stock')
-
-function publishBlockers(variant) {
-  return variant.blockers ?? []
-}
-
-function blockerLabel(variant) {
-  return variant.sizes.length ? __('Not ready') : __('Needs a size')
-}
 
 async function togglePublish(variant) {
   const toggled = await trySubmit(publishAction, {
@@ -143,73 +163,66 @@ async function togglePublish(variant) {
   if (!toggled) return
   toast.success(
     variant.is_published
-      ? __('{0} hidden from the storefront', [variant.option])
-      : __('{0} published', [variant.option]),
+      ? __('{0} is now a draft', [colorLabel(variant)])
+      : __('{0} is live', [colorLabel(variant)]),
   )
   emit('saved')
 }
 
-// Same additive receipt as the Stock screen and the product menu — commera has no way to set
-// on-hand to an exact number, so one quantity goes onto every size of this option.
-function receiveStock(variant) {
-  const itemCodes = variant.sizes.map((size) => size.item_code).filter(Boolean)
-  if (!itemCodes.length) {
-    toast.info(__('{0} has no sizes to add stock to yet.', [variant.option]))
-    return
-  }
+const stockOpen = ref(false)
+const stockTarget = ref([])
+const allStockRows = computed(() => stockRows(props.product.variants))
 
-  dialog.prompt({
-    title: __('Add stock to {0}', [variant.option]),
-    message: __(
-      'Adds this quantity to each of the {0} sizes under this option. There is no way to set stock to an exact number here.',
-      [itemCodes.length],
-    ),
-    fields: [{ name: 'value', label: __('Quantity to add'), type: 'number', required: true }],
-    onConfirm: async ({ values }) => {
-      const quantity = Math.max(0, Math.trunc(Number(values.value) || 0))
-      if (!quantity) return
-
-      const received = await trySubmit(receiveAction, {
-        received_quantities: Object.fromEntries(itemCodes.map((code) => [code, quantity])),
-      })
-      if (!received) return
-      toast.success(__('Added {0} to {1} sizes', [quantity, itemCodes.length]))
-      emit('saved')
-    },
-  })
+function addStock(rows) {
+  stockTarget.value = rows
+  stockOpen.value = true
 }
 
 function rowActions(variant) {
+  const label = colorLabel(variant)
   return [
-    {
-      label: variant.is_published ? __('Hide from storefront') : __('Publish to storefront'),
-      icon: variant.is_published ? 'lucide-eye-off' : 'lucide-globe',
-      onClick: () => togglePublish(variant),
-    },
-    { label: __('Add stock'), icon: 'lucide-package-plus', onClick: () => receiveStock(variant) },
+    { label: __('Edit {0}', [label]), icon: 'lucide-pencil', onClick: () => openVariant(variant) },
+    { label: __('Add stock'), icon: 'lucide-package-plus', onClick: () => addStock(stockRows([variant])) },
+    variant.is_published
+      ? { label: __('Unpublish'), icon: 'lucide-eye-off', onClick: () => togglePublish(variant) }
+      : {
+          label: __('Publish'),
+          icon: 'lucide-globe',
+          onClick: () => togglePublish(variant),
+        },
   ]
 }
 
-// Seven columns. The min-width has to clear every fixed column plus both minmax floors, or the
-// 1.3fr Variant column collapses to nothing instead of the row scrolling.
-const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.5rem', '7rem', '3rem']
+// Phones get three tracks (name, status, menu) and read price and stock off the name's second
+// line; from sm up those two get their own columns. The cells for them carry max-sm:hidden to match.
+const columns = {
+  base: ['minmax(0,1fr)', '3.5rem', '2rem'],
+  sm: ['minmax(0,1fr)', '7.5rem', '5.5rem', '5.5rem', '2rem'],
+}
 </script>
 
 <template>
   <section class="space-y-5">
-    <!-- The axis, first: the matrix below is nothing but its values. -->
     <div id="product-options" class="rounded-5 border border-outline-gray-1">
-      <h2 class="px-4 py-3 text-lg-semibold text-ink-gray-8">{{ __('Options') }}</h2>
-
-      <template v-if="options.options.length || options.sizes.length">
-        <button
-          v-if="options.options.length"
-          type="button"
-          class="flex w-full items-center gap-3 border-t border-outline-gray-1 px-4 py-3 text-start hover:bg-surface-gray-1"
+      <div class="flex items-start justify-between gap-3 px-4 py-3">
+        <div class="min-w-0">
+          <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Options') }}</h2>
+          <p v-if="!hasOptions" class="mt-1 text-p-sm text-ink-gray-5">
+            {{ product.can_edit_options ? __('Sell this in more than one size or color.') : __('It sells as a single item.') }}
+          </p>
+        </div>
+        <Button
+          v-if="hasOptions && product.can_edit_options"
+          :label="__('Edit')"
+          icon-left="lucide-pencil"
           @click="showEditOptions = true"
-        >
-          <span class="w-24 shrink-0 text-base text-ink-gray-6">{{ product.option_attribute }}</span>
-          <span class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+        />
+      </div>
+
+      <dl v-if="hasOptions" class="border-t border-outline-gray-1">
+        <div v-if="hasColors" class="flex items-start gap-3 px-4 py-3">
+          <dt class="w-20 shrink-0 pt-0.5 text-base text-ink-gray-6">{{ optionName || __('Option') }}</dt>
+          <dd class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             <Badge v-for="value in options.options" :key="value" variant="subtle">
               <span class="flex items-center gap-1.5">
                 <SwatchDot
@@ -221,158 +234,184 @@ const columns = ['minmax(7rem,1.3fr)', 'minmax(5rem,1fr)', '6.5rem', '5rem', '4.
                 {{ value }}
               </span>
             </Badge>
-          </span>
-          <span class="lucide-chevron-right size-4 shrink-0 text-ink-gray-5 rtl:rotate-180" aria-hidden="true" />
-        </button>
-
-        <button
-          v-if="options.sizes.length"
-          type="button"
-          class="flex w-full items-center gap-3 border-t border-outline-gray-1 px-4 py-3 text-start hover:bg-surface-gray-1"
-          @click="showEditOptions = true"
-        >
-          <span class="w-24 shrink-0 text-base text-ink-gray-6">{{ __('Size') }}</span>
-          <span class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          </dd>
+        </div>
+        <div v-if="options.sizes.length" class="flex items-start gap-3 border-t border-outline-gray-1 px-4 py-3 first:border-t-0">
+          <dt class="w-20 shrink-0 pt-0.5 text-base text-ink-gray-6">{{ __('Size') }}</dt>
+          <dd class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             <Badge v-for="size in options.sizes" :key="size" :label="size" variant="subtle" />
-          </span>
-          <span class="lucide-chevron-right size-4 shrink-0 text-ink-gray-5 rtl:rotate-180" aria-hidden="true" />
-        </button>
-      </template>
+          </dd>
+        </div>
+      </dl>
 
-      <button
-        v-else-if="product.can_edit_options"
-        type="button"
-        class="flex w-full items-center gap-2 border-t border-outline-gray-1 px-4 py-3 text-start hover:bg-surface-gray-1"
-        @click="showEditOptions = true"
-      >
-        <span class="lucide-plus size-4 text-ink-gray-7" aria-hidden="true" />
-        <span class="text-base text-ink-gray-8">{{ __('Add options like size or color') }}</span>
-      </button>
-
-      <p v-else class="border-t border-outline-gray-1 px-4 py-3 text-p-sm text-ink-gray-5">
-        {{ __('It sells as a single item.') }}
-      </p>
+      <div v-else-if="product.can_edit_options" class="border-t border-outline-gray-1 px-2 py-2">
+        <Button
+          variant="ghost"
+          icon-left="lucide-plus"
+          :label="__('Add options like size or color')"
+          @click="showEditOptions = true"
+        />
+      </div>
     </div>
 
-    <!-- The matrix: one row per option, each with its own sizes underneath. The
-         card, its List and its headers stay mounted with no variants — the ⋯
-         menu's "jump to variants" row scrolls to this id and would land nowhere
-         if the card came and went, and an empty column layout is how every other
-         list in the app answers "no rows" (see ProductStock right below). -->
-    <div id="product-variants" class="rounded-5 border border-outline-gray-1">
-      <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-        <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Variants') }}</h2>
+    <!-- A product with no options shows its one price and stock in the product page's own card. -->
+    <div v-if="hasOptions" id="product-variants" class="rounded-5 border border-outline-gray-1">
+      <div class="flex flex-wrap items-start justify-between gap-2 px-4 py-3">
+        <div class="min-w-0">
+          <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Variants') }}</h2>
+          <p class="mt-1 text-p-sm text-ink-gray-5">{{ variantsHint }}</p>
+        </div>
         <div class="flex items-center gap-2">
           <template v-if="selection.length">
             <span class="text-sm text-ink-gray-5">{{ __('{0} selected', [selection.length]) }}</span>
-            <Button :label="__('Set price')" :loading="bulkRunning === 'Set price'" @click="bulkSetPrice" />
+            <Button :label="__('Set price')" :loading="bulkRunning === 'Set price'" @click="openBulkPrice" />
             <Button :label="__('Clear')" variant="ghost" :disabled="Boolean(bulkRunning)" @click="selection = []" />
           </template>
+          <Button
+            v-else
+            :label="__('Add stock')"
+            icon-left="lucide-package-plus"
+            :disabled="!allStockRows.length"
+            @click="addStock(allStockRows)"
+          />
         </div>
       </div>
 
-      <div class="overflow-x-auto px-2 pb-2">
-        <List
-          v-model:selection="selection"
-          class="min-w-[42rem]"
-          selectable
-          :row-height="Math.max(ia.density, 48)"
-          :columns="columns"
-        >
+      <div class="border-t border-outline-gray-1 px-1 pb-1 sm:px-2">
+        <List v-model:selection="selection" class="list-row-px-2" :selectable="hasColors" :columns="columns">
           <ListHeader>
-            <ListHeaderCell>{{ __('Variant') }}</ListHeaderCell>
-            <ListHeaderCell>{{ __('Sizes') }}</ListHeaderCell>
-            <ListHeaderCell>{{ __('Price') }}</ListHeaderCell>
-            <ListHeaderCell>{{ __('Stock') }}</ListHeaderCell>
-            <ListHeaderCell>{{ __('Photos') }}</ListHeaderCell>
-            <ListHeaderCell>{{ __('Storefront') }}</ListHeaderCell>
-            <ListHeaderCell></ListHeaderCell>
+            <ListHeaderCell>{{ hasColors ? optionName || __('Option') : __('Size') }}</ListHeaderCell>
+            <ListHeaderCell class="max-sm:hidden">{{ __('Price') }}</ListHeaderCell>
+            <ListHeaderCell class="max-sm:hidden">{{ __('In stock') }}</ListHeaderCell>
+            <ListHeaderCell>{{ __('Status') }}</ListHeaderCell>
+            <ListHeaderCell />
           </ListHeader>
+
           <ListRows :items="product.variants" row-key="name" v-slot="{ item }">
-            <ListRow :value="item.name">
-              <ListCell>
-                <button class="flex min-w-0 items-center gap-2.5" @click.stop="openVariant(item)">
-                  <Thumb :image="item.images[0]" size="size-7" />
-                  <span class="truncate text-base text-ink-gray-8">{{ item.option }}</span>
-                </button>
+            <ListRow :value="hasColors ? item.name : undefined" class="min-h-12 py-1.5">
+              <ListCell class="min-w-0">
+                <div class="flex min-w-0 items-center gap-1">
+                  <Button
+                    v-if="groupSizes(item).length && product.variants.length > 1"
+                    variant="ghost"
+                    size="sm"
+                    :icon="isExpanded(item) ? 'lucide-chevron-down' : 'lucide-chevron-right rtl:-scale-x-100'"
+                    :label="isExpanded(item) ? __('Hide sizes of {0}', [colorLabel(item)]) : __('Show sizes of {0}', [colorLabel(item)])"
+                    @click.stop="toggleExpanded(item)"
+                  />
+                  <button
+                    type="button"
+                    class="flex min-w-0 items-center gap-2.5 rounded-4 px-1 py-0.5 text-start hover:bg-surface-gray-2"
+                    @click.stop="openVariant(item)"
+                  >
+                    <Thumb :image="item.images[0]" size="size-8" />
+                    <span class="min-w-0">
+                      <span class="block truncate text-base-medium text-ink-gray-8">{{ colorLabel(item) }}</span>
+                      <span v-if="groupSizes(item).length" class="block truncate text-sm text-ink-gray-5">
+                        {{ groupSizes(item).length === 1 ? __('1 size') : __('{0} sizes', [groupSizes(item).length]) }}
+                      </span>
+                      <span class="block truncate text-sm text-ink-gray-5 sm:hidden">
+                        {{ money(priceInputs(item.sizes[0]).price ?? 0) }} · {{ __('{0} in stock', [totalStock(item)]) }}
+                      </span>
+                    </span>
+                  </button>
+                </div>
               </ListCell>
-              <ListCell>
-                <span class="truncate text-base text-ink-gray-5">
-                  {{ item.sizes.map((s) => s.size).join(', ') || '—' }}
+              <ListCell class="max-sm:hidden">
+                <!-- One price for the whole color: set_variant_price writes every size under it. -->
+                <EditableValue
+                  :model-value="priceInputs(item.sizes[0]).price ?? 0"
+                  :label="__('Price')"
+                  :description="__('Same price for every size of {0}.', [colorLabel(item)])"
+                  format="money"
+                  @update:model-value="(price) => setPrice(item, price)"
+                />
+                <span v-if="priceInputs(item.sizes[0]).originalPrice" class="text-sm text-ink-gray-4 line-through tabular-nums">
+                  {{ money(priceInputs(item.sizes[0]).originalPrice) }}
+                </span>
+              </ListCell>
+              <ListCell class="max-sm:hidden">
+                <span class="px-1.5 text-base tabular-nums" :class="totalStock(item) ? 'text-ink-gray-8' : 'text-ink-gray-5'">
+                  {{ totalStock(item) }}
                 </span>
               </ListCell>
               <ListCell>
-                <!-- One price for the whole row: sets every size under this variant
-                     in one pass (catalog.set_variant_price), the same bulk operation
-                     create_product uses. -->
-                <EditableValue
-                  :model-value="priceFields(item.sizes[0]).discountedPrice ?? 0"
-                  :label="__('Discounted price')"
-                  format="money"
-                  @update:model-value="(rate) => setPrice(item, rate)"
-                />
-              </ListCell>
-              <ListCell>
-                <!-- Read-only: commera only exposes receiving stock (additive), not
-                     setting on-hand to an arbitrary number. -->
-                <EditableValue
-                  :model-value="item.sizes.reduce((sum, s) => sum + (s.stock ?? 0), 0)"
-                  :label="__('On hand')"
-                  readonly
-                  :class="stockTone(item.sizes.reduce((sum, s) => sum + (s.stock ?? 0), 0))"
-                />
-              </ListCell>
-              <ListCell>
-                <!-- Photos are per variant, so the count is a way in, not a stat. -->
-                <button
-                  class="flex items-center gap-1.5 rounded-4 px-1.5 py-0.5 hover:bg-surface-gray-2"
-                  @click.stop="openVariant(item)"
-                >
-                  <span
-                    class="size-3.5"
-                    :class="item.images.length ? 'lucide-image text-ink-gray-6' : 'lucide-image-plus text-ink-gray-4'"
-                    aria-hidden="true"
-                  />
-                  <span class="text-base tabular-nums" :class="item.images.length ? 'text-ink-gray-7' : 'text-ink-gray-4'">
-                    {{ item.images.length || __('Add') }}
-                  </span>
-                </button>
-              </ListCell>
-              <ListCell>
-                <!-- Why it cannot go live matters more than that it has not, so a blocked
-                     option names what it is missing instead of just reading "Hidden". -->
-                <Badge
-                  v-if="item.is_published"
-                  :label="__('Live')"
-                  theme="green"
-                  variant="subtle"
-                />
-                <Tooltip v-else-if="publishBlockers(item).length" :text="publishBlockers(item).join(', ')">
-                  <Badge :label="blockerLabel(item)" theme="amber" variant="subtle" />
+                <Badge v-if="item.is_published" :label="__('Live')" theme="green" variant="subtle" />
+                <Tooltip v-else-if="item.blockers?.length" :text="item.blockers.join(', ')">
+                  <Badge :label="__('Draft')" theme="gray" variant="subtle">
+                    <template #suffix><span class="lucide-info size-3" aria-hidden="true" /></template>
+                  </Badge>
                 </Tooltip>
-                <Badge v-else :label="__('Hidden')" theme="gray" variant="subtle" />
+                <Badge v-else :label="__('Draft')" theme="gray" variant="subtle" />
               </ListCell>
-              <ListCell>
+              <ListCell class="justify-end">
                 <Dropdown :options="rowActions(item)" @click.stop>
-                  <Button icon="lucide-ellipsis" :label="__('Options for this variant')" variant="ghost" />
+                  <Button icon="lucide-ellipsis" variant="ghost" :label="__('More actions for {0}', [colorLabel(item)])" />
                 </Dropdown>
               </ListCell>
             </ListRow>
+
+            <!-- Sizes as plain rows under their color: no value, so no checkbox, and they keep
+                 the list's row-after-row dividers. -->
+            <template v-if="isExpanded(item)">
+              <ListRow v-for="size in groupSizes(item)" :key="size.item_code" class="min-h-11 py-1">
+                <!-- Indented to the color's name, which sits after the chevron (when there is one) and the thumb. -->
+                <ListCell class="min-w-0" :class="product.variants.length > 1 ? 'ps-20' : 'ps-12'">
+                  <span class="min-w-0">
+                    <span class="block truncate text-base text-ink-gray-8">{{ size.size }}</span>
+                    <span class="block truncate text-xs text-ink-gray-5 max-sm:hidden">{{ size.item_code }}</span>
+                    <span class="block truncate text-sm text-ink-gray-5 sm:hidden">{{ __('{0} in stock', [size.stock ?? 0]) }}</span>
+                  </span>
+                </ListCell>
+                <ListCell class="max-sm:hidden" />
+                <ListCell class="max-sm:hidden">
+                  <span class="px-1.5 text-base tabular-nums" :class="size.stock ? 'text-ink-gray-8' : 'text-ink-gray-5'">
+                    {{ size.stock ?? 0 }}
+                  </span>
+                </ListCell>
+                <ListCell class="col-span-2 justify-end">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon-left="lucide-plus"
+                    :label="__('Add stock')"
+                    @click.stop="addStock(stockRows([{ ...item, sizes: [size] }]))"
+                  />
+                </ListCell>
+              </ListRow>
+            </template>
           </ListRows>
         </List>
       </div>
-
-      <EmptyState
-        v-if="!product.variants.length"
-        compact
-        icon="lucide-layers"
-        :title="__('No variants yet')"
-        :description="__('Variants are the buyable combinations, like a colour in a size.')"
-      />
     </div>
   </section>
 
   <EditOptionsDialog v-model:open="showEditOptions" :product="product" @saved="emit('saved')" />
-  <VariantDialog v-model:open="showVariant" :variant="editing" :product="product" @saved="emit('saved')" />
+  <VariantDialog
+    v-model:open="showVariant"
+    :variant="editing"
+    :product="product"
+    @saved="emit('saved')"
+    @add-stock="addStock"
+  />
+  <ReceiveStockDialog v-model:open="stockOpen" :rows="stockTarget" @received="emit('saved')" />
+  <FormDialog
+    v-model:open="bulkPriceOpen"
+    size="md"
+    :title="__('Set price')"
+    :primary-label="__('Set price')"
+    :primary-disabled="Boolean(bulkPriceError)"
+    :reason="bulkPriceError"
+    @submit="bulkSetPrice"
+  >
+    <FormControl
+      v-model.number="bulkPrice"
+      type="number"
+      :label="__('Price')"
+      required
+      :description="__('Same price for every size of {0}.', [bulkSelected.map(colorLabel).join(', ')])"
+    >
+      <template #prefix><span class="text-base text-ink-gray-5">{{ currency }}</span></template>
+    </FormControl>
+  </FormDialog>
 </template>
-

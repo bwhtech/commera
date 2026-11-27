@@ -51,7 +51,7 @@ function cancel(close) {
         <span v-else class="text-base">{{ format === 'money' ? money(modelValue) : modelValue }}</span>
         <span
           class="lucide-pencil size-3 text-ink-gray-4 transition-opacity"
-          :class="open ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
+          :class="open ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'"
           aria-hidden="true"
         />
       </button>

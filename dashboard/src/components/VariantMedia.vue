@@ -1,11 +1,12 @@
 <script setup>
 /**
- * Photos for one variant. The first one is the cover — it is what the
- * storefront swaps to when a shopper picks this colour or size.
+ * Photos for one color. The first one is the cover: it is what the
+ * storefront swaps to when a shopper picks this color.
  */
-import { ref } from 'vue'
-import { Badge, Button, toast, useFileUpload } from 'frappe-ui'
+import { computed, ref } from 'vue'
+import { Badge, Button, Dropdown, toast, useFileUpload } from 'frappe-ui'
 import { useAdminAction, trySubmit } from '../data/api'
+import { PLACEHOLDER_OPTION } from '../data/product'
 import { __ } from '../data/translation'
 
 const props = defineProps({
@@ -16,10 +17,15 @@ const emit = defineEmits(['saved'])
 const { upload, isUploading } = useFileUpload()
 const addAction = useAdminAction('catalog.add_product_images')
 const removeAction = useAdminAction('catalog.remove_product_image')
+const moveAction = useAdminAction('catalog.move_product_image')
+
+const isPlaceholder = computed(() => props.variant.option === PLACEHOLDER_OPTION)
 
 const fileInput = ref(null)
+const lastRemoved = ref(null)
 
 async function addFiles(files) {
+  lastRemoved.value = null
   const uploaded = []
   for (const file of files) {
     try {
@@ -52,13 +58,41 @@ function onDrop(event) {
   addFiles([...(event.dataTransfer?.files ?? [])])
 }
 
-async function remove(fileUrl) {
+async function makeCover(fileUrl) {
+  lastRemoved.value = null
+  const moved = await trySubmit(moveAction, { style_attribute_variant: props.variant.name, file_url: fileUrl, position: 0 })
+  if (!moved) return
+  toast.success(__('Cover photo changed'))
+  emit('saved')
+}
+
+// Removal saves at once, so the way back sits under the photos: the same file, re-attached at its
+// old place. Inline rather than a toast action, because a modal dialog blocks clicks on the toast.
+
+async function undoRemove() {
+  const { fileUrl, position } = lastRemoved.value
+  const added = await trySubmit(addAction, { style_attribute_variant: props.variant.name, file_urls: [fileUrl] })
+  if (!added) return
+  lastRemoved.value = null
+  await trySubmit(moveAction, { style_attribute_variant: props.variant.name, file_url: fileUrl, position })
+  emit('saved')
+}
+
+async function remove(fileUrl, position) {
   const removed = await trySubmit(removeAction, {
     style_attribute_variant: props.variant.name,
     file_url: fileUrl,
   })
   if (!removed) return
+  lastRemoved.value = { fileUrl, position }
   emit('saved')
+}
+
+function photoActions(image, index) {
+  return [
+    index > 0 && { label: __('Make cover'), icon: 'lucide-star', onClick: () => makeCover(image) },
+    { label: __('Remove'), icon: 'lucide-trash-2', onClick: () => remove(image, index) },
+  ].filter(Boolean)
 }
 </script>
 
@@ -82,10 +116,16 @@ async function remove(fileUrl) {
       </span>
       <span>
         <span class="block text-base-medium text-ink-gray-8">
-          {{ isUploading ? __('Uploading…') : __('Add photos of {0}', [variant.option]) }}
+          <template v-if="isUploading">{{ __('Uploading…') }}</template>
+          <template v-else-if="isPlaceholder">{{ __('Add photos') }}</template>
+          <template v-else>{{ __('Add photos of {0}', [variant.option]) }}</template>
         </span>
         <span class="block text-p-sm text-ink-gray-5">
-          {{ __('Shown when a shopper picks {0}. Drop images here or click to choose.', [variant.option]) }}
+          {{
+            isPlaceholder
+              ? __('Drop images here or click to choose.')
+              : __('Shown when a shopper picks {0}. Drop images here or click to choose.', [variant.option])
+          }}
         </span>
       </span>
     </button>
@@ -97,14 +137,17 @@ async function remove(fileUrl) {
       >
         <img :src="image" class="size-full object-cover" alt="" />
         <Badge v-if="index === 0" class="absolute bottom-1 start-1" :label="__('Cover')" theme="gray" variant="solid" size="sm" />
-        <!-- Touch has no hover, so the only way to delete a photo has to be
-             visible from the start on a phone; hover-reveal is a desktop luxury. -->
-        <Button
-          class="absolute end-1 top-1 !size-6 !rounded-full !bg-black-overlay-500 !text-white opacity-100 backdrop-blur-sm transition-opacity hover:!bg-black-overlay-700 sm:opacity-0 sm:group-hover:opacity-100"
-          icon="lucide-x"
-          :label="__('Remove photo')"
-          @click="remove(image)"
-        />
+        <!-- Touch has no hover, so on a phone the menu is visible from the start; from sm up it
+             shows on hover and on keyboard focus, never invisible while focused. -->
+        <Dropdown :options="photoActions(image, index)">
+          <Button
+            class="absolute end-1 top-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+            size="sm"
+            variant="outline"
+            icon="lucide-ellipsis"
+            :label="__('Photo actions')"
+          />
+        </Dropdown>
       </div>
 
       <button
@@ -119,5 +162,9 @@ async function remove(fileUrl) {
         </span>
       </button>
     </div>
+    <p v-if="lastRemoved" class="mt-2 flex items-center gap-2 text-p-sm text-ink-gray-6" aria-live="polite">
+      {{ __('Photo removed.') }}
+      <Button size="sm" variant="ghost" :label="__('Undo')" :loading="addAction.loading" @click="undoRemove" />
+    </p>
   </div>
 </template>

@@ -1,11 +1,12 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Alert, Button, Dialog, ErrorMessage, Select, toast } from 'frappe-ui'
+import { Alert, Select, toast } from 'frappe-ui'
 import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { optionChanges, pairKey } from '../data/optionSizes'
 import { PLACEHOLDER_ATTRIBUTE, productOptions } from '../data/product'
 import { __ } from '../data/translation'
 import AttributeMultiSelect from './AttributeMultiSelect.vue'
+import FormDialog from './FormDialog.vue'
 import OptionSizeGrid from './OptionSizeGrid.vue'
 
 const props = defineProps({ product: { type: Object, required: true } })
@@ -21,6 +22,10 @@ const sizesOpen = ref(false)
 const pickerOpen = computed(() => optionsOpen.value || sizesOpen.value)
 
 const firstOption = computed(() => props.product.option_attribute === PLACEHOLDER_ATTRIBUTE)
+const hasOptions = computed(() => {
+  const shown = productOptions(props.product)
+  return Boolean(shown.options.length || shown.sizes.length)
+})
 const chosenAttribute = ref('')
 const attributesRequest = useAdminRead('catalog.get_attributes', { immediate: false })
 const attributeOptions = computed(() =>
@@ -79,38 +84,34 @@ const summary = computed(() => {
   const parts = []
   if (addedCount.value === 1) parts.push(__('1 variant will be added'))
   else if (addedCount.value) parts.push(__('{0} variants will be added', [addedCount.value]))
-  if (removedCount.value) parts.push(__('{0} will come off sale', [removedCount.value]))
-  return parts.join(' · ') || __('No changes yet')
+  if (removedCount.value === 1) parts.push(__('1 will leave the store'))
+  else if (removedCount.value) parts.push(__('{0} will leave the store', [removedCount.value]))
+  return parts.join(' · ')
 })
 
 const emptyError = computed(() => (changes.value.ticked.length ? '' : __('Keep at least one variant ticked.')))
-const canSave = computed(() => (addedCount.value || removedCount.value) && !emptyError.value)
+const hasChanges = computed(() => Boolean(addedCount.value || removedCount.value))
+const canSave = computed(() => hasChanges.value && !emptyError.value)
+const blockedReason = computed(() => (hasChanges.value ? emptyError.value : __('Nothing has changed yet.')))
 
-const removedHint = __(
-  "They leave the storefront and can't be sold, but past orders keep them. Tick one again to bring it back with its stock and price.",
-)
-const addedHint = __(
-  "A new size takes its option's price and goes on sale with it. A new option takes the product's price and stays hidden until it has a photo.",
+const removedHint = __('Past orders keep them. Tick one again to bring it back with its stock and price.')
+const addedHint = computed(() =>
+  __('A new size takes the price of its {0}. A new {0} takes the product price and starts as a draft.', [
+    optionLabel.value.toLowerCase(),
+  ]),
 )
 
-const stockByPair = computed(
-  () =>
-    new Map(
-      props.product.variants.flatMap((variant) =>
-        variant.sizes.map((size) => [pairKey(variant.option, size.size), size.stock ?? 0]),
-      ),
-    ),
+const currentStock = computed(() =>
+  props.product.variants.reduce((total, variant) => total + variant.sizes.reduce((sum, size) => sum + (size.stock ?? 0), 0), 0),
 )
-const offSaleStock = computed(() =>
-  changes.value.removed.reduce((total, pair) => total + (stockByPair.value.get(pairKey(pair.option, pair.size)) ?? 0), 0),
-)
+// Shown from the start, not once values are ticked: the seller should know the cost before choosing.
 const firstOptionHint = computed(() =>
-  offSaleStock.value
+  currentStock.value
     ? __(
-        'The {0} in stock and past orders stay on the current item, which goes off sale. The new variants start with no stock: use Add stock to add it.',
-        [offSaleStock.value],
+        'The current item goes off sale and keeps its {0} in stock and its past orders. The new variants start with no stock: use Add stock after saving.',
+        [currentStock.value],
       )
-    : __('Past orders stay on the current item, which goes off sale. The new variants start with no stock.'),
+    : __('The current item goes off sale and keeps its past orders. The new variants start with no stock.'),
 )
 
 const saveAction = useAdminAction('catalog.save_product_options')
@@ -129,8 +130,8 @@ async function save() {
   const { created, disabled, restored } = saveAction.data
   const parts = [
     created && __('{0} added', [created]),
-    restored && __('{0} back on sale', [restored]),
-    disabled && __('{0} taken off sale', [disabled]),
+    restored && __('{0} back in the store', [restored]),
+    disabled && __('{0} taken out of the store', [disabled]),
   ].filter(Boolean)
   toast.success(__('Variants updated: {0}', [parts.join(', ')]))
   open.value = false
@@ -139,77 +140,64 @@ async function save() {
 </script>
 
 <template>
-  <Dialog v-model:open="open" size="xl" :title="__('Edit options')" :dismissible="!pickerOpen">
-    <template #default>
-      <div class="space-y-5">
-        <Select
-          v-if="firstOption"
-          v-model="chosenAttribute"
-          :label="__('Option')"
-          :options="attributeOptions"
-          :description="__('What this product varies by. Sizes are added below and apply to every option.')"
-        />
+  <FormDialog
+    v-model:open="open"
+    :title="hasOptions ? __('Edit options') : __('Add options')"
+    :primary-label="__('Save changes')"
+    :primary-disabled="!canSave"
+    :reason="canSave ? '' : blockedReason"
+    :loading="saveAction.loading"
+    :dismissible="!pickerOpen"
+    @submit="save"
+  >
+    <div class="space-y-5">
+      <Alert v-if="firstOption && (!hasOptions || options.length)" :title="__('Adding options replaces the current item')" :description="firstOptionHint" />
 
-        <AttributeMultiSelect
-          v-if="!firstOption || chosenAttribute"
-          v-model="options"
-          v-model:open="optionsOpen"
-          :attribute="optionLabel"
-          :label="optionLabel"
-          :placeholder="__('Pick or type a {0}', [optionLabel.toLowerCase()])"
-          :description="__('Type a new {0} to add it', [optionLabel.toLowerCase()])"
-          @values="setOptionSwatches"
-        />
-
-        <AttributeMultiSelect
-          v-model="sizes"
-          v-model:open="sizesOpen"
-          attribute="Size"
-          :label="__('Sizes')"
-          :placeholder="__('Pick or type a size')"
-        />
-
-        <OptionSizeGrid
-          v-if="options.length && sizes.length"
-          v-model="excludedPairs"
-          :options="options"
-          :sizes="sizes"
-          :option-label="optionLabel"
-          :swatches="optionSwatches"
-          :live="[...livePairs]"
-        />
-
-        <p class="text-sm text-ink-gray-5">{{ summary }}</p>
-        <ErrorMessage :message="emptyError" />
-
-        <Alert
-          v-if="firstOption && removedCount && addedCount"
-          :title="__('The current item goes off sale')"
-          :description="firstOptionHint"
-        />
-        <Alert
-          v-else-if="removedCount"
-          :title="__('Unticked variants are hidden, not deleted')"
-          :description="removedHint"
-        />
-        <Alert
-          v-else-if="addedCount"
-          :title="__('Prices are filled in for you')"
-          :description="addedHint"
-        />
-      </div>
-    </template>
-
-    <template #actions>
-      <Button
-        class="w-full"
-        variant="solid"
-        theme="gray"
-        :label="__('Save options')"
-        :disabled="!canSave"
-        :loading="saveAction.loading"
-        @click="save"
+      <Select
+        v-if="firstOption"
+        v-model="chosenAttribute"
+        :label="__('Option')"
+        :options="attributeOptions"
+        :description="__('Like color or material. Sizes are picked below.')"
       />
-    </template>
-  </Dialog>
+
+      <AttributeMultiSelect
+        v-if="!firstOption || chosenAttribute"
+        v-model="options"
+        v-model:open="optionsOpen"
+        :attribute="optionLabel"
+        :label="optionLabel"
+        :placeholder="__('Pick or type a {0}', [optionLabel.toLowerCase()])"
+        :description="__('Type a new {0} to add it', [optionLabel.toLowerCase()])"
+        @values="setOptionSwatches"
+      />
+
+      <AttributeMultiSelect
+        v-model="sizes"
+        v-model:open="sizesOpen"
+        attribute="Size"
+        :label="__('Sizes')"
+        :placeholder="__('Pick or type a size')"
+      />
+
+      <OptionSizeGrid
+        v-if="options.length && sizes.length"
+        v-model="excludedPairs"
+        :options="options"
+        :sizes="sizes"
+        :option-label="optionLabel"
+        :swatches="optionSwatches"
+        :live="[...livePairs]"
+      />
+
+      <p v-if="summary" class="text-sm text-ink-gray-5">{{ summary }}</p>
+
+      <Alert
+        v-if="removedCount && !firstOption"
+        :title="__('Unticked variants leave the store, they are not deleted')"
+        :description="removedHint"
+      />
+      <Alert v-if="addedCount && !firstOption" :title="__('Prices are filled in for you')" :description="addedHint" />
+    </div>
+  </FormDialog>
 </template>
