@@ -2761,3 +2761,21 @@ product created,منتج تم إنشاؤه
 "already a product, left alone",منتج موجود، تُرك كما هو
 item that did not import,عنصر لم يُستورد
 No price yet,لا سعر بعد
+All sizes of {0},كل مقاسات {0}
+Edit price of {0},تعديل سعر {0}
+Step {0} of {1} · {2},الخطوة {0} من {1} · {2}
+Step 1 · {0},الخطوة 1 · {0}
+Fix the skipped rows in your file to import.,أصلح الصفوف المتخطاة في ملفك لتتمكن من الاستيراد.
+Nothing to import,لا يوجد ما يُستورد
+No products were published,لم يُنشر أي منتج
+{0} of 1 color has a photo,{0} من لون واحد له صورة
+{0} of 1 product has a photo,{0} من منتج واحد له صورة
+1 color still needs a photo.,لون واحد ما زال يحتاج إلى صورة.
+1 product still needs a photo.,منتج واحد ما زال يحتاج إلى صورة.
+{0} added.,أُضيفت {0}.
+"1 item is already a product, so it was left alone.",صنف واحد موجود بالفعل كمنتج، لذا تُرك كما هو.
+"{0} items are already products, so they were left alone.",{0} أصناف موجودة بالفعل كمنتجات، لذا تُركت كما هي.
+"Fix the items below in ERPNext, then import them again.",أصلح الأصناف أدناه في ERPNext، ثم استوردها مرة أخرى.
+"{0} ""{1}"" is not a number.",{0} «{1}» ليس رقمًا.
+"Price does not match row {0}. Every size of {1} in ""{2}"" has the same price.","السعر لا يطابق الصف {0}. لكل مقاسات {1} في ""{2}"" السعر نفسه."
+"Price does not match row {0}. Every size of ""{1}"" has the same price.","السعر لا يطابق الصف {0}. لكل مقاسات ""{1}"" السعر نفسه."
