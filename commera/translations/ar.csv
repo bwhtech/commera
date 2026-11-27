@@ -2779,3 +2779,7 @@ No products were published,لم يُنشر أي منتج
 "{0} ""{1}"" is not a number.",{0} «{1}» ليس رقمًا.
 "Price does not match row {0}. Every size of {1} in ""{2}"" has the same price.","السعر لا يطابق الصف {0}. لكل مقاسات {1} في ""{2}"" السعر نفسه."
 "Price does not match row {0}. Every size of ""{1}"" has the same price.","السعر لا يطابق الصف {0}. لكل مقاسات ""{1}"" السعر نفسه."
+Customers can find it on your store now.,يمكن للعملاء العثور عليه في متجرك الآن.
+Sizes of {0},مقاسات {0}
+Fix the ticked sizes to continue.,صحّح المقاسات المحددة للمتابعة.
+Details,التفاصيل
