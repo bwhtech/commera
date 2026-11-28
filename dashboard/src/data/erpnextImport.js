@@ -97,6 +97,7 @@ export async function startErpnextImport() {
   imp.erpnext.status = null
   imp.erpnext.error = ''
   imp.erpnext.otherImportRunning = false
+  imp.erpnext.startFailed = false
   imp.erpnext.published = null
 
   const itemCodes = itemCodesToImport(imp.erpnext.selected, imp.erpnext.importableCount)
@@ -105,6 +106,7 @@ export async function startErpnextImport() {
   if (!started) {
     imp.erpnext.error = errorMessage(startAction.error, __('The import could not start. Try again in a moment.'))
     imp.erpnext.otherImportRunning = startAction.error?.type === 'ImportAlreadyRunningError'
+    imp.erpnext.startFailed = true
     endPhase(ticket, 'failed')
     return
   }

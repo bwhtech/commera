@@ -76,6 +76,8 @@ function blankImport() {
       // The start was refused because another import (other items) is still running: nothing
       // started, so the result card says that instead of "could not finish".
       otherImportRunning: false,
+      // The start itself was refused, so nothing ran: the result says "did not start", not "could not finish".
+      startFailed: false,
       published: null,
     },
   }

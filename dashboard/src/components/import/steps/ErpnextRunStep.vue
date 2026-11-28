@@ -49,6 +49,14 @@ function finish(path) {
   closeImport()
   router.push(path)
 }
+
+// A start that was refused ran nothing, so it "did not start"; one that stopped part-way "could not
+// finish" and keeps what it made.
+const failedTitle = computed(() => {
+  if (imp.erpnext.otherImportRunning) return __('These items were not imported')
+  if (imp.erpnext.startFailed) return __('The import did not start')
+  return __('The import could not finish')
+})
 </script>
 
 <template>
@@ -82,7 +90,7 @@ function finish(path) {
       <ImportResult
         :failed="!imp.erpnext.otherImportRunning"
         :waiting="imp.erpnext.otherImportRunning"
-        :title="imp.erpnext.otherImportRunning ? __('These items were not imported') : __('The import could not finish')"
+        :title="failedTitle"
         :body="imp.erpnext.error || __('It stopped before the end. The products it already made are kept, so running it again picks up the rest.')"
       >
         <Button :label="__('Close')" @click="closeImport" />
