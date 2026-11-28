@@ -6,6 +6,7 @@ import { Button, Dropdown, ScrollArea, Skeleton, toast } from 'frappe-ui'
 import AppPageHeader from '../components/AppPageHeader.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PageBody from '../components/PageBody.vue'
+import ResponsiveButton from '../components/ResponsiveButton.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import VariantEditor from '../components/VariantEditor.vue'
 import ProductBasics from '../components/product/ProductBasics.vue'
@@ -63,8 +64,10 @@ const stats = useProductStats(product)
 const updateAction = useAdminAction('catalog.update_product')
 const publishAction = useAdminAction('catalog.set_product_published')
 
+const isPublished = computed(() => product.value?.variants.some((variant) => variant.is_published))
+
 async function togglePublish() {
-  const publish = !product.value.variants.some((variant) => variant.is_published)
+  const publish = !isPublished.value
   const toggled = await trySubmit(publishAction, { item_template: product.value.id, publish })
   if (!toggled) return
   const result = publishAction.data
@@ -164,6 +167,13 @@ const loadFailure = computed(() =>
       :breadcrumbs="[{ label: __('Products'), route: '/products' }, { label: product.title }]"
     >
       <template #actions>
+        <ResponsiveButton
+          v-if="!isPublished"
+          icon="lucide-globe"
+          :label="__('Publish to storefront')"
+          :loading="publishAction.loading"
+          @click="togglePublish"
+        />
         <Dropdown :options="moreActions">
           <Button icon="lucide-ellipsis" :label="__('More actions')" />
         </Dropdown>
@@ -178,7 +188,7 @@ const loadFailure = computed(() =>
         <PageBody width="narrow">
           <div class="flex flex-wrap items-center gap-2">
             <StatusBadge :status="product.status" />
-            <span class="text-sm text-ink-gray-5">
+            <span v-if="product.sku !== product.title" class="text-sm text-ink-gray-5">
               {{ product.sku }}
             </span>
           </div>
