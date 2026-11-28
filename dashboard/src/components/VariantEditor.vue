@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Dropdown, FormControl, Tooltip, toast } from 'frappe-ui'
 import { List, ListCell, ListHeader, ListHeaderCell, ListRow, ListRows } from 'frappe-ui/list'
+import DotList from './DotList.vue'
 import Thumb from './Thumb.vue'
 import EditableValue from './EditableValue.vue'
 import FormDialog from './FormDialog.vue'
@@ -11,6 +12,7 @@ import EditOptionsDialog from './EditOptionsDialog.vue'
 import ReceiveStockDialog from './product/ReceiveStockDialog.vue'
 import SwatchDot from './SwatchDot.vue'
 import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
+import { errorMessage } from '../data/errors'
 import { money, symbolFor } from '../data/format'
 import {
   PLACEHOLDER_ATTRIBUTE,
@@ -19,9 +21,11 @@ import {
   priceInputRates,
   priceInputs,
   productOptions,
+  stockLabel,
 } from '../data/product'
 import { __ } from '../data/translation'
 import { useBulkAction } from '../utils/useBulkAction'
+import { useIsMobile } from '../utils/useIsMobile'
 import { colorLabel, groupSizes, priceScopeHint, priceUpdatedMessage, stockRows, totalStock } from '../data/variants'
 
 const props = defineProps({ product: { type: Object, required: true } })
@@ -34,11 +38,25 @@ const selection = ref([])
 const editingName = ref(null)
 const editing = computed(() => props.product.variants.find((variant) => variant.name === editingName.value) ?? null)
 const showVariant = ref(false)
+// Set for one opening only: Add price on a phone, where the seller came to type a price.
+const focusPrice = ref(false)
 
-function openVariant(variant) {
+function openVariant(variant, { withPriceFocused = false } = {}) {
   editingName.value = variant.name
+  focusPrice.value = withPriceFocused
   showVariant.value = true
 }
+
+// The page's Add price on a phone, where the price column is hidden: the first color the publish
+// check stops on opens in its dialog.
+function openFirstUnpriced() {
+  const unpriced = props.product.variants.find((variant) =>
+    variant.sizes.some((size) => !hasPrice(priceInputs(size).price)),
+  )
+  if (unpriced) openVariant(unpriced, { withPriceFocused: true })
+}
+
+defineExpose({ openFirstUnpriced })
 
 const route = useRoute()
 const router = useRouter()
@@ -67,12 +85,21 @@ const optionName = computed(() =>
 )
 
 const variantCount = computed(() => props.product.variants.reduce((sum, variant) => sum + variant.sizes.length, 0))
+const optionNoun = computed(() => (optionName.value || __('Option')).toLowerCase())
 const variantsHint = computed(() => {
   const count = variantCount.value === 1 ? __('1 variant.') : __('{0} variants.', [variantCount.value])
   if (!hasColors.value) return `${count} ${__('Same price for every size.')}`
-  // Colors with no sizes: each color is one variant with its own price, so there is no scope to explain.
-  if (!options.value.sizes.length) return count
-  return `${count} ${__('Each {0} has one price for all its sizes.', [optionName.value.toLowerCase()])}`
+  // Colors with no sizes: each color is one variant, so its price is its own.
+  if (!options.value.sizes.length) return `${count} ${__('Each {0} has its own price.', [optionNoun.value])}`
+  return `${count} ${__('Each {0} has one price for all its sizes.', [optionNoun.value])}`
+})
+
+// The header counts variants (color × size) and the checkboxes pick colors, so the bulk count names
+// what it counts. Only Color has a plural the dashboard can say in a whole translated sentence.
+const selectionLabel = computed(() => {
+  const count = selection.value.length
+  if (optionName.value !== 'Color') return __('{0} selected', [count])
+  return count === 1 ? __('1 color selected') : __('{0} colors selected', [count])
 })
 
 // Collapsed by default so the colors read as a short list; one group has nothing to collapse into.
@@ -82,6 +109,14 @@ function sizeCount(variant) {
   if (!count) return ''
   return count === 1 ? __('1 size') : __('{0} sizes', [count])
 }
+// The line under a color's name. A phone has no stock column, so stock joins it there; DotList
+// wraps between facts, never inside "0 in stock" or onto a dangling dot, when a Status badge
+// narrows the name.
+const isMobile = useIsMobile()
+function colorFacts(variant) {
+  return [sizeCount(variant), isMobile.value && stockLabel(totalStock(variant))].filter(Boolean)
+}
+
 const isExpanded = (variant) => props.product.variants.length === 1 || expanded.value.has(variant.name)
 function toggleExpanded(variant) {
   const next = new Set(expanded.value)
@@ -102,7 +137,8 @@ const swatches = computed(() =>
   ),
 )
 
-const priceAction = useAdminAction('catalog.set_variant_price')
+// Quiet: a refusal is shown once, under the inline price input, which stays open to retype it.
+const priceAction = useAdminAction('catalog.set_variant_price', { quiet: true })
 
 function repricingError(variant, price) {
   if (!hasPrice(price)) return __('Enter a price above zero.')
@@ -113,13 +149,18 @@ function repriced(variant, price) {
   return priceInputRates({ ...priceInputs(variant.sizes[0]), price })
 }
 
-async function setPrice(variant, price) {
+// EditableValue's `submit`: '' once saved, else the reason, which it shows inline.
+async function submitPrice(variant, price) {
   const error = repricingError(variant, price)
-  if (error) return toast.error(error)
-  const saved = await trySubmit(priceAction, { style_attribute_variant: variant.name, ...repriced(variant, price) })
-  if (!saved) return
+  if (error) return error
+  try {
+    await priceAction.submit({ style_attribute_variant: variant.name, ...repriced(variant, price) })
+  } catch (refusal) {
+    return errorMessage(refusal)
+  }
   toast.success(priceUpdatedMessage(variant))
   emit('saved')
+  return ''
 }
 
 // Its own quiet request: see Pricing.vue's bulk repricing, which this mirrors.
@@ -129,6 +170,7 @@ const { running: bulkRunning, run: runBulk } = useBulkAction()
 const currency = symbolFor()
 const bulkPriceOpen = ref(false)
 const bulkPrice = ref(null)
+const bulkPriceTyped = computed(() => bulkPrice.value != null && bulkPrice.value !== '')
 const bulkSelected = computed(() => props.product.variants.filter((variant) => selection.value.includes(variant.name)))
 const bulkPriceError = computed(() => (hasPrice(bulkPrice.value) ? '' : __('Enter a price above zero.')))
 const bulkPriceHint = computed(() => {
@@ -228,12 +270,42 @@ function rowActions(variant) {
   ]
 }
 
-// Phones get three tracks (name, status, menu) and read price and stock off the name's second
-// line; from sm up those two get their own columns. The cells for them carry max-sm:hidden to match.
-const columns = {
-  base: ['minmax(0,1fr)', 'auto', '2rem'],
-  sm: ['minmax(0,1fr)', '7.5rem', '5.5rem', '7rem', '2rem'],
+// A status column earns its place only when the colors differ: the page header's badge already says
+// "Not published" or "Live" for the product, and a column repeating it on every row says nothing.
+// A blocked color (no price, no photo) differs from a ready one, so it keeps the column too.
+function statusKey(variant) {
+  if (variant.is_published) return 'live'
+  return variant.blockers?.length ? 'blocked' : 'ready'
 }
+const showsStatus = computed(() => new Set(props.product.variants.map(statusKey)).size > 1)
+
+// Phones get the name, status and menu tracks and read price and stock off the name's second line;
+// from sm up those two get their own columns. The cells for them carry max-sm:hidden to match.
+const columns = computed(() =>
+  showsStatus.value
+    ? { base: ['minmax(0,1fr)', 'auto', '2rem'], sm: ['minmax(0,1fr)', '7.5rem', '5.5rem', '7rem', '2rem'] }
+    : { base: ['minmax(0,1fr)', '2rem'], sm: ['minmax(0,1fr)', '7.5rem', '5.5rem', '2rem'] },
+)
+
+// The color's name sits after the chevron (on a product with sizes and more than one color), the
+// button's px-1 and the thumb with gap-3: 28 + 4 + 4 + 32 + 12 = 80px (ps-20), or 48px (ps-12) with
+// no chevron. The header label and the size rows use the same inset, so all three start on one
+// line. Recheck both numbers if the chevron, the thumb or that gap changes.
+const hasChevrons = computed(() => props.product.variants.length > 1 && options.value.sizes.length > 0)
+const nameInset = computed(() => (hasChevrons.value ? 'ps-20' : 'ps-12'))
+
+// frappe-ui draws a row divider and the header rule across the grid tracks only, so they start after
+// the checkbox column and stop at the row's hover inset. The other product cards rule edge to edge;
+// these lift the track placement (inline style, hence !) and stretch both lines over the wrapper's
+// px-1 / sm:px-2, so the variant rows rule the same way, sizes included.
+const FULL_BLEED_RULES = [
+  '[&_[data-slot=list-divider]]:![grid-column:auto]',
+  '[&_[data-slot=list-divider]]:-inset-x-1',
+  'sm:[&_[data-slot=list-divider]]:-inset-x-2',
+  '[&_[data-slot=list-header-border]]:[grid-column:auto]',
+  '[&_[data-slot=list-header-border]]:-inset-x-1',
+  'sm:[&_[data-slot=list-header-border]]:-inset-x-2',
+]
 // Sizes alone have no status of their own: the product's status in the page header is theirs.
 const sizeColumns = {
   base: ['minmax(0,1fr)', '2rem'],
@@ -243,20 +315,23 @@ const sizeColumns = {
 
 <template>
   <section class="space-y-5">
-    <div id="product-options" class="rounded-5 border border-outline-gray-1">
+    <!-- A product that cannot take options (an imported single item) has nothing to show or do
+         here: Price and stock already says it sells as one item. -->
+    <div v-if="hasOptions || product.can_edit_options" id="product-options" class="rounded-5 border border-outline-gray-1">
       <div class="flex items-start justify-between gap-3 px-4 py-3">
         <div class="min-w-0">
           <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Options') }}</h2>
-          <p v-if="!hasOptions" class="mt-1 text-p-sm text-ink-gray-5">
-            {{ product.can_edit_options ? __('Sell this in more than one size or color.') : __('It sells as a single item.') }}
+          <p v-if="!hasOptions" class="mt-1 text-p-sm text-ink-gray-6">
+            {{ __('Sell this in more than one size or color.') }}
           </p>
         </div>
         <Button
-          v-if="hasOptions && product.can_edit_options"
+          v-if="hasOptions"
           :label="__('Edit')"
           icon-left="lucide-pencil"
           @click="showEditOptions = true"
         />
+        <Button v-else :label="__('Add options')" icon-left="lucide-plus" @click="showEditOptions = true" />
       </div>
 
       <dl v-if="hasOptions" class="border-t border-outline-gray-1">
@@ -283,15 +358,6 @@ const sizeColumns = {
           </dd>
         </div>
       </dl>
-
-      <div v-else-if="product.can_edit_options" class="border-t border-outline-gray-1 px-2 py-2">
-        <Button
-          variant="ghost"
-          icon-left="lucide-plus"
-          :label="__('Add options like size or color')"
-          @click="showEditOptions = true"
-        />
-      </div>
     </div>
 
     <!-- A product with no options shows its one price and stock in the product page's own card. -->
@@ -299,11 +365,11 @@ const sizeColumns = {
       <div class="flex flex-wrap items-start justify-between gap-2 px-4 py-3">
         <div class="min-w-0">
           <h2 class="text-lg-semibold text-ink-gray-8">{{ __('Variants') }}</h2>
-          <p class="mt-1 text-p-sm text-ink-gray-5">{{ variantsHint }}</p>
+          <p class="mt-1 text-p-sm text-ink-gray-6 tabular-nums">{{ variantsHint }}</p>
         </div>
         <div class="flex items-center gap-2">
           <template v-if="selection.length">
-            <span class="text-sm text-ink-gray-5">{{ __('{0} selected', [selection.length]) }}</span>
+            <span class="text-sm text-ink-gray-6 tabular-nums">{{ selectionLabel }}</span>
             <Button :label="__('Set price')" :loading="bulkRunning === 'Set price'" @click="openBulkPrice" />
             <Button :label="__('Clear')" variant="ghost" :disabled="Boolean(bulkRunning)" @click="selection = []" />
           </template>
@@ -317,14 +383,15 @@ const sizeColumns = {
         </div>
       </div>
 
+      <!-- Numbers (price, stock) end-align under end-aligned headers, as in the variant dialog's
+           sizes table; pe-1.5 matches the px-1.5 of the price trigger and the stock number, so each
+           header ends where its values end. -->
       <div class="border-t border-outline-gray-1 px-1 pb-1 sm:px-2">
-        <List v-if="sizesOnlyVariant" class="list-row-px-2" :columns="sizeColumns">
-          <ListHeader>
+        <List v-if="sizesOnlyVariant" class="list-row-px-2" :class="FULL_BLEED_RULES" :columns="sizeColumns">
+          <ListHeader class="text-ink-gray-6">
             <ListHeaderCell>{{ __('Size') }}</ListHeaderCell>
-            <!-- ps-1.5 matches the px-1.5 of the price trigger and the stock number, so each header
-                 starts where its values start. -->
-            <ListHeaderCell class="ps-1.5 max-sm:hidden">{{ __('Price') }}</ListHeaderCell>
-            <ListHeaderCell class="ps-1.5 max-sm:hidden">{{ __('In stock') }}</ListHeaderCell>
+            <ListHeaderCell class="justify-end pe-1.5 max-sm:hidden">{{ __('Price') }}</ListHeaderCell>
+            <ListHeaderCell class="justify-end pe-1.5 max-sm:hidden">{{ __('In stock') }}</ListHeaderCell>
             <ListHeaderCell />
           </ListHeader>
 
@@ -337,28 +404,29 @@ const sizeColumns = {
                   @click.stop="openVariant(sizesOnlyVariant)"
                 >
                   <span class="block truncate text-base-medium text-ink-gray-8">{{ size.size }}</span>
-                  <span class="block truncate text-sm text-ink-gray-5 sm:hidden">
+                  <span class="block text-sm text-ink-gray-6 tabular-nums sm:hidden">
                     {{ money(priceInputs(size).price ?? 0) }}
                     <span v-if="priceInputs(size).originalPrice" class="line-through">{{ money(priceInputs(size).originalPrice) }}</span>
-                    · {{ __('{0} in stock', [size.stock ?? 0]) }}
+                    · {{ stockLabel(size.stock) }}
                   </span>
                 </button>
               </ListCell>
-              <ListCell class="max-sm:hidden" data-price-cell>
+              <ListCell class="flex-col !items-end max-sm:hidden" data-price-cell>
                 <EditableValue
                   :model-value="priceInputs(size).price ?? 0"
                   :label="__('Price')"
                   :description="priceScopeHint(sizesOnlyVariant)"
                   :trigger-label="__('Edit price of {0}', [product.title])"
+                  :submit="(price) => submitPrice(sizesOnlyVariant, price)"
                   format="money"
-                  @update:model-value="(price) => setPrice(sizesOnlyVariant, price)"
+                  align="end"
                 />
-                <span v-if="priceInputs(size).originalPrice" class="text-sm text-ink-gray-4 line-through tabular-nums">
+                <span v-if="priceInputs(size).originalPrice" class="pe-1.5 text-sm text-ink-gray-6 line-through tabular-nums">
                   {{ money(priceInputs(size).originalPrice) }}
                 </span>
               </ListCell>
-              <ListCell class="max-sm:hidden">
-                <span class="px-1.5 text-base tabular-nums" :class="size.stock ? 'text-ink-gray-8' : 'text-ink-gray-5'">
+              <ListCell class="justify-end max-sm:hidden">
+                <span class="px-1.5 text-base tabular-nums" :class="size.stock ? 'text-ink-gray-8' : 'text-ink-gray-6'">
                   {{ size.stock ?? 0 }}
                 </span>
               </ListCell>
@@ -371,12 +439,12 @@ const sizeColumns = {
           </ListRows>
         </List>
 
-        <List v-else v-model:selection="selection" class="list-row-px-2" selectable :columns="columns">
-          <ListHeader>
-            <ListHeaderCell>{{ optionName || __('Option') }}</ListHeaderCell>
-            <ListHeaderCell class="ps-1.5 max-sm:hidden">{{ __('Price') }}</ListHeaderCell>
-            <ListHeaderCell class="ps-1.5 max-sm:hidden">{{ __('In stock') }}</ListHeaderCell>
-            <ListHeaderCell>{{ __('Status') }}</ListHeaderCell>
+        <List v-else v-model:selection="selection" class="list-row-px-2" :class="FULL_BLEED_RULES" selectable :columns="columns">
+          <ListHeader class="text-ink-gray-6">
+            <ListHeaderCell :class="nameInset">{{ optionName || __('Option') }}</ListHeaderCell>
+            <ListHeaderCell class="justify-end pe-1.5 max-sm:hidden">{{ __('Price') }}</ListHeaderCell>
+            <ListHeaderCell class="justify-end pe-1.5 max-sm:hidden">{{ __('In stock') }}</ListHeaderCell>
+            <ListHeaderCell v-if="showsStatus">{{ __('Status') }}</ListHeaderCell>
             <ListHeaderCell />
           </ListHeader>
 
@@ -384,27 +452,31 @@ const sizeColumns = {
             <ListRow :value="item.name" class="min-h-12 py-1.5">
               <ListCell class="min-w-0">
                 <div class="flex min-w-0 items-center gap-1">
-                  <Button
-                    v-if="groupSizes(item).length && product.variants.length > 1"
-                    variant="ghost"
-                    size="sm"
-                    :icon="isExpanded(item) ? 'lucide-chevron-down' : 'lucide-chevron-right rtl:-scale-x-100'"
-                    :label="isExpanded(item) ? __('Hide sizes of {0}', [colorLabel(item)]) : __('Show sizes of {0}', [colorLabel(item)])"
-                    @click.stop="toggleExpanded(item)"
-                  />
+                  <template v-if="hasChevrons">
+                    <Button
+                      v-if="groupSizes(item).length"
+                      variant="ghost"
+                      size="sm"
+                      :icon="isExpanded(item) ? 'lucide-chevron-down' : 'lucide-chevron-right rtl:-scale-x-100'"
+                      :label="isExpanded(item) ? __('Hide sizes of {0}', [colorLabel(item)]) : __('Show sizes of {0}', [colorLabel(item)])"
+                      @click.stop="toggleExpanded(item)"
+                    />
+                    <!-- A color whose sizes were all taken out keeps the chevron's width, so its name
+                         stays on the line nameInset draws. -->
+                    <span v-else class="size-7 shrink-0" aria-hidden="true" />
+                  </template>
                   <button
                     type="button"
-                    class="flex min-w-0 items-center gap-2.5 rounded-4 px-1 py-0.5 text-start hover:bg-surface-gray-2"
+                    class="flex min-w-0 items-center gap-3 rounded-4 px-1 py-0.5 text-start hover:bg-surface-gray-2"
                     @click.stop="openVariant(item)"
                   >
                     <Thumb :image="item.images[0]" size="size-8" />
                     <span class="min-w-0">
                       <span class="block truncate text-base-medium text-ink-gray-8">{{ colorLabel(item) }}</span>
-                      <!-- On a phone, stock joins the sizes line and the price gets a line of its own. -->
-                      <span class="block truncate text-sm text-ink-gray-5">
-                        {{ sizeCount(item) }}<span class="sm:hidden">{{ sizeCount(item) ? ' · ' : '' }}{{ __('{0} in stock', [totalStock(item)]) }}</span>
-                      </span>
-                      <span class="block truncate text-sm text-ink-gray-5 sm:hidden">
+                      <!-- On a phone the price gets a line of its own. Neither line truncates: they
+                           are the only place a phone shows these numbers. -->
+                      <DotList class="text-sm text-ink-gray-6 tabular-nums" :parts="colorFacts(item)" />
+                      <span class="block text-sm text-ink-gray-6 tabular-nums sm:hidden">
                         {{ money(priceInputs(item.sizes[0]).price ?? 0) }}
                         <span v-if="priceInputs(item.sizes[0]).originalPrice" class="line-through">{{ money(priceInputs(item.sizes[0]).originalPrice) }}</span>
                       </span>
@@ -412,26 +484,29 @@ const sizeColumns = {
                   </button>
                 </div>
               </ListCell>
-              <ListCell class="max-sm:hidden" data-price-cell>
-                <!-- One price for the whole color: set_variant_price writes every size under it. -->
+              <!-- One price for the whole color: set_variant_price writes every size under it. The
+                   original price sits under it, as the sizes line sits under the name, so the charged
+                   prices keep one right edge down the column whether a row has one or not. -->
+              <ListCell class="flex-col !items-end max-sm:hidden" data-price-cell>
                 <EditableValue
                   :model-value="priceInputs(item.sizes[0]).price ?? 0"
                   :label="__('Price')"
                   :description="priceScopeHint(item) || undefined"
                   :trigger-label="__('Edit price of {0}', [colorLabel(item)])"
+                  :submit="(price) => submitPrice(item, price)"
                   format="money"
-                  @update:model-value="(price) => setPrice(item, price)"
+                  align="end"
                 />
-                <span v-if="priceInputs(item.sizes[0]).originalPrice" class="text-sm text-ink-gray-4 line-through tabular-nums">
+                <span v-if="priceInputs(item.sizes[0]).originalPrice" class="pe-1.5 text-sm text-ink-gray-6 line-through tabular-nums">
                   {{ money(priceInputs(item.sizes[0]).originalPrice) }}
                 </span>
               </ListCell>
-              <ListCell class="max-sm:hidden">
-                <span class="px-1.5 text-base tabular-nums" :class="totalStock(item) ? 'text-ink-gray-8' : 'text-ink-gray-5'">
+              <ListCell class="justify-end max-sm:hidden">
+                <span class="px-1.5 text-base tabular-nums" :class="totalStock(item) ? 'text-ink-gray-8' : 'text-ink-gray-6'">
                   {{ totalStock(item) }}
                 </span>
               </ListCell>
-              <ListCell>
+              <ListCell v-if="showsStatus">
                 <Badge v-if="item.is_published" :label="__('Live')" theme="green" variant="subtle" />
                 <Tooltip v-else-if="item.blockers?.length" :text="item.blockers.join(', ')">
                   <Badge :label="__('Not published')" theme="gray" variant="subtle">
@@ -451,20 +526,19 @@ const sizeColumns = {
                  the list's row-after-row dividers. Stock is added from the color's menu. -->
             <template v-if="isExpanded(item)">
               <ListRow v-for="size in groupSizes(item)" :key="size.item_code" class="min-h-11 py-1">
-                <!-- Indented to the color's name, which sits after the chevron (when there is one) and the thumb. -->
-                <ListCell class="min-w-0" :class="product.variants.length > 1 ? 'ps-20' : 'ps-12'">
+                <ListCell class="min-w-0" :class="nameInset">
                   <span class="min-w-0">
                     <span class="block truncate text-base text-ink-gray-8">{{ size.size }}</span>
-                    <span class="block truncate text-sm text-ink-gray-5 sm:hidden">{{ __('{0} in stock', [size.stock ?? 0]) }}</span>
+                    <span class="block text-sm text-ink-gray-6 tabular-nums sm:hidden">{{ stockLabel(size.stock) }}</span>
                   </span>
                 </ListCell>
                 <ListCell class="max-sm:hidden" />
-                <ListCell class="max-sm:hidden">
-                  <span class="px-1.5 text-base tabular-nums" :class="size.stock ? 'text-ink-gray-8' : 'text-ink-gray-5'">
+                <ListCell class="justify-end max-sm:hidden">
+                  <span class="px-1.5 text-base tabular-nums" :class="size.stock ? 'text-ink-gray-8' : 'text-ink-gray-6'">
                     {{ size.stock ?? 0 }}
                   </span>
                 </ListCell>
-                <ListCell class="col-span-2" />
+                <ListCell :class="{ 'col-span-2': showsStatus }" />
               </ListRow>
             </template>
           </ListRows>
@@ -478,6 +552,7 @@ const sizeColumns = {
     v-model:open="showVariant"
     :variant="editing"
     :product="product"
+    :focus-price="focusPrice"
     @saved="emit('saved')"
     @add-stock="addStockFromVariant"
   />
@@ -489,16 +564,19 @@ const sizeColumns = {
     :primary-label="__('Set price')"
     :primary-disabled="Boolean(bulkPriceError)"
     :reason="bulkPriceError"
+    :dirty="bulkPriceTyped"
     @submit="bulkSetPrice"
   >
     <FormControl
       v-model.number="bulkPrice"
       type="number"
+      inputmode="decimal"
+      placeholder="0"
       :label="__('Price')"
       required
       :description="bulkPriceHint"
     >
-      <template #prefix><span class="text-base text-ink-gray-5">{{ currency }}</span></template>
+      <template #prefix><span class="text-base text-ink-gray-6">{{ currency }}</span></template>
     </FormControl>
   </FormDialog>
 </template>

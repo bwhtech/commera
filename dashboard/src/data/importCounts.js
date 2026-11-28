@@ -23,13 +23,14 @@ export function erpnextImportLabel(selected) {
   return selected === 1 ? __('Import 1 item') : __('Import {0} items', [selected])
 }
 
-// The Review step's one-line summary, problems last and only when there are any.
+// The Review step's one-line summary, problems last and only when there are any. A problem carries
+// its tone, so the screen can color it the way the row badges are.
 export function reviewSummary({ products, variants, warnings, errors }) {
   // "0 products" says nothing the disabled button and its reason do not already say.
-  const parts = products ? [productCount(products)] : []
-  if (variants) parts.push(variantCount(variants))
-  if (warnings) parts.push(warnings === 1 ? __('1 warning') : __('{0} warnings', [warnings]))
-  if (errors) parts.push(errors === 1 ? __('1 row skipped') : __('{0} rows skipped', [errors]))
+  const parts = products ? [{ label: productCount(products) }] : []
+  if (variants) parts.push({ label: variantCount(variants) })
+  if (warnings) parts.push({ label: warningCount(warnings), tone: 'warning' })
+  if (errors) parts.push({ label: skippedRowCount(errors), tone: 'error' })
   return parts
 }
 
@@ -57,15 +58,53 @@ export const showsOriginalPrice = (row) => row.sale_price > 0 && row.compare_at_
 // The Review filter actually applied: one whose tab is gone (its bucket emptied) falls back to all rows.
 export const visibleFilter = (filter, options) => (options.some((option) => option.value === filter) ? filter : 'all')
 
-// Photos are grouped per color of a product, or per product when it has no colors.
-export function photoGroupsHavePhoto(withPhoto, total, hasColors) {
-  if (total === 1) return hasColors ? __('{0} of 1 color has a photo', [withPhoto]) : __('{0} of 1 product has a photo', [withPhoto])
-  return hasColors ? __('{0} of {1} colors have a photo', [withPhoto, total]) : __('{0} of {1} products have a photo', [withPhoto, total])
+// Photos are grouped per color of a product, or per product when it has no colors. A batch can hold
+// both, and calling a plain candle a "color" is wrong, so the noun follows what the groups are.
+export function photoGroupKind(groups) {
+  const colored = groups.filter((group) => group.color).length
+  if (!colored) return 'products'
+  return colored === groups.length ? 'colors' : 'mixed'
 }
 
-export function photoGroupsNeedPhoto(missing, total, hasColors) {
-  if (total === 1) return hasColors ? __('1 color still needs a photo.') : __('1 product still needs a photo.')
-  return hasColors
-    ? __('{0} of {1} colors still need a photo.', [missing, total])
-    : __('{0} of {1} products still need a photo.', [missing, total])
+// The verb agrees with the count in front of it: "1 of 3 colors has", "2 of 3 colors have".
+export function photoGroupsHavePhoto(withPhoto, total, kind) {
+  if (total === 1) return kind === 'colors' ? __('{0} of 1 color has a photo', [withPhoto]) : __('{0} of 1 product has a photo', [withPhoto])
+  if (withPhoto === 1) {
+    if (kind === 'colors') return __('1 of {0} colors has a photo', [total])
+    if (kind === 'mixed') return __('1 of {0} products and colors has a photo', [total])
+    return __('1 of {0} products has a photo', [total])
+  }
+  if (kind === 'colors') return __('{0} of {1} colors have a photo', [withPhoto, total])
+  if (kind === 'mixed') return __('{0} of {1} products and colors have a photo', [withPhoto, total])
+  return __('{0} of {1} products have a photo', [withPhoto, total])
+}
+
+export function photoGroupsNeedPhoto(missing, total, kind) {
+  if (total === 1) return kind === 'colors' ? __('1 color still needs a photo.') : __('1 product still needs a photo.')
+  if (missing === 1) {
+    if (kind === 'colors') return __('1 of {0} colors still needs a photo.', [total])
+    if (kind === 'mixed') return __('1 of {0} products and colors still needs a photo.', [total])
+    return __('1 of {0} products still needs a photo.', [total])
+  }
+  if (kind === 'colors') return __('{0} of {1} colors still need a photo.', [missing, total])
+  if (kind === 'mixed') return __('{0} of {1} products and colors still need a photo.', [missing, total])
+  return __('{0} of {1} products still need a photo.', [missing, total])
+}
+
+// The Images step's nudge towards adding several photos at once, once there are many to go.
+export function manyPhotoGroupsTip(total, kind) {
+  if (kind === 'colors') return __('For {0} colors, adding several named photos at once is far quicker.', [total])
+  if (kind === 'mixed') return __('For {0} products and colors, adding several named photos at once is far quicker.', [total])
+  return __('For {0} products, adding several named photos at once is far quicker.', [total])
+}
+
+export const warningCount = (count) => (count === 1 ? __('1 warning') : __('{0} warnings', [count]))
+
+export const skippedRowCount = (count) => (count === 1 ? __('1 row skipped') : __('{0} rows skipped', [count]))
+
+// A run result row, named by its number and the product title it carried. A photo error for a
+// product the file never made has no row, only its name.
+export function resultRowName({ row, title }) {
+  if (!row) return title || ''
+  return title ? __('Row {0} · {1}', [row, title]) : __('Row {0}', [row])
 }

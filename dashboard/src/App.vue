@@ -13,6 +13,8 @@ import SearchPalette from './components/SearchPalette.vue'
 import ImportDialog from './components/import/ImportDialog.vue'
 import AddProductDialog from './components/AddProductDialog.vue'
 import LanguageDialog from './components/LanguageDialog.vue'
+import ConfirmDialog from './components/ConfirmDialog.vue'
+import PromptDialog from './components/PromptDialog.vue'
 
 // frappe-ui ships MobileShell alongside DesktopShell rather than as a responsive variant,
 // so the layout is picked per viewport. The phone bundle is lazy.
@@ -66,6 +68,10 @@ provide(routeLocationKey, shallowReactive(shellRoute))
       <AddProductDialog v-if="canAddProducts" />
     </template>
     <LanguageDialog />
+    <!-- Last, so a leave guard asked over an open dialog draws on top of it. Outside the admin
+         check: a guard can fire on any page. -->
+    <PromptDialog />
+    <ConfirmDialog />
   </FrappeUIProvider>
 </template>
 

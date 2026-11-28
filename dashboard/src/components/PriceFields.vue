@@ -45,7 +45,7 @@ function removeOriginalPrice() {
         required
       >
         <template #prefix>
-          <span class="text-base text-ink-gray-5">{{ currencySymbol }}</span>
+          <span class="text-base text-ink-gray-6">{{ currencySymbol }}</span>
         </template>
       </FormControl>
 
@@ -61,12 +61,15 @@ function removeOriginalPrice() {
           placeholder="0"
         >
           <template #prefix>
-            <span class="text-base text-ink-gray-5">{{ currencySymbol }}</span>
+            <span class="text-base text-ink-gray-6">{{ currencySymbol }}</span>
           </template>
         </FormControl>
-        <!-- mt-6 drops the × past the field label so it sits level with the input. -->
+        <!-- The × drops past the field label to sit level with the input: frappe-ui's label is 13px
+             at leading-tighter (1.15), so 14.95px, plus the field's space-y-1.5 (6px) is 20.95px.
+             21px centres it to within 0.05px; mt-6 (24px) left it 3px low. Recheck if frappe-ui
+             changes the label's size, leading or gap. -->
         <Button
-          class="mt-6"
+          class="mt-[1.3125rem]"
           variant="ghost"
           icon="lucide-x"
           :aria-label="__('Remove original price')"

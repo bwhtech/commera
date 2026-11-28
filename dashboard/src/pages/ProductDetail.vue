@@ -19,7 +19,14 @@ import PluginSlot from '../components/PluginSlot.vue'
 import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { errorMessage } from '../data/errors'
 import { priceRange } from '../data/format'
-import { hasPrice, originalPriceError, priceInputRates, priceInputs, productOptions, useProductStats } from '../data/product'
+import {
+  hasPrice,
+  originalPriceError,
+  priceInputRates,
+  priceInputs,
+  productOptions,
+  useProductStats,
+} from '../data/product'
 import { changedFields, rebaseDraft, storedDraft } from '../data/productDraft'
 import { useRecordPlugins } from '../data/recordPlugins'
 import { __ } from '../data/translation'
@@ -49,11 +56,32 @@ const product = computed(() => {
     status: data.disabled ? 'archived' : isLive ? 'live' : 'draft',
     restock_level: data.restock_level,
     variants: data.variants,
+    size_order: data.size_order,
     option_attribute: data.option_attribute,
     can_edit_options: data.can_edit_options,
     recent_sales: data.recent_sales,
   }
 })
+
+// A second reload while one is in flight aborts the first mid-body, and frappe-ui's fetch logs that
+// abort as a "programming error". Writes here land in quick runs (a photo removed, then its undo; a
+// stock receipt, then a cover change), so a reload asked for during one runs once after it instead.
+let reloadQueued = false
+function reloadProduct() {
+  if (productRequest.loading) {
+    reloadQueued = true
+    return
+  }
+  productRequest.reload()
+}
+watch(
+  () => productRequest.loading,
+  (loading) => {
+    if (loading || !reloadQueued) return
+    reloadQueued = false
+    productRequest.reload()
+  },
+)
 
 const isLive = computed(() => product.value?.status === 'live')
 const stats = useProductStats(product)
@@ -144,7 +172,7 @@ async function save() {
     // while anything typed during the request stays a change.
     if (savedFields.length) {
       stored.value = { ...stored.value, ...Object.fromEntries(savedFields.map((field) => [field, submitted[field]])) }
-      productRequest.reload()
+      reloadProduct()
     }
     saving.value = false
   }
@@ -179,23 +207,35 @@ const isMissingPrice = computed(() => {
   return sizes.length > 0 && sizes.some((size) => !hasPrice(priceInputs(size).price))
 })
 
+const variantEditor = ref(null)
+
 // A product sold as one item has its Price on the page; otherwise each color's price is in Variants,
-// where the first input is a row checkbox, so focus goes to the first price trigger instead.
+// where the first input is a row checkbox, so focus goes to the first price trigger instead. A phone
+// hides the price column (the price rides the name's second line), so there the color that needs a
+// price opens in its own dialog with Price focused.
 function goToPrice() {
+  if (!singleItem.value && isMobile.value) {
+    variantEditor.value?.openFirstUnpriced()
+    return
+  }
   const section = document.getElementById(singleItem.value ? 'product-pricing' : 'product-variants')
   section?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   const target = singleItem.value ? 'input' : '[data-price-cell] button'
   section?.querySelector(target)?.focus({ preventScroll: true })
 }
 
-const addPriceAction = computed(() => (isMissingPrice.value ? { label: __('Add price'), onClick: goToPrice } : undefined))
+// Gray subtle, not the Alert's default amber label: amber ink on the Alert's gray-1 surface measures
+// 3.0:1 in light mode. Naming a variant and theme is what makes frappe-ui skip that override.
+const addPriceAction = computed(() =>
+  isMissingPrice.value ? { label: __('Add price'), variant: 'subtle', theme: 'gray', onClick: goToPrice } : undefined,
+)
 
 async function togglePublish() {
   const publish = !isLive.value
   const toggled = await trySubmit(publishAction, { item_template: product.value.id, publish })
   if (!toggled) return
   const result = publishAction.data
-  productRequest.reload()
+  reloadProduct()
   if (result.skipped.length) {
     const options = result.skipped.map((skipped) => skipped.option).join(', ')
     const reasons = [...new Set(result.skipped.flatMap((skipped) => skipped.blockers))].join('. ')
@@ -210,14 +250,14 @@ async function toggleArchive() {
   const saved = await trySubmit(updateAction, { item_template: product.value.id, disabled: disabled ? 1 : 0 })
   if (!saved) return
   toast.success(disabled ? __('Archived') : __('Restored'))
-  productRequest.reload()
+  reloadProduct()
 }
 
 const actions = computed(() =>
   product.value
     ? buildProductActions(product.value, router, {
         onToggleArchive: toggleArchive,
-        onReload: () => productRequest.reload(),
+        onReload: reloadProduct,
       })
     : { groups: [] },
 )
@@ -226,7 +266,7 @@ const { cards, actionGroup, openAction, record, reload: reloadPlugins } = useRec
   'product',
   'Item',
   () => route.params.id,
-  { onReload: () => productRequest.reload() },
+  { onReload: reloadProduct },
 )
 
 const hasRail = useMediaQuery('(min-width: 1024px)')
@@ -246,18 +286,14 @@ const breadcrumbs = computed(() => [
 
 // Below lg the rail is hidden, so the two numbers a seller looks for first ride along at the top,
 // except on a product sold as one item, whose Price and stock card already shows them.
-// A draft with no stock reads calm, as on the products list.
 const showsGlance = computed(() => !hasRail.value && !singleItem.value)
-const glance = computed(() => {
-  const price = priceRange(stats.value.priceLow, stats.value.priceHigh)
-  if (stats.value.onHand <= 0 && !isLive.value) return __('{0} · No stock yet', [price])
-  return __('{0} · {1} in stock', [price, stats.value.onHand])
-})
-
-watch(
-  () => route.params.id,
-  () => productRequest.reload(),
+// Zero reads "0 in stock", as on the variant rows and in stockLabel().
+const glance = computed(() =>
+  __('{0} · {1} in stock', [priceRange(stats.value.priceLow, stats.value.priceHigh), stats.value.onHand]),
 )
+
+// Another product opening in this component needs no reload of its own: `refetch` re-runs the read
+// when its params change, and a second request here would abort that one.
 
 // A deleted item, a typo in the URL and a permission refusal all settle the same
 // way — a finished request holding no product — so the wording is chosen from
@@ -290,7 +326,7 @@ const loadFailure = computed(() =>
           <Button icon="lucide-ellipsis" :label="__('More actions')" />
         </Dropdown>
         <template v-if="isDirty">
-          <span class="hidden text-p-sm text-ink-gray-5 md:inline">
+          <span class="hidden text-p-sm text-ink-gray-6 md:inline">
             {{ hasErrors ? __('Fix the highlighted fields to save') : __('Unsaved changes') }}
           </span>
           <Button :label="__('Discard')" variant="subtle" theme="gray" :disabled="saving" @click="discard" />
@@ -341,12 +377,12 @@ const loadFailure = computed(() =>
             <p v-if="isDirty && hasErrors" class="text-p-sm text-ink-red-6 md:hidden">
               {{ __('Fix the highlighted fields to save') }}
             </p>
-            <p v-if="showsGlance" class="text-p-sm text-ink-gray-5 tabular-nums">{{ glance }}</p>
+            <p v-if="showsGlance" class="text-p-sm text-ink-gray-6 tabular-nums">{{ glance }}</p>
           </div>
 
           <div class="space-y-6">
             <ProductBasics :draft="draft" :title-error="titleError" />
-            <ProductPhotos v-if="product.variants.length" :product="product" @saved="productRequest.reload()" />
+            <ProductPhotos v-if="product.variants.length" :product="product" @saved="reloadProduct" />
             <ProductPricing
               v-if="singleItem"
               :key="singleItem.name"
@@ -354,9 +390,9 @@ const loadFailure = computed(() =>
               :draft="draft"
               :price-error="priceError"
               :original-price-error="originalPriceMessage"
-              @received="productRequest.reload()"
+              @received="reloadProduct"
             />
-            <VariantEditor :product="product" @saved="productRequest.reload()" />
+            <VariantEditor ref="variantEditor" :product="product" @saved="reloadProduct" />
             <!-- From lg up it sits at the top of the rail, beside the form. -->
             <ProductOrganization class="lg:hidden" :draft="draft" />
             <ProductStorefront :product="product" :is-live="isLive" />

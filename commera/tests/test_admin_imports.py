@@ -2,11 +2,14 @@
 # Tests for imports: the mapping, the row rules shared with the Add product dialog, run_import's photo
 # half, and Publish all.
 
+import io
 import os
+import zipfile
 from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from openpyxl import Workbook
 
 from commera.api.admin.catalog import get_selling_rates
 from commera.api.admin.import_rows import suggest_mapping
@@ -87,9 +90,12 @@ class RunImportTestCase(IntegrationTestCase):
 			f"{self.title},{self.collection},{self.color},S,120,99,0",
 			f"{self.title},{self.collection},{self.color},M,120,99,0",
 		]
+		return self.make_upload(f"import-{self.suffix}.csv", "\n".join(rows))
+
+	def make_upload(self, file_name, content):
 		file_doc = frappe.new_doc("File")
-		file_doc.file_name = f"import-{self.suffix}.csv"
-		file_doc.content = "\n".join(rows)
+		file_doc.file_name = file_name
+		file_doc.content = content
 		file_doc.is_private = 0
 		file_doc.insert()
 		self.written_files.append(file_doc.get_full_path())
@@ -223,6 +229,79 @@ class TestRunImportImageAssignmentShape(RunImportTestCase):
 		self.assertEqual(self.get_created_titles(), [])
 
 
+UNREADABLE_FILE = (
+	"This file is not a readable Excel or CSV file. Save it again from Excel, or export it as CSV."
+)
+
+
+class TestUnreadableFiles(RunImportTestCase):
+	"""A file the parsers cannot read is the merchant's to fix, so it is one plain validation message,
+	never a 500 that names a Python exception."""
+
+	def assert_unreadable(self, file_url):
+		with self.assertRaises(frappe.ValidationError) as refusal:
+			parse_and_validate(file_url)
+		self.assertEqual(str(refusal.exception), UNREADABLE_FILE)
+
+	def test_bytes_that_are_not_a_workbook_are_refused_in_plain_words(self):
+		self.assert_unreadable(self.make_upload(f"corrupt-{self.suffix}.xlsx", bytes(range(256)) * 8))
+
+	def test_a_text_file_named_xlsx_is_refused_in_plain_words(self):
+		self.assert_unreadable(self.make_upload(f"text-{self.suffix}.xlsx", "This is not an Excel ZIP file"))
+
+	def test_a_zip_with_no_workbook_inside_is_refused_in_plain_words(self):
+		archive = io.BytesIO()
+		with zipfile.ZipFile(archive, "w") as zip_file:
+			zip_file.writestr("notes.txt", "not a workbook")
+		self.assert_unreadable(self.make_upload(f"zip-{self.suffix}.xlsx", archive.getvalue()))
+
+	def test_a_workbook_renamed_csv_is_refused_in_plain_words(self):
+		workbook = Workbook()
+		workbook.active.append(["Product Title", "Price"])
+		content = io.BytesIO()
+		workbook.save(content)
+		self.assert_unreadable(self.make_upload(f"renamed-{self.suffix}.csv", content.getvalue()))
+
+	def test_a_real_workbook_is_read(self):
+		workbook = Workbook()
+		workbook.active.append(["Product Title", "Collection", "Price"])
+		workbook.active.append([self.title, self.collection, 450])
+		content = io.BytesIO()
+		workbook.save(content)
+
+		result = parse_and_validate(self.make_upload(f"real-{self.suffix}.xlsx", content.getvalue()))
+
+		self.assertEqual((result["counts"]["ready"], result["rows"][0]["title"]), (1, self.title))
+
+
+class TestRunImportResult(RunImportTestCase):
+	def test_the_result_names_each_skipped_row_and_each_warning_by_title(self):
+		broken = f"{self.title} broken"
+		file_url = self.make_import_file(
+			[
+				"Product Title,Collection,Price,Original price",
+				f"{self.title},{self.collection},500,400",
+				f"{broken},{self.collection},0,",
+			]
+		)
+
+		result = run_import(file_url)
+
+		self.assertEqual(
+			result["row_errors"], [{"row": 3, "title": broken, "message": "Enter a price above zero."}]
+		)
+		self.assertEqual(
+			result["row_warnings"],
+			[
+				{
+					"row": 2,
+					"title": self.title,
+					"message": "Original price must be higher than the price. It is left out.",
+				}
+			],
+		)
+
+
 class TestImportPrices(RunImportTestCase):
 	def test_a_row_without_a_price_is_refused(self):
 		file_url = self.make_import_file(
@@ -234,7 +313,7 @@ class TestImportPrices(RunImportTestCase):
 
 		issue = parse_and_validate(file_url)["rows"][0]["issue"]
 
-		self.assertEqual(issue, {"level": "error", "text": "Price is missing"})
+		self.assertEqual(issue, {"level": "error", "text": "Price is missing."})
 
 	def test_a_single_price_column_is_what_the_shopper_pays(self):
 		file_url = self.make_import_file(

@@ -357,6 +357,15 @@ class TestSaveProductOptions(DeleteProductTestCase):
 		self.assertEqual(list(crimson), ["S", "M", "L", "XL"])
 		self.assertEqual((crimson["L"]["default_rate"], crimson["L"]["sale_rate"]), (500, 400))
 
+	def test_the_product_lists_sparse_sizes_in_the_size_attribute_order(self):
+		save_product_options(
+			self.item_template, add=[{"option": "Teal", "size": "L"}, {"option": "Teal", "size": "S"}]
+		)
+
+		product = get_product(self.item_template)
+		self.assertEqual(product["size_order"], ["S", "M", "L"])
+		self.assertEqual([size["size"] for size in product["variants"][1]["sizes"]], ["S", "L"])
+
 	def test_a_new_size_skips_a_compare_at_saved_below_the_price(self):
 		frappe.db.set_value(
 			"Item Price",

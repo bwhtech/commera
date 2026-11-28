@@ -301,6 +301,16 @@ def import_items(item_codes: list | None, log_name: str, import_id: str = JOB_ID
 	set_status(import_id, progress)
 
 
+def get_failure_message(error, item_code):
+	"""What the result card says about an item that failed. A refusal (ValidationError) is written for
+	the seller already. Anything else is a bug: its text ("'NoneType' object has no attribute ...") is
+	for the error log, where it goes, and the seller is told the plain consequence."""
+	if isinstance(error, frappe.ValidationError) and cstr(error):
+		return cstr(error)
+	frappe.log_error(f"ERPNext import of {item_code}")
+	return _("Something went wrong with this item. Run the import again to retry it.")
+
+
 def import_batch(plans: list, log, failed: list) -> list:
 	created = []
 	for plan in plans:
@@ -309,9 +319,13 @@ def import_batch(plans: list, log, failed: list) -> list:
 			configurator = add_product(plan)
 		except Exception as error:
 			frappe.db.rollback(save_point="erpnext_import")
-			failed.append({"item_code": plan["item_code"], "error": cstr(error) or type(error).__name__})
-			if not isinstance(error, frappe.ValidationError):
-				frappe.log_error(f"ERPNext import of {plan['item_code']}")
+			failed.append(
+				{
+					"item_code": plan["item_code"],
+					"item_name": plan["item_name"],
+					"error": get_failure_message(error, plan["item_code"]),
+				}
+			)
 			continue
 		frappe.db.release_savepoint("erpnext_import")
 		created.append((plan, configurator))

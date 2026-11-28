@@ -194,20 +194,24 @@ function productStatus(product) {
   return product.published_count ? { status: 'published', label: __('Live') } : { status: 'draft', label: __('Not published') }
 }
 
-// The item code is shown only when it says something the title does not: a dashboard product is
-// named after its title, so the code would repeat it.
+// The item code is shown only when it says something the title does not. A dashboard product is
+// named after its title, and an ERPNext item's code is often its name with hyphens for spaces
+// ("Linen-Tee" under "Linen Tee"), so codes are compared by their letters and digits alone.
+const codeKey = (text) => (text ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '')
+
 function productSubtitle(product) {
   const variants = listedVariantCount(product)
   return [
-    product.name !== product.title ? product.name : '',
+    codeKey(product.name) !== codeKey(product.title) ? product.name : '',
     variants ? (variants === 1 ? __('1 variant') : __('{0} variants', [variants])) : '',
   ].filter(Boolean).join(' · ')
 }
 
-// A draft that never had stock is a product still being set up, not one that sold out.
+// One wording for every count, zero included, so the list and the product page agree. Only the
+// tone tells a draft still being set up (quiet gray) from a live product that sold out (red).
 function stockLabel(product) {
-  if (product.stock <= 0 && !product.published_count) return { text: __('No stock yet'), tone: 'text-ink-gray-5' }
-  return { text: __('{0} in stock', [product.stock]), tone: stockTone(product.stock) }
+  const tone = product.stock <= 0 && !product.published_count ? 'text-ink-gray-6' : stockTone(product.stock)
+  return { text: __('{0} in stock', [product.stock]), tone }
 }
 
 function collectionSummary(product) {
@@ -285,11 +289,15 @@ function collectionSummary(product) {
            reader cannot see reads as a rendering fault. Price is the one kept, and status and stock
            move under the title. Do not lower the `min-w`: below the columns' own sum the 1fr track
            collapses to zero and the product cell disappears. -->
+      <!-- list-row-px-3 gives the header the same inset as the rows: by default only an
+           interactive row gets frappe-ui's 0.75rem, so every header label sat 12px off its column.
+           A phone row takes its height from its three lines plus py-3 instead of the density, which
+           left them 1px from the dividers. -->
       <List
       v-model:selection="selection"
-      class="sm:min-w-[57rem]"
+      class="list-row-px-3 sm:min-w-[57rem]"
       :selectable="selecting"
-      :row-height="Math.max(ia.density, 44)"
+      :row-height="isMobile ? undefined : Math.max(ia.density, 44)"
       :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['1fr', '7rem', '11rem', '8rem', '7rem'] }"
     >
       <ListHeader>
@@ -317,16 +325,16 @@ function collectionSummary(product) {
       <ListSkeleton v-if="productsRequest.loading && !rows.length" :columns="skeletonColumns" />
 
       <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
-        <ListRow :route="productRoute(item.name)" :value="item.name">
+        <ListRow class="max-sm:py-3" :route="productRoute(item.name)" :value="item.name">
           <ListCell>
             <div class="flex min-w-0 items-center gap-2.5">
               <Thumb :image="item.image" />
               <div class="min-w-0">
                 <p class="truncate text-base text-ink-gray-8">{{ item.title }}</p>
-                <p v-if="productSubtitle(item)" class="truncate text-sm text-ink-gray-5">{{ productSubtitle(item) }}</p>
-                <p class="mt-0.5 flex items-center gap-2 text-sm sm:hidden">
+                <p v-if="productSubtitle(item)" class="truncate text-sm text-ink-gray-6 tabular-nums">{{ productSubtitle(item) }}</p>
+                <p class="mt-1 flex items-center gap-2 text-sm sm:hidden">
                   <StatusBadge v-bind="productStatus(item)" />
-                  <span :class="stockLabel(item).tone">{{ stockLabel(item).text }}</span>
+                  <span class="tabular-nums" :class="stockLabel(item).tone">{{ stockLabel(item).text }}</span>
                 </p>
               </div>
             </div>

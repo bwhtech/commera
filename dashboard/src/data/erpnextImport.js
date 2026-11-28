@@ -24,7 +24,7 @@ const statusRequest = useAdminRead('erpnext_import.get_erpnext_import_status', {
   params: () => ({ job_id: imp.erpnext.jobId }),
 })
 
-export const startAction = useAdminAction('erpnext_import.start_erpnext_import')
+export const startAction = useAdminAction('erpnext_import.start_erpnext_import', { quiet: true })
 export const publishAction = useAdminAction('erpnext_import.publish_imported_products')
 
 const ITEM_CODES_PAGE = 500

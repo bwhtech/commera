@@ -14,13 +14,16 @@ import {
   publishImported,
 } from '../../../data/importFlow'
 import { useAdminAction, trySubmit } from '../../../data/api'
-import { doneTitle, photoCount, publishedBody } from '../../../data/importCounts'
+import { doneTitle, photoCount, publishedBody, resultRowName } from '../../../data/importCounts'
+import { errorMessage } from '../../../data/errors'
 import { __ } from '../../../data/translation'
 import { productRoute } from '../../../ia/routes'
 import ImportResult from '../ImportResult.vue'
 import NotPublishedList from '../NotPublishedList.vue'
+import ImportRowList from '../ImportRowList.vue'
 
-const runImportAction = useAdminAction('imports.run_import')
+// Quiet: a refused run ends on the failed card, which already says why. A toast repeated it.
+const runImportAction = useAdminAction('imports.run_import', { quiet: true })
 
 // run_import is one synchronous request that writes every product, so it has no progress to show
 // and no way to cancel. Past this the merchant is told it is slow, not stuck, and that closing is safe.
@@ -47,6 +50,7 @@ async function run() {
   const result = runImportAction.data
   imp.created = result.created
   imp.runRowErrors = result.row_errors
+  imp.runRowWarnings = result.row_warnings ?? []
   imp.imagesAttached = result.images_attached
   imp.runImageErrors = result.image_errors
   endPhase(ticket, 'done')
@@ -68,6 +72,20 @@ function finish(path) {
 
 const published = computed(() => imp.published?.published ?? null)
 const notPublished = computed(() => imp.published?.not_published ?? [])
+
+// One entry per row, keyed by row and message: a product that failed to create reports every one of
+// its rows, and a row can carry a photo error as well as a row error.
+const rowEntries = (rows) =>
+  rows.map((entry) => ({ key: `${entry.row}-${entry.message}`, name: resultRowName(entry), message: entry.message }))
+
+const skippedTitle = computed(() =>
+  imp.runRowErrors.length === 1 ? __('1 row was skipped') : __('{0} rows were skipped', [imp.runRowErrors.length]),
+)
+const warningsTitle = computed(() =>
+  imp.runRowWarnings.length === 1
+    ? __('1 row came in with a warning')
+    : __('{0} rows came in with a warning', [imp.runRowWarnings.length]),
+)
 
 const doneBody = computed(() => {
   if (published.value != null) return publishedBody(published.value, notPublished.value.length)
@@ -99,23 +117,16 @@ const doneBody = computed(() => {
     </template>
 
     <template v-else-if="imp.phase === 'failed'">
-      <div class="rounded-6 border border-outline-gray-1 px-6 py-8 text-center">
-        <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-red-2 text-ink-red-6">
-          <span class="lucide-triangle-alert size-6" aria-hidden="true" />
-        </div>
-        <h2 class="mt-4 text-xl-semibold text-ink-gray-9">{{ __('The import could not run') }}</h2>
-        <p class="mx-auto mt-1.5 max-w-md text-p-base text-ink-gray-6">{{ runImportAction.error?.message }}</p>
-        <div class="mt-5 flex flex-wrap items-center justify-center gap-2">
-          <Button :label="__('Close')" @click="closeImport" />
-          <Button variant="solid" theme="gray" icon-left="lucide-arrow-left rtl:-scale-x-100" :label="__('Back to review')" @click="goToStep('review')" />
-        </div>
-      </div>
+      <ImportResult failed :title="__('The import could not run')" :body="errorMessage(runImportAction.error)">
+        <Button :label="__('Close')" @click="closeImport" />
+        <Button variant="solid" theme="gray" icon-left="lucide-arrow-left rtl:-scale-x-100" :label="__('Back to review')" @click="goToStep('review')" />
+      </ImportResult>
     </template>
 
     <template v-else>
       <ImportResult :published="published" :title="doneTitle(imp.created.length, published)" :body="doneBody">
         <template v-if="imp.imagesAttached" #details>
-          <p class="mx-auto mt-1 max-w-md text-p-sm text-ink-gray-5">{{ __('{0} added.', [photoCount(imp.imagesAttached)]) }}</p>
+          <p class="mx-auto mt-1 max-w-md text-p-sm tabular-nums text-ink-gray-6">{{ __('{0} added.', [photoCount(imp.imagesAttached)]) }}</p>
         </template>
         <template v-if="published == null && imp.created.length">
           <Button :label="__('View products')" @click="finish('/products')" />
@@ -130,31 +141,23 @@ const doneBody = computed(() => {
         @open="(itemTemplate) => finish(productRoute(itemTemplate))"
       />
 
-      <div v-if="imp.runRowErrors.length" class="rounded-5 border border-outline-gray-1">
-        <div class="border-b border-outline-gray-1 px-4 py-3 text-base-semibold text-ink-gray-8">
-          {{ imp.runRowErrors.length === 1 ? __('1 row was skipped') : __('{0} rows were skipped', [imp.runRowErrors.length]) }}
-        </div>
-        <div v-scroll-fade class="max-h-56 divide-y divide-outline-gray-1 overflow-y-auto">
-          <div v-for="rowError in imp.runRowErrors" :key="rowError.row" class="flex items-start gap-3 px-4 py-2.5">
-            <span class="shrink-0 text-sm tabular-nums text-ink-gray-5">{{ __('Row {0}', [rowError.row]) }}</span>
-            <span class="text-p-sm text-ink-gray-7">{{ rowError.message }}</span>
-          </div>
-        </div>
-      </div>
+      <ImportRowList v-if="imp.runRowErrors.length" :title="skippedTitle" :entries="rowEntries(imp.runRowErrors)" />
 
-      <div v-if="imp.runImageErrors.length" class="rounded-5 border border-outline-gray-1">
-        <!-- The server reports one entry per spreadsheet row of a group whose photos failed. -->
-        <div class="border-b border-outline-gray-1 px-4 py-3 text-base-semibold text-ink-gray-8">
-          {{ __('Photos that did not attach') }}
-        </div>
-        <div v-scroll-fade class="max-h-56 divide-y divide-outline-gray-1 overflow-y-auto">
-          <div v-for="imageError in imp.runImageErrors" :key="imageError.row + imageError.message" class="flex items-start gap-3 px-4 py-2.5">
-            <span v-if="imageError.row" class="shrink-0 text-sm tabular-nums text-ink-gray-5">{{ __('Row {0}', [imageError.row]) }}</span>
-            <span class="text-p-sm text-ink-gray-7">{{ imageError.message }}</span>
-          </div>
-        </div>
-        <p class="border-t border-outline-gray-1 px-4 py-2.5 text-p-sm text-ink-gray-5">{{ __('Add them from each product page.') }}</p>
-      </div>
+      <ImportRowList
+        v-if="imp.runRowWarnings.length"
+        tone="warning"
+        :title="warningsTitle"
+        :entries="rowEntries(imp.runRowWarnings)"
+      />
+
+      <!-- The server reports one entry per spreadsheet row of a group whose photos failed. -->
+      <ImportRowList
+        v-if="imp.runImageErrors.length"
+        tone="warning"
+        :title="__('Photos that did not attach')"
+        :entries="rowEntries(imp.runImageErrors)"
+        :footer="__('Add them from each product page.')"
+      />
     </template>
   </div>
 </template>

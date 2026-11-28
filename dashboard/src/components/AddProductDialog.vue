@@ -5,14 +5,15 @@
  * Company, warehouse, price list, UOM and naming series are resolved server-side —
  * this dialog never shows an ERPNext concept the owner did not ask for.
  */
-import { computed, ref, watch } from 'vue'
-import { Button, ErrorMessage, FormControl, Select, dialog, toast } from 'frappe-ui'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { Button, ErrorMessage, FormControl, Select, toast } from 'frappe-ui'
 import { useRouter } from 'vue-router'
 import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { addProduct, closeAddProduct } from '../data/addProduct'
 import { newProductOptionSizes } from '../data/optionSizes'
 import { hasPrice, originalPriceError, priceInputRates } from '../data/product'
 import { productRoute } from '../ia/routes'
+import { errorMessage } from '../data/errors'
 import { __ } from '../data/translation'
 import AttributeMultiSelect from './AttributeMultiSelect.vue'
 import FormDialog from './FormDialog.vue'
@@ -83,20 +84,25 @@ watch(
 
 watch(title, () => (titleError.value = ''))
 
+// The two "new" forms are FormDialogs over this one, not frappe-ui's dialog.prompt: a prompt stays
+// a centred modal on a phone, logs a Vue warning for its reactive component, and drops its typed
+// name to Escape without asking.
 const createCollectionAction = useAdminAction('catalog.create_collection')
+const newCollection = reactive({ open: false, title: '' })
+
 function addCollection() {
-  dialog.prompt({
-    title: __('New collection'),
-    message: __('Collections group products in your store, like T-shirts or Candles.'),
-    fields: [{ name: 'title', label: __('Name'), required: true }],
-    confirmLabel: __('Add collection'),
-    onConfirm: async ({ values }) => {
-      const created = await trySubmit(createCollectionAction, { title: values.title })
-      if (!created) return
-      await collectionsRequest.reload()
-      collection.value = createCollectionAction.data.name
-    },
-  })
+  newCollection.title = ''
+  newCollection.open = true
+}
+
+async function saveCollection() {
+  const title = newCollection.title.trim()
+  if (!title || createCollectionAction.loading) return
+  const created = await trySubmit(createCollectionAction, { title })
+  if (!created) return
+  newCollection.open = false
+  await collectionsRequest.reload()
+  collection.value = createCollectionAction.data.name
 }
 
 // The option axis is any attribute catalog.get_attributes marks as one: never Size, which is the
@@ -107,25 +113,21 @@ const optionAttributeOptions = computed(() =>
 )
 
 const createAttributeAction = useAdminAction('catalog.create_attribute')
+const newOption = reactive({ open: false, name: '', values: '' })
+
 function addAttribute() {
-  dialog.prompt({
-    title: __('New option'),
-    message: __('Adds an option every product in your store can use.'),
-    fields: [
-      { name: 'title', label: __('Name'), required: true, placeholder: __('Material') },
-      { name: 'values', label: __('Values'), placeholder: __('Cotton, Linen') },
-    ],
-    confirmLabel: __('Add option'),
-    onConfirm: async ({ values }) => {
-      const created = await trySubmit(createAttributeAction, {
-        name: values.title,
-        values: values.values || undefined,
-      })
-      if (!created) return
-      await attributesRequest.reload()
-      optionAttribute.value = values.title
-    },
-  })
+  Object.assign(newOption, { name: '', values: '' })
+  newOption.open = true
+}
+
+async function saveAttribute() {
+  const name = newOption.name.trim()
+  if (!name || createAttributeAction.loading) return
+  const created = await trySubmit(createAttributeAction, { name, values: newOption.values.trim() || undefined })
+  if (!created) return
+  newOption.open = false
+  await attributesRequest.reload()
+  optionAttribute.value = name
 }
 
 watch(optionAttributeOptions, (options) => {
@@ -190,7 +192,36 @@ const optionsHint = computed(() => {
   return __('Each {0} and size pair is a variant you sell and stock.', [option])
 })
 
-const createAction = useAdminAction('catalog.create_product')
+// Quiet, so a taken title is said once, on its field. Every other refusal still gets its one toast.
+const createAction = useAdminAction('catalog.create_product', {
+  quiet: true,
+  onError: (error) => {
+    if (error?.type !== 'DuplicateEntryError') toast.error(errorMessage(error))
+  },
+})
+
+// Anything closing would throw away. The collection is not counted: it is preselected, not typed.
+const hasValue = (value) => value !== null && value !== ''
+const isDirty = computed(
+  () =>
+    Boolean(title.value.trim()) ||
+    hasValue(price.value) ||
+    hasValue(originalPrice.value) ||
+    colors.value.length > 0 ||
+    sizes.value.length > 0,
+)
+
+const titleField = ref(null)
+
+// The refusal disables the primary, which drops focus to the page; the merchant's next move is a
+// new title, so focus goes back there with the old one selected to type over.
+async function focusTitle() {
+  await nextTick()
+  const input = titleField.value?.querySelector('input')
+  input?.focus()
+  input?.select()
+  input?.scrollIntoView({ block: 'nearest' })
+}
 
 // The price is required. create_product only writes Item Prices for a rate above zero, so a product
 // created without one carries no Item Price row at all and reads as 0 until someone prices it by hand.
@@ -222,10 +253,10 @@ async function submit() {
     price: rates.default_rate,
     sale_price: rates.sale_rate,
   })
-  // useAdminAction already toasted the refusal; a taken title also belongs on its field.
   if (!added) {
     if (createAction.error?.type === 'DuplicateEntryError') {
       titleError.value = __('A product with this title already exists.')
+      focusTitle()
     }
     return
   }
@@ -250,16 +281,19 @@ async function submit() {
     :reason="missingReason"
     :note="__('Saved, but not published yet. You add photos next.')"
     :dismissible="!pickerOpen"
+    :dirty="isDirty"
     @submit="submit"
   >
     <div class="space-y-5">
-      <FormControl
-        v-model="title"
-        :label="__('Title')"
-        :placeholder="__('Cotton oversized tee')"
-        :error="titleError"
-        required
-      />
+      <div ref="titleField">
+        <FormControl
+          v-model="title"
+          :label="__('Title')"
+          :placeholder="__('Cotton oversized tee')"
+          :error="titleError"
+          required
+        />
+      </div>
 
       <PriceFields
         v-model:price="price"
@@ -270,7 +304,7 @@ async function submit() {
       <Select
         v-model="collection"
         :label="__('Collection')"
-        :description="__('Collections group products in your store, like T-shirts or Candles.')"
+        :description="__('Collections group products in your store, like Shirts or Candles.')"
         :placeholder="__('Select a collection')"
         :options="collectionOptions"
         :empty-text="__('No collections yet')"
@@ -302,7 +336,7 @@ async function submit() {
         <div class="flex items-start gap-3">
           <div class="min-w-0 flex-1">
             <h3 class="text-base-semibold text-ink-gray-8">{{ __('Options') }}</h3>
-            <p class="mt-0.5 text-p-sm text-ink-gray-5">
+            <p class="mt-0.5 text-p-sm text-ink-gray-6">
               {{ optionsHint }}
             </p>
           </div>
@@ -357,8 +391,53 @@ async function submit() {
         />
 
         <ErrorMessage v-if="gridError" :message="gridError" />
-        <p v-else-if="summary" class="text-p-sm text-ink-gray-7">{{ summary }}</p>
+        <p v-else-if="summary" class="text-p-sm text-ink-gray-7 tabular-nums">{{ summary }}</p>
       </section>
+    </div>
+  </FormDialog>
+
+  <FormDialog
+    v-model:open="newCollection.open"
+    size="md"
+    :title="__('New collection')"
+    :description="__('Collections group products in your store, like Shirts or Candles.')"
+    :primary-label="__('Add collection')"
+    :primary-disabled="!newCollection.title.trim()"
+    :reason="newCollection.title.trim() ? '' : __('Enter a name to continue.')"
+    :loading="createCollectionAction.loading"
+    :dirty="Boolean(newCollection.title.trim())"
+    @submit="saveCollection"
+  >
+    <FormControl v-model="newCollection.title" :label="__('Name')" required @keydown.enter.prevent="saveCollection" />
+  </FormDialog>
+
+  <FormDialog
+    v-model:open="newOption.open"
+    size="md"
+    :title="__('New option')"
+    :description="__('Adds an option every product in your store can use.')"
+    :primary-label="__('Add option', null, 'Product option')"
+    :primary-disabled="!newOption.name.trim()"
+    :reason="newOption.name.trim() ? '' : __('Enter a name to continue.')"
+    :loading="createAttributeAction.loading"
+    :dirty="Boolean(newOption.name.trim() || newOption.values.trim())"
+    @submit="saveAttribute"
+  >
+    <div class="space-y-4">
+      <FormControl
+        v-model="newOption.name"
+        :label="__('Name')"
+        :placeholder="__('Material')"
+        required
+        @keydown.enter.prevent="saveAttribute"
+      />
+      <FormControl
+        v-model="newOption.values"
+        :label="__('Values')"
+        :placeholder="__('Cotton, Linen')"
+        :description="__('Separate values with commas.')"
+        @keydown.enter.prevent="saveAttribute"
+      />
     </div>
   </FormDialog>
 </template>

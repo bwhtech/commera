@@ -618,6 +618,10 @@ def get_product(item_template: str):
 		"restock_level": restock_level,
 		"option_attribute": option_attribute,
 		"can_edit_options": bool(template.has_variants and configurators),
+		# Every size the product sells, once, in the Size attribute's order. A sparse colour lists only
+		# its own sizes, so the screen cannot rebuild this order from the colours alone: Red S/M and
+		# Blue S/L would merge as S, L, M.
+		"size_order": list(dict.fromkeys(row.size for row in sizes)),
 		"variants": [
 			{
 				"name": row.name,

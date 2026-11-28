@@ -4,8 +4,10 @@ import {
   doneTitle,
   erpnextImportLabel,
   importLabel,
+  photoGroupKind,
   photoGroupsHavePhoto,
   photoGroupsNeedPhoto,
+  resultRowName,
   publishedBody,
   reviewSummary,
   showsOriginalPrice,
@@ -21,7 +23,7 @@ test('the import button counts products, and variants separately', () => {
 
 test('a review with every row skipped never offers to import 0 products', () => {
   assert.equal(importLabel({ products: 0, variants: 0 }), 'Nothing to import')
-  assert.deepEqual(reviewSummary({ products: 0, variants: 0, warnings: 0, errors: 2 }), ['2 rows skipped'])
+  assert.deepEqual(reviewSummary({ products: 0, variants: 0, warnings: 0, errors: 2 }), [{ label: '2 rows skipped', tone: 'error' }])
 })
 
 test('the original price is struck through only beside a valid lower price', () => {
@@ -32,8 +34,12 @@ test('the original price is struck through only beside a valid lower price', () 
 })
 
 test('the review summary names problems only when there are some', () => {
-  assert.deepEqual(reviewSummary({ products: 1, variants: 3, warnings: 0, errors: 0 }), ['1 product', '3 variants'])
-  assert.deepEqual(reviewSummary({ products: 2, variants: 0, warnings: 1, errors: 2 }), ['2 products', '1 warning', '2 rows skipped'])
+  assert.deepEqual(reviewSummary({ products: 1, variants: 3, warnings: 0, errors: 0 }), [{ label: '1 product' }, { label: '3 variants' }])
+  assert.deepEqual(reviewSummary({ products: 2, variants: 0, warnings: 1, errors: 2 }), [
+    { label: '2 products' },
+    { label: '1 warning', tone: 'warning' },
+    { label: '2 rows skipped', tone: 'error' },
+  ])
 })
 
 test('a finished import says drafts until they are published', () => {
@@ -54,14 +60,36 @@ test('a review filter whose tab is gone falls back to all rows', () => {
 })
 
 test('photo groups are counted as colors, or as products when nothing has a color', () => {
-  assert.equal(photoGroupsNeedPhoto(2, 3, true), '2 of 3 colors still need a photo.')
-  assert.equal(photoGroupsNeedPhoto(1, 4, false), '1 of 4 products still need a photo.')
+  assert.equal(photoGroupsNeedPhoto(2, 3, 'colors'), '2 of 3 colors still need a photo.')
+  assert.equal(photoGroupsNeedPhoto(2, 4, 'products'), '2 of 4 products still need a photo.')
+})
+
+test('the verb agrees with the count in front of it', () => {
+  assert.equal(photoGroupsNeedPhoto(1, 2, 'colors'), '1 of 2 colors still needs a photo.')
+  assert.equal(photoGroupsNeedPhoto(1, 4, 'products'), '1 of 4 products still needs a photo.')
+  assert.equal(photoGroupsHavePhoto(1, 2, 'colors'), '1 of 2 colors has a photo')
+  assert.equal(photoGroupsHavePhoto(0, 2, 'colors'), '0 of 2 colors have a photo')
+  assert.equal(photoGroupsHavePhoto(2, 3, 'products'), '2 of 3 products have a photo')
+})
+
+test('a batch of colored and plain products never calls a plain product a color', () => {
+  const kind = photoGroupKind([{ color: 'Red' }, { color: '' }])
+  assert.equal(kind, 'mixed')
+  assert.equal(photoGroupsHavePhoto(1, 2, kind), '1 of 2 products and colors has a photo')
+  assert.equal(photoGroupsNeedPhoto(1, 2, kind), '1 of 2 products and colors still needs a photo.')
+  assert.equal(photoGroupKind([{ color: 'Red' }, { color: 'Blue' }]), 'colors')
+  assert.equal(photoGroupKind([{ color: '' }]), 'products')
 })
 
 test('one photo group is counted in the singular', () => {
-  assert.equal(photoGroupsNeedPhoto(1, 1, false), '1 product still needs a photo.')
-  assert.equal(photoGroupsNeedPhoto(1, 1, true), '1 color still needs a photo.')
-  assert.equal(photoGroupsHavePhoto(1, 1, false), '1 of 1 product has a photo')
+  assert.equal(photoGroupsNeedPhoto(1, 1, 'products'), '1 product still needs a photo.')
+  assert.equal(photoGroupsNeedPhoto(1, 1, 'colors'), '1 color still needs a photo.')
+  assert.equal(photoGroupsHavePhoto(1, 1, 'products'), '1 of 1 product has a photo')
+})
+
+test('a run result row is named by its number and its title', () => {
+  assert.equal(resultRowName({ row: 6, title: 'Linen shirt' }), 'Row 6 · Linen shirt')
+  assert.equal(resultRowName({ row: 6, title: '' }), 'Row 6')
 })
 
 test('the ERPNext pick button never offers to import 0 items', () => {

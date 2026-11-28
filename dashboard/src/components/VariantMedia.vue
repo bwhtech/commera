@@ -8,6 +8,7 @@ import { Badge, Button, Dropdown, toast, useFileUpload } from 'frappe-ui'
 import { useAdminAction, trySubmit } from '../data/api'
 import { PLACEHOLDER_OPTION } from '../data/product'
 import { __ } from '../data/translation'
+import { useIsMobile } from '../utils/useIsMobile'
 
 const props = defineProps({
   variant: { type: Object, required: true },
@@ -22,6 +23,15 @@ const removeAction = useAdminAction('catalog.remove_product_image')
 const moveAction = useAdminAction('catalog.move_product_image')
 
 const isPlaceholder = computed(() => props.variant.option === PLACEHOLDER_OPTION)
+
+// A phone has no drag and no click: its drop zone says what a thumb does.
+const isMobile = useIsMobile()
+const dropHint = computed(() => {
+  if (isPlaceholder.value) return isMobile.value ? __('Tap to choose photos.') : __('Drop images here or click to choose.')
+  return isMobile.value
+    ? __('Shown when a shopper picks {0}. Tap to choose photos.', [props.variant.option])
+    : __('Shown when a shopper picks {0}. Drop images here or click to choose.', [props.variant.option])
+})
 
 const addLabel = computed(() => (isPlaceholder.value ? __('Add photo') : __('Add photos of {0}', [props.variant.option])))
 
@@ -127,13 +137,7 @@ function photoActions(image, index) {
           <template v-else-if="isPlaceholder">{{ __('Add photos') }}</template>
           <template v-else>{{ __('Add photos of {0}', [variant.option]) }}</template>
         </span>
-        <span class="block text-p-sm text-ink-gray-5">
-          {{
-            isPlaceholder
-              ? __('Drop images here or click to choose.')
-              : __('Shown when a shopper picks {0}. Drop images here or click to choose.', [variant.option])
-          }}
-        </span>
+        <span class="block text-p-sm text-ink-gray-6">{{ dropHint }}</span>
       </span>
     </button>
     <div v-else class="flex flex-wrap gap-2" @dragover.prevent @drop.prevent="onDrop">
@@ -158,7 +162,7 @@ function photoActions(image, index) {
       </div>
 
       <button
-        class="grid size-20 place-content-center rounded-4 border border-dashed border-outline-gray-2 text-ink-gray-5 hover:bg-surface-gray-1"
+        class="grid size-20 place-content-center rounded-4 border border-dashed border-outline-gray-2 text-ink-gray-6 hover:bg-surface-gray-1"
         :aria-label="addLabel"
         :disabled="isUploading"
         @click="fileInput.click()"

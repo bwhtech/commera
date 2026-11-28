@@ -253,9 +253,29 @@ class TestErpnextImport(ProductOnboardingTestCase):
 			_log, status = self.run_import([good, bad])
 
 		self.assertEqual(status["created"], 1)
-		self.assertEqual(status["failed"], [{"item_code": bad, "error": "Broken template"}])
+		item_name = frappe.db.get_value("Item", bad, "item_name")
+		self.assertEqual(
+			status["failed"], [{"item_code": bad, "item_name": item_name, "error": "Broken template"}]
+		)
 		self.assertTrue(frappe.db.exists("Style Attribute Configurator", {"item_template": good}))
 		self.assertFalse(frappe.db.exists("Style Attribute Configurator", {"item_template": bad}))
+
+	def test_an_unexpected_failure_is_logged_and_told_in_plain_words(self):
+		bad = self.make_plain_item()
+
+		def crash(plan):
+			raise AttributeError("'NoneType' object has no attribute 'name'")
+
+		with (
+			patch.object(erpnext_import, "add_product", crash),
+			patch.object(erpnext_import.frappe, "log_error") as log_error,
+		):
+			_log, status = self.run_import([bad])
+
+		self.assertEqual(
+			status["failed"][0]["error"], "Something went wrong with this item. Run the import again to retry it."
+		)
+		log_error.assert_called_once()
 
 	def price_item(self, item_code, rate=499):
 		item_price = frappe.new_doc("Item Price")

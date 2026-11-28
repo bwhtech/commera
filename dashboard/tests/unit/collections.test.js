@@ -12,8 +12,9 @@ test('loads asked for while one is in flight share it instead of aborting it', a
   }
   const imports = {
     vue: `export { computed } from '${import.meta.resolve('vue')}'`,
-    'frappe-ui': 'export const dialog = {}; export const toast = {}',
+    'frappe-ui': 'export const toast = {}',
     './api': 'export const useAdminRead = () => globalThis.collectionsTest.read; export const useAdminAction = () => ({}); export const trySubmit = () => true',
+    '../utils/confirmDialog': 'export const askValue = () => {}',
     './translation': 'export const __ = (message) => message',
   }
   let transformed = source

@@ -42,7 +42,7 @@ const sources = [
           <span :class="[source.icon, 'size-5 shrink-0 text-ink-gray-7']" aria-hidden="true" />
           <div class="min-w-0 flex-1">
             <div class="text-base-semibold text-ink-gray-8">{{ source.title }}</div>
-            <p class="mt-1 text-p-sm text-ink-gray-5">{{ source.body }}</p>
+            <p class="mt-1 text-p-sm text-ink-gray-6">{{ source.body }}</p>
           </div>
           <!-- Always in the layout, so selecting a card never reflows its text. -->
           <span
@@ -53,7 +53,5 @@ const sources = [
         </div>
       </button>
     </div>
-
-    <p class="text-p-sm text-ink-gray-5">{{ __('Shopify, WooCommerce and more are coming soon.') }}</p>
   </div>
 </template>

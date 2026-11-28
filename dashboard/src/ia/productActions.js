@@ -1,4 +1,5 @@
-import { dialog, toast } from 'frappe-ui'
+import { toast } from 'frappe-ui'
+import { askConfirm, askValue } from '../utils/confirmDialog'
 import { useAdminAction, trySubmit } from '../data/api'
 import { __ } from '../data/translation'
 
@@ -65,29 +66,25 @@ export function buildProductActions(product, router, handlers = {}) {
           label: __('Set the low-stock level'),
           icon: 'lucide-bell',
           onClick: () =>
-            dialog.prompt({
+            askValue({
               title: __('Set the low-stock level'),
               message: __(
                 'Every size of this product reads as Low stock on the Stock screen at or below this number. Nobody is notified.',
               ),
-              fields: [
-                {
-                  name: 'value',
-                  label: __('Low-stock level'),
-                  type: 'number',
-                  required: true,
-                  defaultValue: String(product.restock_level ?? ''),
-                },
-              ],
-              onConfirm: async ({ values }) => {
+              label: __('Low-stock level'),
+              type: 'number',
+              value: String(product.restock_level ?? ''),
+              confirmLabel: __('Save'),
+              submit: async (value) => {
                 // set_restock_level stores cint(level), which truncates: 2.7 is kept as 2.
                 // Truncating here too keeps the toast honest about what was stored.
-                const level = Math.max(0, Math.trunc(Number(values.value) || 0))
+                const level = Math.max(0, Math.trunc(Number(value) || 0))
                 const saved = await trySubmit(restockLevelAction, { item_template: product.id, level })
-                if (!saved) return
+                if (!saved) return false
 
                 toast.success(__('Low stock now reads at {0} or below', [level]))
                 handlers.onReload?.()
+                return true
               },
             }),
         },
@@ -103,18 +100,18 @@ export function buildProductActions(product, router, handlers = {}) {
           icon: isArchived ? 'lucide-archive-restore' : 'lucide-archive',
           // Restoring is undoable and goes straight through; archiving takes the product
           // off the storefront, so only that half asks first.
-          onClick: () => {
+          onClick: async () => {
             if (isArchived) {
               handlers.onToggleArchive()
               return
             }
-            dialog.confirm({
+            const confirmed = await askConfirm({
               title: __('Archive this product?'),
               message: __('It leaves the storefront. Past orders keep their line items.'),
-              theme: 'red',
               confirmLabel: __('Archive'),
-              onConfirm: handlers.onToggleArchive,
+              cancelLabel: __('Cancel'),
             })
+            if (confirmed) handlers.onToggleArchive()
           },
         },
         {
@@ -122,21 +119,21 @@ export function buildProductActions(product, router, handlers = {}) {
           label: __('Delete'),
           icon: 'lucide-trash-2',
           theme: 'red',
-          onClick: () =>
-            dialog.confirm({
+          onClick: async () => {
+            const confirmed = await askConfirm({
               title: __('Delete {0}?', [product.title]),
               message: __(
                 'This removes the product, its options and every size under it, for good. A product that has ever been ordered cannot be deleted. Archive it instead, and its past orders keep their line items.',
               ),
-              theme: 'red',
               confirmLabel: __('Delete'),
-              onConfirm: async () => {
-                const deleted = await trySubmit(deleteAction, { item_template: product.id })
-                if (!deleted) return
-                toast.success(__('{0} deleted', [product.title]))
-                router.push('/products')
-              },
-            }),
+              cancelLabel: __('Cancel'),
+            })
+            if (!confirmed) return
+            const deleted = await trySubmit(deleteAction, { item_template: product.id })
+            if (!deleted) return
+            toast.success(__('{0} deleted', [product.title]))
+            router.push('/products')
+          },
         },
       ],
     },

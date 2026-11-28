@@ -45,7 +45,7 @@ const lowSizes = computed(() =>
 <template>
   <div class="divide-y divide-outline-gray-1">
     <section v-if="!isSingleItem || stats.committed" class="px-4 py-4">
-      <h3 class="text-sm text-ink-gray-5">{{ __('At a glance') }}</h3>
+      <h3 class="text-sm text-ink-gray-6">{{ __('At a glance') }}</h3>
       <dl class="mt-3 space-y-2">
         <div v-if="!isSingleItem" class="flex items-baseline justify-between gap-3">
           <dt class="text-base text-ink-gray-6">{{ __('Price') }}</dt>
@@ -53,44 +53,44 @@ const lowSizes = computed(() =>
         </div>
         <div v-if="!isSingleItem" class="flex items-baseline justify-between gap-3">
           <dt class="text-base text-ink-gray-6">{{ __('In stock') }}</dt>
-          <dd class="text-base text-ink-gray-7 tabular-nums">{{ stats.onHand }}</dd>
+          <dd class="text-base text-ink-gray-8 tabular-nums">{{ stats.onHand }}</dd>
         </div>
         <div v-if="stats.committed" class="flex items-baseline justify-between gap-3">
           <dt class="text-base text-ink-gray-6">{{ __('Ordered, not shipped') }}</dt>
-          <dd class="text-base text-ink-gray-7 tabular-nums">{{ stats.committed }}</dd>
+          <dd class="text-base text-ink-gray-8 tabular-nums">{{ stats.committed }}</dd>
         </div>
       </dl>
     </section>
 
     <section class="px-4 py-4">
-      <h3 class="text-sm text-ink-gray-5">{{ __('Last 30 days') }}</h3>
+      <h3 class="text-sm text-ink-gray-6">{{ __('Last 30 days') }}</h3>
       <div v-if="hasSales" class="mt-3 grid grid-cols-3 gap-3">
         <div>
           <p class="text-lg text-ink-gray-9 tabular-nums">{{ stats.unitsSold }}</p>
-          <p class="mt-0.5 text-sm text-ink-gray-5">{{ __('sold') }}</p>
+          <p class="mt-0.5 text-sm text-ink-gray-6">{{ __('sold') }}</p>
         </div>
         <div>
           <p class="text-lg text-ink-gray-9 tabular-nums">{{ stats.orderCount }}</p>
-          <p class="mt-0.5 text-sm text-ink-gray-5">{{ __('orders') }}</p>
+          <p class="mt-0.5 text-sm text-ink-gray-6">{{ __('orders') }}</p>
         </div>
         <div>
           <p class="text-lg text-ink-gray-9 tabular-nums">{{ money(stats.revenue) }}</p>
-          <p class="mt-0.5 text-sm text-ink-gray-5">{{ __('revenue') }}</p>
+          <p class="mt-0.5 text-sm text-ink-gray-6">{{ __('revenue') }}</p>
         </div>
       </div>
-      <p v-else class="mt-2 text-p-sm text-ink-gray-5">{{ __('No sales yet.') }}</p>
+      <p v-else class="mt-2 text-p-sm text-ink-gray-6">{{ __('No sales yet.') }}</p>
     </section>
 
     <section v-if="isLive && lowSizes.length" class="px-4 py-4">
-      <h3 class="text-sm text-ink-gray-5">{{ __('Needs stock') }}</h3>
+      <h3 class="text-sm text-ink-gray-6">{{ __('Needs stock') }}</h3>
       <ul class="mt-3 space-y-2">
         <li v-for="row in lowSizes.slice(0, ATTENTION_LIMIT)" :key="row.id" class="flex items-center gap-2.5">
           <Thumb :image="row.image" size="size-6" />
-          <span class="min-w-0 flex-1 truncate text-base text-ink-gray-7">{{ row.title }}</span>
+          <span class="min-w-0 flex-1 truncate text-base text-ink-gray-8">{{ row.title }}</span>
           <span class="text-base tabular-nums" :class="stockTone(row.stock)">{{ row.stock }}</span>
         </li>
       </ul>
-      <p v-if="lowSizes.length > ATTENTION_LIMIT" class="mt-2 text-sm text-ink-gray-5">
+      <p v-if="lowSizes.length > ATTENTION_LIMIT" class="mt-2 text-sm text-ink-gray-6 tabular-nums">
         {{ __('{0} more', [lowSizes.length - ATTENTION_LIMIT]) }}
       </p>
     </section>

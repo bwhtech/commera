@@ -54,9 +54,15 @@ const factsOf = (item) => [
   kindLabel(item),
   item.price
     ? { label: money(item.price), class: 'tabular-nums text-ink-gray-7' }
-    : { label: __('No price yet'), class: 'text-ink-amber-7' },
+    : { label: __('No price yet'), class: 'text-ink-amber-8' },
   { label: __('{0} in stock', [item.stock || 0]), class: 'tabular-nums' },
 ]
+
+// Items made in Desk are named after their code by default, and "Bowl / Bowl · Products" says the
+// name twice. The code shows only when it tells the seller something the name does not.
+const subtitleOf = (item) =>
+  [item.item_code !== item.item_name && item.item_code, item.item_group].filter(Boolean).join(' · ')
+const skippedSubtitleOf = (item) => (item.item_code !== item.item_name ? item.item_code : '')
 
 const isSearching = computed(() => Boolean(imp.erpnext.search))
 const shownCodes = computed(() => imp.erpnext.items.map((item) => item.item_code))
@@ -79,8 +85,20 @@ function toggleAll() {
   })
 }
 
+// While a search is on, the tab says how much of the list it shows, so "3 of 9 selected" beside three
+// rows does not read as a miscount.
+const itemsTabLabel = computed(() => {
+  if (isSearching.value && isShowingCurrentSearch.value) {
+    return __('Items ({0} of {1})', [imp.erpnext.total, imp.erpnext.importableCount])
+  }
+  return __('Items ({0})', [imp.erpnext.importableCount])
+})
+
+// One page holds everything: "1–6 of 6" and two disabled buttons are chrome with nothing to do.
+const hasMorePages = computed(() => imp.erpnext.total > imp.erpnext.pageSize || imp.erpnext.page > 1)
+
 const tabs = computed(() => [
-  { label: __('Items ({0})', [imp.erpnext.importableCount]), value: 'items' },
+  { label: itemsTabLabel.value, value: 'items' },
   { label: __('Skipped ({0})', [imp.erpnext.skipped.length]), value: 'skipped' },
 ])
 </script>
@@ -140,20 +158,24 @@ const tabs = computed(() => [
             <Thumb :image="item.image" />
             <div class="min-w-0 flex-1">
               <div class="truncate text-base text-ink-gray-8">{{ item.item_name }}</div>
-              <DotList class="mt-0.5 text-sm text-ink-gray-5" :parts="factsOf(item)" />
+              <DotList class="mt-0.5 text-sm text-ink-gray-6" :parts="factsOf(item)" />
             </div>
           </label>
         </template>
       </div>
 
+      <!-- list-row-px-2 gives the header the same inset as the selectable rows (frappe-ui pads only
+           clickable rows by default, which put every header label 12px off its column), and with the
+           px-2 wrapper the checkboxes sit 16px in, under the px-4 selection bar above. -->
       <div v-else class="px-2">
         <List
           v-model:selection="pageSelection"
+          class="list-row-px-2"
           selectable
           :columns="['minmax(0,1fr)', '9rem', '7rem', '5rem']"
           :row-height="52"
         >
-          <ListHeader>
+          <ListHeader class="text-ink-gray-6">
             <ListHeaderCell>{{ __('Item') }}</ListHeaderCell>
             <ListHeaderCell>{{ __('Options') }}</ListHeaderCell>
             <ListHeaderCell>{{ __('Price') }}</ListHeaderCell>
@@ -167,9 +189,7 @@ const tabs = computed(() => [
                   <Thumb :image="item.image" />
                   <div class="min-w-0">
                     <div class="truncate text-base text-ink-gray-8">{{ item.item_name }}</div>
-                    <div class="truncate text-sm text-ink-gray-5">
-                      {{ [item.item_code, item.item_group].filter(Boolean).join(' · ') }}
-                    </div>
+                    <div v-if="subtitleOf(item)" class="truncate text-sm text-ink-gray-6">{{ subtitleOf(item) }}</div>
                   </div>
                 </div>
               </ListCell>
@@ -178,10 +198,10 @@ const tabs = computed(() => [
               </ListCell>
               <ListCell>
                 <span v-if="item.price" class="text-sm text-ink-gray-7 tabular-nums">{{ money(item.price) }}</span>
-                <span v-else class="text-sm text-ink-amber-7">{{ __('No price yet') }}</span>
+                <span v-else class="text-sm text-ink-amber-8">{{ __('No price yet') }}</span>
               </ListCell>
               <ListCell>
-                <span class="text-sm tabular-nums" :class="item.stock ? 'text-ink-gray-7' : 'text-ink-gray-4'">
+                <span class="text-sm tabular-nums" :class="item.stock ? 'text-ink-gray-7' : 'text-ink-gray-6'">
                   {{ item.stock || 0 }}
                 </span>
               </ListCell>
@@ -201,7 +221,7 @@ const tabs = computed(() => [
         :filtered-description="__('Try another name or item code.')"
       />
 
-      <div v-else class="px-4 pb-3">
+      <div v-else-if="hasMorePages" class="px-4 pb-3">
         <ListPagination
           v-model:page="imp.erpnext.page"
           v-model:page-size="imp.erpnext.pageSize"
@@ -218,8 +238,8 @@ const tabs = computed(() => [
         </div>
       </div>
       <div v-else class="px-2">
-        <List :columns="['minmax(0,1fr)', 'minmax(0,16rem)']" :row-height="52">
-          <ListHeader>
+        <List class="list-row-px-2" :columns="['minmax(0,1fr)', 'minmax(0,16rem)']" :row-height="52">
+          <ListHeader class="text-ink-gray-6">
             <ListHeaderCell>{{ __('Item') }}</ListHeaderCell>
             <ListHeaderCell>{{ __('Why it is skipped') }}</ListHeaderCell>
           </ListHeader>
@@ -228,7 +248,7 @@ const tabs = computed(() => [
               <ListCell>
                 <div class="min-w-0">
                   <div class="truncate text-base text-ink-gray-8">{{ item.item_name }}</div>
-                  <div class="truncate text-sm text-ink-gray-5">{{ item.item_code }}</div>
+                  <div v-if="skippedSubtitleOf(item)" class="truncate text-sm text-ink-gray-6">{{ skippedSubtitleOf(item) }}</div>
                 </div>
               </ListCell>
               <ListCell><span class="truncate text-sm text-ink-gray-6">{{ item.reason }}</span></ListCell>

@@ -59,23 +59,31 @@ export function priceRates({ price, discountedPrice }) {
   return priceInputRates({ price: discountedPrice, originalPrice: price })
 }
 
+// One wording for a stock count on every product screen, zero included: "0 in stock" is honest and
+// countable where "No stock yet" and a bare "0" each said it differently.
+export function stockLabel(count) {
+  return __('{0} in stock', [count ?? 0])
+}
+
 export const PLACEHOLDER_ATTRIBUTE = 'Title'
 export const PLACEHOLDER_OPTION = 'Standard'
 export const PLACEHOLDER_SIZE = 'One Size'
 
+// Sizes come from catalog.get_product's `size_order`, the store's Size attribute order, whenever the
+// product carries it: two sparse colors (Red S/M, Blue S/L) do not hold enough to place M against L.
 export function productOptions(product) {
   const options = [...new Set(product.variants.map((variant) => variant.option))]
+  const sizes = product.size_order ?? mergeOrderedSizes(product.variants.map((variant) => variant.sizes.map((size) => size.size)))
   return {
     options: options.filter((option) => option !== PLACEHOLDER_OPTION),
-    sizes: mergeOrderedSizes(product.variants.map((variant) => variant.sizes.map((size) => size.size))).filter(
-      (size) => size !== PLACEHOLDER_SIZE,
-    ),
+    sizes: sizes.filter((size) => size !== PLACEHOLDER_SIZE),
   }
 }
 
-// Each color lists its sizes in the Size attribute's order, but a sparse color skips some. A plain
-// union would put White's S after Black's M and L; slotting each unseen size in just after the size
-// it follows in its own list keeps the attribute order across all colors.
+// The fallback for a product shape without `size_order`. Each color lists its sizes in the Size
+// attribute's order, but a sparse color skips some. A plain union would put White's S after Black's
+// M and L; slotting each unseen size in just after the size it follows in its own list keeps the
+// attribute order wherever the colors overlap.
 export function mergeOrderedSizes(lists) {
   const merged = []
   for (const list of lists) {

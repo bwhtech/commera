@@ -1,11 +1,12 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Button, Dialog, Spinner, toast } from 'frappe-ui'
-import { DialogDescription, DialogTitle } from 'reka-ui'
+import { Button, Spinner, toast } from 'frappe-ui'
+import { DialogDescription } from 'reka-ui'
 import { canChangeStep, closeImport, imp, isMappingChecked, steps } from '../../data/importFlow'
 import { loadErpnextPreview } from '../../data/erpnextImport'
 import { erpnextImportLabel, importLabel } from '../../data/importCounts'
 import { fieldLabel, stillNeeded } from '../../data/importMapping'
+import DialogShell from '../DialogShell.vue'
 import ImportStepNav from './ImportStepNav.vue'
 import SourceStep from './steps/SourceStep.vue'
 import UploadStep from './steps/UploadStep.vue'
@@ -37,10 +38,10 @@ watch(
 const isReady = computed(() => imp.hasSourceChoice !== null)
 
 // One scroll box serves every step, so a new step would otherwise open where the last one was left.
-const body = ref(null)
+const shell = ref(null)
 watch(
   () => imp.step,
-  () => body.value?.scrollTo({ top: 0 }),
+  () => shell.value?.scrollToTop(),
 )
 const stepKey = computed(() => steps.value[imp.step]?.key)
 
@@ -89,7 +90,8 @@ const blockedReason = computed(() => {
 const canContinue = computed(() => canChangeStep.value && !blockedReason.value)
 
 const nextLabel = computed(() => {
-  if (stepKey.value === 'images') return assignedPhotos.value ? __('Continue') : __('Skip photos')
+  // With no row ready there is nothing to add photos to, so there is nothing to skip either.
+  if (stepKey.value === 'images') return assignedPhotos.value || !imp.counts.ready ? __('Continue') : __('Skip photos')
   if (stepKey.value === 'review') return importLabel(imp.counts)
   if (stepKey.value === 'pick') return erpnextImportLabel(erpnextSelected.value)
   return __('Continue')
@@ -115,54 +117,57 @@ function close() {
 </script>
 
 <template>
-  <Dialog
-    v-model:open="imp.open"
+  <!-- Never dismissible: Escape or a stray click would throw away a mapped file. The × (in the
+       sheet's corner on a phone, whose footer has no Cancel) is the way out. -->
+  <DialogShell
+    ref="shell"
+    :open="imp.open"
+    :title="__('Import products')"
     size="5xl"
     position="top"
-    padding-top="2rem"
-    bare
     :dismissible="false"
-    @update:open="(v) => (v ? null : close())"
+    close-button="always"
+    @update:open="(open) => (open ? null : close())"
   >
-    <!-- The panel has to fit the window with its own footer visible: the
-         dialog's own margins take 8rem, everything else is the body's scroll. dvh, not vh: on a
-         phone vh is the height with the address bar hidden, which would push the footer off. -->
-    <div class="flex max-h-[calc(100dvh-8rem)] flex-col">
-      <!-- FormDialog's header: bare drops frappe-ui's own, so the title and the step line are wired
-           to the dialog through the same reka primitives. The step bar stays put above the body. -->
-      <div class="space-y-4 px-4 pb-4 pt-5 sm:px-6">
-        <div class="flex items-start gap-3">
-          <div class="min-w-0 flex-1">
-            <DialogTitle class="text-2xl-semibold text-ink-gray-8">{{ __('Import products') }}</DialogTitle>
-            <DialogDescription class="mt-1 text-p-sm text-ink-gray-5">{{ stepLine }}</DialogDescription>
-          </div>
-          <Button class="-mt-0.5" variant="ghost" icon="lucide-x" :aria-label="__('Close')" @click="close" />
-        </div>
-        <ImportStepNav v-if="isReady && !isSourceStep" />
+    <!-- The step line and the step bar stay put above the body, like FormDialog's description. -->
+    <template #header>
+      <DialogDescription class="mt-1 text-p-sm text-ink-gray-6">{{ stepLine }}</DialogDescription>
+      <div v-if="isReady && !isSourceStep" class="mt-4">
+        <ImportStepNav />
       </div>
+    </template>
 
-      <div ref="body" v-scroll-fade class="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-2 sm:px-6">
-        <component :is="current" v-if="isReady" @next="next" />
-        <div v-else class="flex justify-center py-14"><Spinner class="size-5" /></div>
-      </div>
+    <div class="sm:pt-2">
+      <component :is="current" v-if="isReady" @next="next" />
+      <div v-else class="flex justify-center py-14"><Spinner class="size-5" /></div>
+    </div>
 
-      <!-- FormDialog's footer: the reason (or, from sm, the idle hint) on the left, Back + the primary on the right. -->
-      <div
-        v-if="isReady && !onLastStep"
-        class="flex flex-col gap-3 border-t border-outline-gray-1 px-4 py-4 sm:flex-row sm:items-center sm:px-6"
-      >
-        <p class="min-w-0 flex-1 text-p-sm" :class="blockedReason ? 'text-ink-gray-7' : 'text-ink-gray-5 max-sm:hidden'" aria-live="polite">
+    <!-- FormDialog's footer: the reason (or, from sm, the idle hint) on the left, Back + the primary on the right. -->
+    <template v-if="isReady && !onLastStep" #footer="{ buttonSize }">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <p
+          class="min-w-0 flex-1 text-p-sm"
+          :class="blockedReason ? 'text-ink-gray-7' : 'text-ink-gray-6 max-sm:hidden'"
+          aria-live="polite"
+        >
           {{ blockedReason || __('Nothing is saved until the last step.') }}
         </p>
-        <div class="flex items-center justify-end gap-2 sm:ms-auto">
+        <!-- A phone fills the width. Back and Continue split it; the import button, whose label
+             carries the counts ("Import 2 products (3 variants)"), takes all but Back's own width
+             so the counts are never cut. -->
+        <div class="flex gap-2 sm:ms-auto sm:items-center">
           <Button
             v-if="imp.step > 0"
+            :class="startsImport ? 'shrink-0' : 'max-sm:flex-1'"
+            :size="buttonSize"
             icon-left="lucide-arrow-left rtl:-scale-x-100"
             :label="__('Back')"
             :disabled="!canChangeStep"
             @click="back"
           />
           <Button
+            class="max-sm:min-w-0 max-sm:flex-1"
+            :size="buttonSize"
             variant="solid"
             theme="gray"
             :disabled="!canContinue"
@@ -172,6 +177,6 @@ function close() {
           />
         </div>
       </div>
-    </div>
-  </Dialog>
+    </template>
+  </DialogShell>
 </template>

@@ -1,7 +1,8 @@
 // The collection picker is offered from two places — one product's ⋯ menu and the Products bulk
 // bar — so the list, the wording and the count it reports live here rather than in each screen.
 import { computed } from 'vue'
-import { dialog, toast } from 'frappe-ui'
+import { toast } from 'frappe-ui'
+import { askValue } from '../utils/confirmDialog'
 import { useAdminAction, useAdminRead, trySubmit } from './api'
 import { __ } from './translation'
 
@@ -69,31 +70,23 @@ export async function pickCollectionFor(itemTemplates, { label, mode = 'add', on
   }
 
   const { action, title, message, confirmLabel, done } = MODES[mode]
-  dialog.prompt({
+  askValue({
     title: title(label),
     message: message(),
-    fields: [
-      {
-        name: 'collection',
-        label: __('Collection'),
-        type: 'select',
-        required: true,
-        options: collectionOptions.value,
-      },
-    ],
+    label: __('Collection'),
+    type: 'select',
+    options: collectionOptions.value,
     confirmLabel: confirmLabel(),
-    onConfirm: async ({ values }) => {
-      const changed = await trySubmit(action, {
-        item_templates: itemTemplates,
-        collection: values.collection,
-      })
-      if (!changed) return
+    submit: async (collection) => {
+      const changed = await trySubmit(action, { item_templates: itemTemplates, collection })
+      if (!changed) return false
       const response = action.data
 
       // The server reports which products it actually changed (one already in the collection is
       // skipped), and under which collection it resolved the name to — the toast says that.
       toast.success(done(response.updated.length, response.collection))
       onDone?.()
+      return true
     },
   })
 }

@@ -1,6 +1,6 @@
 <script setup>
-import { computed } from 'vue'
-import { Alert, Badge, Button, Select, Spinner, dialog } from 'frappe-ui'
+import { computed, reactive } from 'vue'
+import { Alert, Button, FormControl, Select, Spinner } from 'frappe-ui'
 import { trySubmit, useAdminAction, useAdminRead } from '../../../data/api'
 import {
   checkMapping,
@@ -11,6 +11,8 @@ import {
 } from '../../../data/importFlow'
 import { TARGET_FIELDS, fieldLabel, isSameMapping, stillNeeded } from '../../../data/importMapping'
 import { __ } from '../../../data/translation'
+import ToneBadge from '../ToneBadge.vue'
+import FormDialog from '../../FormDialog.vue'
 
 const mapped = computed(() => Object.values(imp.mapping).filter(Boolean).length)
 
@@ -28,19 +30,24 @@ const collectionOptions = computed(() => [
   ...(collectionsRequest.data ?? []).map((name) => ({ label: name, value: name })),
 ])
 
+// The same New collection dialog as Add product's: frappe-ui's dialog.prompt logged a Vue
+// "reactive component" warning and a reka "Missing Description" warning on every open, and was a
+// centred modal on a phone where every other dialog here is a sheet.
 const createCollectionAction = useAdminAction('catalog.create_collection')
+const newCollection = reactive({ open: false, title: '' })
+
 function addCollection() {
-  dialog.prompt({
-    title: __('New collection'),
-    message: __('Collections group products in your store, like T-shirts or Candles.'),
-    fields: [{ name: 'title', label: __('Name'), required: true }],
-    confirmLabel: __('Add collection'),
-    onConfirm: async ({ values }) => {
-      if (!(await trySubmit(createCollectionAction, { title: values.title }))) return
-      await collectionsRequest.reload()
-      setDefaultCollection(createCollectionAction.data.name)
-    },
-  })
+  newCollection.title = ''
+  newCollection.open = true
+}
+
+async function saveCollection() {
+  const title = newCollection.title.trim()
+  if (!title || createCollectionAction.loading) return
+  if (!(await trySubmit(createCollectionAction, { title }))) return
+  newCollection.open = false
+  await collectionsRequest.reload()
+  setDefaultCollection(createCollectionAction.data.name)
 }
 
 // A guess from a header that only contains a known name ("Variant Size"). The merchant's own pick is
@@ -57,7 +64,7 @@ const hasOwnChanges = computed(() => !isSameMapping(imp.mapping, imp.suggestedMa
       <div class="min-w-0 flex-1">
         <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Match your columns') }}</h2>
         <p class="mt-1.5 text-p-base text-ink-gray-6">
-          {{ __("We matched {0} of {1} columns for you. Columns set to Don't import are left out.", [mapped, imp.headers.length]) }}
+          {{ __("We matched {0} of {1} columns for you. Columns set to “Don't import” are left out.", [mapped, imp.headers.length]) }}
         </p>
       </div>
       <Button
@@ -86,8 +93,8 @@ const hasOwnChanges = computed(() => !isSameMapping(imp.mapping, imp.suggestedMa
 
     <div class="overflow-hidden rounded-5 border border-outline-gray-1">
       <div class="hidden grid-cols-2 gap-4 border-b border-outline-gray-1 bg-surface-gray-1 px-5 py-2.5 sm:grid">
-        <span class="text-sm text-ink-gray-5">{{ __('Column in your file') }}</span>
-        <span class="text-sm text-ink-gray-5">{{ __('Goes into') }}</span>
+        <span class="text-sm text-ink-gray-6">{{ __('Column in your file') }}</span>
+        <span class="text-sm text-ink-gray-6">{{ __('Goes into') }}</span>
       </div>
 
       <div class="divide-y divide-outline-gray-1">
@@ -99,7 +106,7 @@ const hasOwnChanges = computed(() => !isSameMapping(imp.mapping, imp.suggestedMa
         >
           <div class="min-w-0">
             <div class="truncate text-base text-ink-gray-8">{{ header }}</div>
-            <div v-if="imp.samples[header]" class="truncate text-sm text-ink-gray-5">{{ imp.samples[header] }}</div>
+            <div v-if="imp.samples[header]" class="truncate text-sm text-ink-gray-6">{{ imp.samples[header] }}</div>
           </div>
           <div class="flex min-w-0 items-center gap-2">
             <Select
@@ -109,32 +116,52 @@ const hasOwnChanges = computed(() => !isSameMapping(imp.mapping, imp.suggestedMa
               :aria-label="__('Field for {0}', [header])"
               @update:model-value="(field) => setColumnField(header, field)"
             />
-            <Badge v-if="needsCheck(header)" class="shrink-0" :label="__('Check this')" theme="amber" variant="subtle" />
+            <ToneBadge v-if="needsCheck(header)" class="shrink-0" :label="__('Check this')" />
+          </div>
+        </div>
+
+        <!-- The collection every product goes into is one more "goes into" answer, so it is a row of
+             the same grid: its picker then starts on the same line as every field picker above. -->
+        <div
+          v-if="!hasCollectionColumn"
+          class="flex flex-col gap-2 px-4 py-3 sm:grid sm:grid-cols-2 sm:items-center sm:gap-4 sm:px-5"
+        >
+          <div class="min-w-0">
+            <div class="text-base text-ink-gray-8">{{ __('No collection column') }}</div>
+            <div class="text-p-sm text-ink-gray-6">{{ __('Every product goes into the one you pick. You can move them later.') }}</div>
+          </div>
+          <div class="flex min-w-0 items-center gap-2">
+            <Select
+              class="min-w-0 flex-1"
+              :model-value="imp.defaultCollection"
+              :options="collectionOptions"
+              :aria-label="__('Collection for every product')"
+              @update:model-value="setDefaultCollection"
+            />
+            <Button :label="__('New')" icon-left="lucide-plus" @click="addCollection" />
           </div>
         </div>
       </div>
     </div>
 
-    <div v-if="!hasCollectionColumn" class="space-y-1.5">
-      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-        <span class="text-base text-ink-gray-8 sm:flex-1">{{ __('Your file has no collection column. Put every product in:') }}</span>
-        <div class="flex items-center gap-2 sm:w-80">
-          <Select
-            class="min-w-0 flex-1"
-            :model-value="imp.defaultCollection"
-            :options="collectionOptions"
-            :aria-label="__('Collection')"
-            @update:model-value="setDefaultCollection"
-          />
-          <Button :label="__('New')" icon-left="lucide-plus" @click="addCollection" />
-        </div>
-      </div>
-      <p class="text-p-sm text-ink-gray-5">{{ __('You can move products to other collections later.') }}</p>
-    </div>
-
-    <div v-if="imp.phase === 'checking'" class="flex items-center gap-2 text-sm text-ink-gray-5">
+    <div v-if="imp.phase === 'checking'" class="flex items-center gap-2 text-sm text-ink-gray-6">
       <Spinner class="size-3.5" />
       {{ __('Checking your columns…') }}
     </div>
+
+    <FormDialog
+      v-model:open="newCollection.open"
+      size="md"
+      :title="__('New collection')"
+      :description="__('Collections group products in your store, like Shirts or Candles.')"
+      :primary-label="__('Add collection')"
+      :primary-disabled="!newCollection.title.trim()"
+      :reason="newCollection.title.trim() ? '' : __('Enter a name to continue.')"
+      :loading="createCollectionAction.loading"
+      :dirty="Boolean(newCollection.title.trim())"
+      @submit="saveCollection"
+    >
+      <FormControl v-model="newCollection.title" :label="__('Name')" required @keydown.enter.prevent="saveCollection" />
+    </FormDialog>
   </div>
 </template>

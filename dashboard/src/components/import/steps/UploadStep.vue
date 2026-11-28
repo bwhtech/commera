@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue'
 import { Button, Spinner, useFileUpload } from 'frappe-ui'
 import { trySubmit } from '../../../data/api'
 import { errorMessage } from '../../../data/errors'
@@ -16,6 +17,14 @@ import { fileSize } from '../../../data/importMapping'
 import { __ } from '../../../data/translation'
 
 const { upload } = useFileUpload()
+
+// "The first 3 of 3 rows" reads like part of the file is hidden, so a short file says it is all there.
+const previewLine = computed(() => {
+  const total = imp.counts.total
+  if (imp.preview.length < total) return __('The first {0} of {1} rows, as they are in your file.', [imp.preview.length, total])
+  if (total === 1) return __('Your 1 row, as it is in your file.')
+  return __('All {0} rows, as they are in your file.', [total])
+})
 
 const TEMPLATE_URL = '/api/method/commera.api.admin.imports.download_product_template'
 
@@ -48,7 +57,7 @@ async function pick(event) {
     imp.parsed = true
   } catch {
     if (!isCurrentImport(ticket)) return
-    imp.fileError = __('Could not read {0}', [file.name])
+    imp.fileError = __('{0} did not upload. Check your connection, then try again.', [file.name])
   } finally {
     endPhase(ticket)
   }
@@ -75,7 +84,7 @@ async function pick(event) {
         <span class="lucide-upload size-5" aria-hidden="true" />
       </div>
       <p class="mt-3 text-base text-ink-gray-7">{{ __('Drop your spreadsheet here') }}</p>
-      <p class="mt-1 text-sm text-ink-gray-5">{{ __('.csv or .xlsx') }}</p>
+      <p class="mt-1 text-sm text-ink-gray-6">{{ __('.csv or .xlsx') }}</p>
       <input ref="fileInput" type="file" accept=".csv,.xlsx" class="hidden" @change="pick" />
       <Button class="mt-3" variant="solid" theme="gray" :label="__('Browse files')" @click="$refs.fileInput.click()" />
     </div>
@@ -87,19 +96,22 @@ async function pick(event) {
         </div>
         <div class="min-w-0 flex-1">
           <div class="truncate text-base-semibold text-ink-gray-8">{{ imp.file.name }}</div>
-          <div class="mt-0.5 text-sm text-ink-gray-5">
+          <div class="mt-0.5 text-sm tabular-nums text-ink-gray-6">
             {{ imp.file.size }}
-            <template v-if="imp.parsed"> · {{ imp.counts.total === 1 ? __('1 row') : __('{0} rows', [imp.counts.total]) }} · {{ __('{0} columns', [imp.headers.length]) }}</template>
+            <template v-if="imp.parsed">
+              · {{ imp.counts.total === 1 ? __('1 row') : __('{0} rows', [imp.counts.total]) }}
+              · {{ imp.headers.length === 1 ? __('1 column') : __('{0} columns', [imp.headers.length]) }}
+            </template>
           </div>
         </div>
         <Spinner v-if="imp.phase === 'parsing'" class="size-4" />
         <Button v-else variant="ghost" icon="lucide-x" :label="__('Remove file')" @click="clearImportFile" />
       </div>
 
-      <p v-if="imp.phase === 'parsing'" class="mt-3 text-sm text-ink-gray-5">{{ __('Reading your file…') }}</p>
-      <p v-else-if="imp.fileError" class="mt-3 text-p-sm text-ink-red-6">
-        {{ imp.fileError }} {{ __('Remove it and try another file.') }}
-      </p>
+      <p v-if="imp.phase === 'parsing'" class="mt-3 text-sm text-ink-gray-6">{{ __('Reading your file…') }}</p>
+      <!-- The server's refusal is already a whole instruction ("Save it again from Excel…"), and the
+           Remove file button sits right above it, so nothing is appended. -->
+      <p v-else-if="imp.fileError" class="mt-3 text-p-sm text-ink-red-7" role="alert">{{ imp.fileError }}</p>
 
       <template v-if="imp.parsed">
         <div class="mt-4 overflow-x-auto rounded-4 border border-outline-gray-1">
@@ -109,7 +121,7 @@ async function pick(event) {
                 <th
                   v-for="header in imp.headers"
                   :key="header"
-                  class="whitespace-nowrap px-3 py-2 text-start text-sm font-normal text-ink-gray-5"
+                  class="whitespace-nowrap px-3 py-2 text-start text-sm font-normal text-ink-gray-6"
                 >
                   {{ header }}
                 </th>
@@ -120,7 +132,7 @@ async function pick(event) {
                 <td
                   v-for="(value, columnIndex) in row"
                   :key="columnIndex"
-                  class="max-w-48 truncate whitespace-nowrap px-3 py-2 text-sm text-ink-gray-7"
+                  class="max-w-48 truncate whitespace-nowrap px-3 py-2 text-sm tabular-nums text-ink-gray-7"
                 >
                   {{ value }}
                 </td>
@@ -128,8 +140,8 @@ async function pick(event) {
             </tbody>
           </table>
         </div>
-        <p class="mt-2 text-sm text-ink-gray-5">
-          {{ __('The first {0} of {1} rows, as they are in your file.', [imp.preview.length, imp.counts.total]) }}
+        <p class="mt-2 text-sm tabular-nums text-ink-gray-6">
+          {{ previewLine }}
         </p>
       </template>
     </div>

@@ -1,5 +1,6 @@
 import { ref } from 'vue'
-import { dialog, toast } from 'frappe-ui'
+import { toast } from 'frappe-ui'
+import { askConfirm } from '../utils/confirmDialog'
 import { useAdminAction, trySubmit } from './api'
 import { __ } from './translation'
 
@@ -18,22 +19,20 @@ export async function loadSampleProducts() {
   })
 }
 
-export function confirmRemoveSampleProducts() {
-  dialog.confirm({
+export async function confirmRemoveSampleProducts() {
+  const confirmed = await askConfirm({
     title: __('Remove demo products?'),
     message: __('This deletes only the demo products. Your own products stay as they are.'),
-    theme: 'red',
     confirmLabel: __('Remove'),
-    onConfirm: async () => {
-      if (removeSampleProductsAction.loading) return
-      if (!(await trySubmit(removeSampleProductsAction))) return
-      sampleProductsChanged.value += 1
-      const { removed, kept } = removeSampleProductsAction.data
-      if (kept.length) {
-        toast.warning(__('{0} demo products removed. {1} kept because they have orders or views', [removed.length, kept.length]))
-        return
-      }
-      toast.success(__('Demo products removed'))
-    },
+    cancelLabel: __('Cancel'),
   })
+  if (!confirmed || removeSampleProductsAction.loading) return
+  if (!(await trySubmit(removeSampleProductsAction))) return
+  sampleProductsChanged.value += 1
+  const { removed, kept } = removeSampleProductsAction.data
+  if (kept.length) {
+    toast.warning(__('{0} demo products removed. {1} kept because they have orders or views', [removed.length, kept.length]))
+    return
+  }
+  toast.success(__('Demo products removed'))
 }

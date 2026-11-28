@@ -13,8 +13,10 @@ const model = defineModel({ type: String, default: '' })
 </script>
 
 <template>
-  <div>
-    <p v-if="label" class="mb-1.5 text-base text-ink-gray-6">{{ label }}</p>
+  <!-- Label, gap and description copy FormControl's own (frappe-ui's InputLabel and InputDescription,
+       which it does not export), so this field reads as one of the form's fields beside a Title. -->
+  <div class="space-y-1.5">
+    <p v-if="label" class="text-sm leading-tighter text-ink-gray-6">{{ label }}</p>
     <div
       class="overflow-hidden rounded-4 border border-outline-gray-2 focus-within:border-outline-gray-3"
     >
@@ -23,6 +25,6 @@ const model = defineModel({ type: String, default: '' })
         <EditorContent :class="['px-3 py-2', minHeight]" />
       </Editor>
     </div>
-    <p v-if="description" class="mt-1.5 text-sm text-ink-gray-5">{{ description }}</p>
+    <p v-if="description" class="text-p-sm text-ink-gray-6">{{ description }}</p>
   </div>
 </template>

@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { Button } from 'frappe-ui'
 import PriceFields from '../PriceFields.vue'
+import { stockLabel } from '../../data/product'
 import ProductSection from './ProductSection.vue'
 import ReceiveStockDialog from './ReceiveStockDialog.vue'
 
@@ -33,8 +34,8 @@ const stockRows = computed(() => [{ id: size.value.item_code, title: props.produ
 
     <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-outline-gray-1 pt-4">
       <div>
-        <p class="text-base text-ink-gray-8 tabular-nums">{{ __('{0} in stock', [size.stock ?? 0]) }}</p>
-        <p v-if="size.committed" class="mt-0.5 text-sm text-ink-gray-5 tabular-nums">
+        <p class="text-base text-ink-gray-8 tabular-nums">{{ stockLabel(size.stock) }}</p>
+        <p v-if="size.committed" class="mt-0.5 text-sm text-ink-gray-6 tabular-nums">
           {{ __('{0} ordered, not shipped', [size.committed]) }}
         </p>
       </div>

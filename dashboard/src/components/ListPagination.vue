@@ -28,7 +28,7 @@ function setSize(size) {
 
 <template>
   <div class="mt-3 flex flex-wrap items-center gap-3 border-t border-outline-gray-1 pt-3">
-    <p class="text-sm text-ink-gray-5 tabular-nums">{{ __('{0}–{1} of {2}', [first, last, total]) }}</p>
+    <p class="text-sm text-ink-gray-6 tabular-nums">{{ __('{0}–{1} of {2}', [first, last, total]) }}</p>
 
     <div class="ms-auto flex items-center gap-2">
       <Select

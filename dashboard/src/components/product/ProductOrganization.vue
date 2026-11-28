@@ -33,7 +33,7 @@ const hint = computed(() =>
       :options="collectionOptions"
       :tag-icon="mainIcon"
     />
-    <p v-if="hint" class="mt-1.5 text-p-sm text-ink-gray-5">{{ hint }}</p>
+    <p v-if="hint" class="mt-1.5 text-p-sm text-ink-gray-6">{{ hint }}</p>
   </ProductSection>
 
   <section v-else class="border-b border-outline-gray-1 px-4 py-4">
@@ -45,6 +45,6 @@ const hint = computed(() =>
       :options="collectionOptions"
       :tag-icon="mainIcon"
     />
-    <p v-if="hint" class="mt-1.5 text-p-sm text-ink-gray-5">{{ hint }}</p>
+    <p v-if="hint" class="mt-1.5 text-p-sm text-ink-gray-6">{{ hint }}</p>
   </section>
 </template>

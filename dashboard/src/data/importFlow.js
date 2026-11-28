@@ -51,6 +51,7 @@ function blankImport() {
     created: [],
     published: null,
     runRowErrors: [],
+    runRowWarnings: [],
     runImageErrors: [],
     imagesAttached: 0,
     erpnext: {
@@ -151,8 +152,9 @@ export function closeImport() {
 }
 
 // One action, shared by the Upload preview and every mapping change: a dry run of what run_import
-// would write (see RunStep).
-export const validateImportAction = useAdminAction('imports.validate_import')
+// would write (see RunStep). Quiet, because both callers show the refusal inline (the Upload step's
+// file line, the Map step's alert), and a toast on top said the same thing twice.
+export const validateImportAction = useAdminAction('imports.validate_import', { quiet: true })
 
 // The Map step's answer, as validate_import, match_import_images and run_import all take it. The
 // collection for every row only applies while no column is matched to Collection.

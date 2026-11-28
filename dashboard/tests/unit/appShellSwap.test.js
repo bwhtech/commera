@@ -37,6 +37,8 @@ function renderApp() {
     ImportDialog: nothing,
     AddProductDialog: nothing,
     LanguageDialog: nothing,
+    ConfirmDialog: nothing,
+    PromptDialog: nothing,
   })
   const { root } = mount({ render: () => Vue.h(App) })
   const shellOf = () => {

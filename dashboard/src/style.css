@@ -136,3 +136,40 @@ a {
       --scroll-fade-right 150ms ease-out;
   }
 }
+
+/* frappe-ui's InputError and its required "*" draw in ink-red-5, which measures 4.46:1 on a
+   light dialog and 3.07:1 on a dark one: under AA for 13px text, and a field error is the one
+   line a merchant must read. red-7 is 6.70:1 and 6.32:1 there, and is what frappe-ui's own
+   ErrorMessage already uses, so a field error and a form error now read in the same red. The
+   attribute pair outranks the single utility class whatever order the two stylesheets load in.
+   Recheck when frappe-ui moves its field errors off red-5. */
+[data-slot='error'][role='alert'],
+[data-slot='label'] > [aria-hidden='true'].text-ink-red-5 {
+  @apply text-ink-red-7;
+}
+
+/* A price or a quantity is typed, never nudged by one: the native spin buttons only show on hover
+   and focus, look different in every browser, and sit on top of the field's end padding. The
+   keyboard's arrow keys still step the value. Tabular figures, because a number field sits next
+   to other numbers (Price beside Original price) and a class on frappe-ui's FormControl lands on
+   its wrapper, which preflight's `font: inherit` does not carry into the input. */
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* frappe-ui's TabButtons draw an unselected tab's label in ink-gray-5: 3.76:1 on its gray track in
+   light mode and 3.4:1 in dark, under AA for a label a merchant reads to pick a filter (Products'
+   Live / Not published, Import's sources). gray-6 passes on both tracks; the selected tab keeps
+   gray-8 on its raised pill, so the two still differ. `:not(:hover)` leaves frappe-ui's own hover
+   ink in charge. Recheck when frappe-ui changes the inactive pill ink. */
+[data-slot='tab-buttons'] [data-state='inactive'] .text-ink-gray-5:not(:hover) {
+  @apply text-ink-gray-6;
+}

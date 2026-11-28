@@ -12,6 +12,7 @@ import { FormControl, toast } from 'frappe-ui'
 import FormDialog from '../FormDialog.vue'
 import { useAdminAction, trySubmit } from '../../data/api'
 import { symbolFor } from '../../data/format'
+import { stockLabel } from '../../data/product'
 import { __ } from '../../data/translation'
 import { useIsMobile } from '../../utils/useIsMobile'
 
@@ -51,6 +52,11 @@ const lines = computed(() =>
     .map((row) => ({ itemCode: row.id, qty: Number(drafts[row.id].qty), rate: drafts[row.id].rate })),
 )
 
+// Anything typed, a cost included, is work a stray Escape would throw away.
+const isDirty = computed(() =>
+  props.rows.some((row) => Boolean(drafts[row.id]?.qty) || Boolean(drafts[row.id]?.rate)),
+)
+
 const totalQty = computed(() => lines.value.reduce((sum, line) => sum + line.qty, 0))
 
 const resultingStock = (row) => (row.onHand ?? 0) + Math.max(0, Number(drafts[row.id]?.qty) || 0)
@@ -84,28 +90,32 @@ async function receive() {
     :primary-disabled="!lines.length"
     :reason="lines.length ? '' : __('Enter a quantity to add.')"
     :loading="receiveAction.loading"
+    :dirty="isDirty"
     @submit="receive"
   >
-    <p class="text-p-sm text-ink-gray-5">{{ __('Adds to what you already have.') }}</p>
+    <p class="text-p-sm text-ink-gray-6">{{ __('Adds to what you already have.') }}</p>
 
-    <div v-if="!labelEachRow" class="mt-4 flex gap-3 border-b border-outline-gray-1 pb-1.5 text-sm text-ink-gray-5">
+    <div v-if="!labelEachRow" class="mt-4 flex gap-3 border-b border-outline-gray-1 pb-1.5 text-sm text-ink-gray-6">
       <span class="flex-1">{{ __('Variant') }}</span>
       <span class="w-28">{{ __('Quantity to add') }}</span>
       <span class="w-40">{{ __('Cost per item (optional)') }}</span>
     </div>
     <div class="divide-y divide-outline-gray-1" :class="labelEachRow ? 'mt-4' : 'mt-3'">
+      <!-- One labelled row lines its inputs up on their bottom edge, under their labels; rows under
+           the shared header have no labels, so their inputs centre on the name and stock lines. -->
       <div
         v-for="row in rows"
         :key="row.id"
-        class="grid grid-cols-2 gap-3 py-3 first:pt-0 last:pb-0 sm:flex sm:items-end"
+        class="grid grid-cols-2 gap-3 py-3 first:pt-0 last:pb-0 sm:flex"
+        :class="labelEachRow ? 'sm:items-end' : 'sm:items-center'"
       >
         <div class="col-span-2 min-w-0 sm:flex-1" :class="{ 'sm:pb-1.5': labelEachRow }">
           <p class="truncate text-base text-ink-gray-8">{{ row.title }}</p>
-          <p class="mt-0.5 text-sm text-ink-gray-5 tabular-nums">
+          <p class="mt-0.5 text-sm text-ink-gray-6 tabular-nums">
             {{
               Number(drafts[row.id]?.qty) > 0
                 ? __('{0} in stock → {1}', [row.onHand ?? 0, resultingStock(row)])
-                : __('{0} in stock', [row.onHand ?? 0])
+                : stockLabel(row.onHand)
             }}
           </p>
         </div>
@@ -115,6 +125,7 @@ async function receive() {
           type="number"
           inputmode="numeric"
           min="0"
+          placeholder="0"
           :label="labelEachRow ? __('Quantity to add') : ''"
           :aria-label="__('Quantity to add for {0}', [row.title])"
         />
@@ -128,7 +139,7 @@ async function receive() {
           :aria-label="__('Cost per item for {0}', [row.title])"
         >
           <template #prefix>
-            <span class="text-base text-ink-gray-5">{{ currencySymbol }}</span>
+            <span class="text-base text-ink-gray-6">{{ currencySymbol }}</span>
           </template>
         </FormControl>
       </div>

@@ -26,11 +26,13 @@ const hint = computed(() =>
   <ProductSection id="product-photos" :title="__('Photos')" :hint="hint">
     <!-- With several colors each row is a compact strip: a drop zone per color filled the first
          phone screen. One strip keeps the large drop zone while it is empty. -->
+    <!-- -mx-4 px-4 runs each row's rule over the section's px-4 to the card edges, as the Options and
+         Variants rows rule, while the content keeps its inset. -->
     <div class="divide-y divide-outline-gray-1">
       <div
         v-for="variant in product.variants"
         :key="variant.name"
-        class="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+        class="-mx-4 flex items-start gap-3 px-4 py-3 first:pt-0 last:pb-0"
       >
         <span v-if="hasColors" class="w-20 shrink-0 truncate pt-0.5 text-base text-ink-gray-6 sm:w-24">
           {{ variant.option }}

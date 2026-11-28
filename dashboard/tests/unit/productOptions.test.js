@@ -68,3 +68,16 @@ test('a color that skips sizes does not reorder them', () => {
   const product = { variants: [variant('Black', ['M', 'L']), variant('White', ['S', 'M', 'L'])] }
   assert.deepEqual(productOptions(product).sizes, ['S', 'M', 'L'])
 })
+
+test('the store size order wins over what sparse colors imply', () => {
+  const product = {
+    size_order: ['S', 'M', 'L'],
+    variants: [variant('Red', ['S', 'M']), variant('Blue', ['S', 'L'])],
+  }
+  assert.deepEqual(productOptions(product).sizes, ['S', 'M', 'L'])
+})
+
+test('the store size order drops the placeholder size', () => {
+  const product = { size_order: ['One Size'], variants: [variant('Indigo', ['One Size'])] }
+  assert.deepEqual(productOptions(product).sizes, [])
+})

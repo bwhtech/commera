@@ -80,13 +80,14 @@ const addedCount = computed(() => changes.value.added.length)
 const removedCount = computed(() => changes.value.removed.length)
 const switchesOption = computed(() => firstOption.value && Boolean(options.value.length))
 
+// Whole sentences, like every other line in the dialog, so each half ends with its own period.
 const summary = computed(() => {
   const parts = []
-  if (addedCount.value === 1) parts.push(__('1 variant will be added'))
-  else if (addedCount.value) parts.push(__('{0} variants will be added', [addedCount.value]))
-  if (removedCount.value === 1) parts.push(__('1 will leave the store'))
-  else if (removedCount.value) parts.push(__('{0} will leave the store', [removedCount.value]))
-  return parts.join(' · ')
+  if (addedCount.value === 1) parts.push(__('1 variant will be added.'))
+  else if (addedCount.value) parts.push(__('{0} variants will be added.', [addedCount.value]))
+  if (removedCount.value === 1) parts.push(__('1 will leave the store.'))
+  else if (removedCount.value) parts.push(__('{0} will leave the store.', [removedCount.value]))
+  return parts.join(' ')
 })
 
 const emptyError = computed(() => (changes.value.ticked.length ? '' : __('Keep at least one variant ticked.')))
@@ -155,10 +156,17 @@ async function save() {
     :reason="canSave ? '' : blockedReason"
     :loading="saveAction.loading"
     :dismissible="!pickerOpen"
+    :dirty="hasChanges"
     @submit="save"
   >
     <div class="space-y-5">
-      <Alert v-if="firstOption && (!hasOptions || options.length)" :title="__('Adding options replaces the current item')" :description="firstOptionHint" />
+      <!-- Amber: saving takes the item the seller sells today off sale. -->
+      <Alert
+        v-if="firstOption && (!hasOptions || options.length)"
+        theme="amber"
+        :title="__('Adding options replaces the current item')"
+        :description="firstOptionHint"
+      />
 
       <Select
         v-if="firstOption"
@@ -175,7 +183,7 @@ async function save() {
         :attribute="optionLabel"
         :label="optionLabel"
         :placeholder="__('Pick or type a {0}', [optionLabel.toLowerCase()])"
-        :description="__('Type a new {0} to add it', [optionLabel.toLowerCase()])"
+        :description="__('Type a new {0} to add it.', [optionLabel.toLowerCase()])"
         @values="setOptionSwatches"
       />
 
@@ -198,8 +206,8 @@ async function save() {
       />
 
       <div v-if="summary" class="space-y-1">
-        <p class="text-p-sm text-ink-gray-7">{{ summary }}</p>
-        <p v-if="!firstOption && consequenceHint" class="text-p-sm text-ink-gray-5">{{ consequenceHint }}</p>
+        <p class="text-p-sm text-ink-gray-7 tabular-nums">{{ summary }}</p>
+        <p v-if="!firstOption && consequenceHint" class="text-p-sm text-ink-gray-6">{{ consequenceHint }}</p>
       </div>
     </div>
   </FormDialog>

@@ -2,9 +2,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { Badge, Button, Progress, Select, Spinner, TabButtons, toast, useFileUpload } from 'frappe-ui'
 import { beginPhase, canChangeStep, endPhase, imp, importParams, isCurrentImport } from '../../../data/importFlow'
-import { photoCount, photoGroupsHavePhoto, photoGroupsNeedPhoto } from '../../../data/importCounts'
+import { manyPhotoGroupsTip, photoCount, photoGroupKind, photoGroupsHavePhoto, photoGroupsNeedPhoto } from '../../../data/importCounts'
 import { useAdminAction, trySubmit } from '../../../data/api'
 import CoachTip from '../CoachTip.vue'
+import ToneBadge from '../ToneBadge.vue'
+import EmptyState from '../../EmptyState.vue'
 import { __ } from '../../../data/translation'
 
 const { upload } = useFileUpload()
@@ -33,7 +35,11 @@ function assignedPhotos(key) {
 const assignedFileUrls = computed(() => new Set(Object.values(imp.imageAssignments).flat()))
 const unplacedFiles = computed(() => imp.imageFiles.filter((file) => !assignedFileUrls.value.has(file.file_url)))
 const groupsWithPhoto = computed(() => groups.value.filter((group) => assignedPhotos(group.key).length).length)
-const hasColors = computed(() => groups.value.some((group) => group.color))
+const groupKind = computed(() => photoGroupKind(groups.value))
+
+// Every row skipped: no product will be made, so there is nothing a photo could land on, and the
+// step says so instead of a "0 of 0" count and a drop zone whose photos could never match.
+const hasNothingToPhotograph = computed(() => !imp.counts.ready)
 
 const groupOptions = computed(() => [
   { label: __('Leave unmatched'), value: '' },
@@ -129,7 +135,7 @@ function onGroupFilesPicked(event) {
 }
 
 onMounted(() => {
-  if (!imp.imageMatch) matchUploadedFiles()
+  if (!imp.imageMatch && !hasNothingToPhotograph.value) matchUploadedFiles()
 })
 </script>
 
@@ -141,13 +147,15 @@ onMounted(() => {
     <div class="flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
       <div class="min-w-0 flex-1">
         <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Add product photos') }}</h2>
-        <p class="mt-1 text-p-base text-ink-gray-6">
+        <!-- Advice about photos is beside the point when nothing can take one; the empty state says why. -->
+        <p v-if="!hasNothingToPhotograph" class="mt-1 text-p-base text-ink-gray-6">
           {{ __('Products sell far better with a photo. You can also skip this and add them from each product page later.') }}
         </p>
       </div>
       <!-- The tabs are unbreakable content, wider than the dialog body on a phone.
            Scroll the strip in place rather than letting it push the body. -->
       <TabButtons
+        v-if="!hasNothingToPhotograph"
         v-model="imp.imagesMode"
         class="max-w-full overflow-x-auto sm:shrink-0 sm:overflow-visible"
         :options="[
@@ -162,8 +170,17 @@ onMounted(() => {
       {{ __('Reading your products…') }}
     </div>
 
+    <div v-if="hasNothingToPhotograph" class="rounded-5 border border-outline-gray-1">
+      <EmptyState
+        compact
+        icon="lucide-image-off"
+        :title="__('No products to add photos to')"
+        :description="__('Every row in your file is skipped. Review shows what to fix in each one.')"
+      />
+    </div>
+
     <!-- A: a folder of files, matched on the product and colour in each name -->
-    <template v-if="imp.imagesMode === 'bulk'">
+    <template v-else-if="imp.imagesMode === 'bulk'">
       <div
         v-if="uploading"
         class="rounded-5 border border-outline-gray-1 p-4"
@@ -173,7 +190,7 @@ onMounted(() => {
           <span class="text-base text-ink-gray-8">
             {{ matchAction.loading ? __('Matching photos to your products…') : __('Uploading photos') }}
           </span>
-          <span class="ms-auto text-sm tabular-nums text-ink-gray-5">{{ __('{0} of {1} uploaded', [doneCount, chosenCount]) }}</span>
+          <span class="ms-auto text-sm tabular-nums text-ink-gray-6">{{ __('{0} of {1} uploaded', [doneCount, chosenCount]) }}</span>
         </div>
         <Progress :value="Math.round((doneCount / chosenCount) * 100)" size="sm" class="mt-3" />
       </div>
@@ -188,7 +205,7 @@ onMounted(() => {
           <span class="lucide-images size-5" aria-hidden="true" />
         </div>
         <p class="mt-3 text-base text-ink-gray-7">{{ __('Drop your photos here') }}</p>
-        <p class="mt-1 max-w-md text-p-sm text-ink-gray-5">
+        <p class="mt-1 max-w-md text-p-sm text-ink-gray-6">
           {{ matchExample[0] }}<span class="whitespace-nowrap text-ink-gray-7">oversized-tee-black-1.jpg</span>{{ matchExample[1] }}
         </p>
         <Button
@@ -202,17 +219,18 @@ onMounted(() => {
       </div>
 
       <template v-else>
-        <p class="text-p-base text-ink-gray-7">
+        <p class="text-p-base tabular-nums text-ink-gray-7">
           {{ __('{0} of {1} photos matched.', [assignedFileUrls.size, imp.imageFiles.length]) }}
-          <span v-if="groups.length - groupsWithPhoto" class="text-ink-gray-5">
-            {{ photoGroupsNeedPhoto(groups.length - groupsWithPhoto, groups.length, hasColors) }}
+          <span v-if="groups.length - groupsWithPhoto" class="text-ink-gray-6">
+            {{ photoGroupsNeedPhoto(groups.length - groupsWithPhoto, groups.length, groupKind) }}
           </span>
         </p>
 
         <div v-if="unplacedFiles.length" class="rounded-5 border border-outline-gray-1">
           <div class="flex items-center gap-2 border-b border-outline-gray-1 px-4 py-3">
             <span class="text-base-semibold text-ink-gray-8">{{ __('Files we could not place') }}</span>
-            <Badge :label="String(unplacedFiles.length)" theme="amber" variant="subtle" />
+            <!-- Gray: amber-7 on amber-2 is 3.55:1 in light mode, and the heading already says these need a pick. -->
+            <Badge class="tabular-nums" :label="String(unplacedFiles.length)" theme="gray" variant="subtle" />
           </div>
           <div v-scroll-fade class="max-h-72 divide-y divide-outline-gray-1 overflow-y-auto">
             <!-- Stacked below sm so the file name keeps its width next to the picker. -->
@@ -251,7 +269,7 @@ onMounted(() => {
     <!-- B: one product colour at a time -->
     <template v-else>
       <div class="flex flex-wrap items-center gap-3 rounded-4 border border-outline-gray-1 bg-surface-gray-1 px-3 py-2.5">
-        <span class="text-base text-ink-gray-7">{{ photoGroupsHavePhoto(groupsWithPhoto, groups.length, hasColors) }}</span>
+        <span class="text-base tabular-nums text-ink-gray-7">{{ photoGroupsHavePhoto(groupsWithPhoto, groups.length, groupKind) }}</span>
         <Progress
           v-if="groups.length"
           :value="Math.round((groupsWithPhoto / groups.length) * 100)"
@@ -262,7 +280,13 @@ onMounted(() => {
 
       <div v-if="groups.length" class="overflow-hidden rounded-5 border border-outline-gray-1">
         <div class="divide-y divide-outline-gray-1">
-          <div v-for="group in groups" :key="group.key" class="flex items-center gap-3 px-4 py-3">
+          <!-- Below sm the badge and the action go under the product: beside it they left the title
+               50px, and two tees in different colors could not be told apart. From sm one row again. -->
+          <div
+            v-for="group in groups"
+            :key="group.key"
+            class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center"
+          >
             <div class="flex min-w-0 flex-1 items-center gap-3">
               <div class="flex shrink-0 gap-1">
                 <img
@@ -279,27 +303,34 @@ onMounted(() => {
                   <span class="lucide-image-off size-4" aria-hidden="true" />
                 </div>
               </div>
+              <!-- min-w-0 lets the name wrap (below sm) or truncate (from sm) inside the row, instead of
+                   holding the row at the name's full width. -->
               <div class="min-w-0">
-                <div class="truncate text-base text-ink-gray-8">{{ group.title }}</div>
-                <div v-if="group.color" class="truncate text-sm text-ink-gray-5">{{ group.color }}</div>
+                <div class="break-words text-base text-ink-gray-8 sm:truncate">{{ group.title }}</div>
+                <div v-if="group.color" class="break-words text-sm text-ink-gray-6 sm:truncate">{{ group.color }}</div>
               </div>
             </div>
-            <Badge
-              v-if="assignedPhotos(group.key).length"
-              class="shrink-0"
-              :label="photoCount(assignedPhotos(group.key).length)"
-              theme="green"
-              variant="subtle"
-            />
-            <Button
-              class="shrink-0"
-              :variant="assignedPhotos(group.key).length ? 'subtle' : 'solid'"
-              theme="gray"
-              :disabled="!canChangeStep"
-              icon-left="lucide-upload"
-              :label="assignedPhotos(group.key).length ? __('Add more') : __('Upload')"
-              @click="chooseGroupFiles(group.key)"
-            />
+            <div class="flex shrink-0 items-center gap-3 max-sm:justify-between">
+              <ToneBadge
+                v-if="assignedPhotos(group.key).length"
+                class="tabular-nums"
+                tone="ready"
+                :label="photoCount(assignedPhotos(group.key).length)"
+              />
+              <!-- The words go in the slot, not in `label`: Button makes `label` its aria-label, and
+                   five buttons all named "Upload" do not say which product each one is for. -->
+              <Button
+                class="ms-auto"
+                :variant="assignedPhotos(group.key).length ? 'subtle' : 'solid'"
+                theme="gray"
+                :disabled="!canChangeStep"
+                icon-left="lucide-upload"
+                :aria-label="assignedPhotos(group.key).length ? __('Add more photos to {0}', [groupName(group)]) : __('Upload photos for {0}', [groupName(group)])"
+                @click="chooseGroupFiles(group.key)"
+              >
+                {{ assignedPhotos(group.key).length ? __('Add more') : __('Upload') }}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -308,7 +339,7 @@ onMounted(() => {
         v-if="groups.length >= 10"
         icon="lucide-clock"
         :title="__('Many products to go')"
-        :text="hasColors ? __('For {0} colors, adding several named photos at once is far quicker.', [groups.length]) : __('For {0} products, adding several named photos at once is far quicker.', [groups.length])"
+        :text="manyPhotoGroupsTip(groups.length, groupKind)"
       />
     </template>
   </div>

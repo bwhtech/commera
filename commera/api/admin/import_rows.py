@@ -2,12 +2,14 @@
 # For license information, please see license.txt
 
 import math
+import zipfile
 
 import frappe
 from frappe import _
 from frappe.utils.csvutils import read_csv_content
 from frappe.utils.data import cstr, flt
 from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file
+from openpyxl.utils.exceptions import InvalidFileException
 
 from commera.api.admin.catalog import get_collection
 
@@ -53,14 +55,38 @@ def normalize_header(text):
 	return "".join(ch for ch in cstr(text).strip().casefold() if ch.isalnum() or ch == " ").strip()
 
 
+# What openpyxl raises for bytes that are not a workbook: no zip at all (a renamed PDF, an old .xls),
+# or a zip without a workbook inside. Anything else is a bug and is left to reach the error log.
+NOT_A_WORKBOOK_ERRORS = (zipfile.BadZipFile, InvalidFileException, KeyError)
+
+
 def read_uploaded_rows(file_url):
 	"""The file's raw grid, header row included, blank rows dropped."""
 	file_doc = frappe.get_doc("File", {"file_url": file_url})
-	if cstr(file_doc.file_name).lower().endswith(".csv"):
-		rows = read_csv_content(file_doc.get_content())
-	else:
-		rows = read_xlsx_file_from_attached_file(file_url=file_url)
+	rows = read_spreadsheet(file_doc)
+	if rows is None:
+		frappe.throw(
+			_(
+				"This file is not a readable Excel or CSV file. Save it again from Excel, or export it as CSV."
+			)
+		)
 	return [row for row in rows if any(cstr(cell).strip() for cell in row)]
+
+
+def read_spreadsheet(file_doc):
+	"""The file's rows, or None when it is not the kind of file its name says. File.get_content() hands
+	back text as str and anything binary as bytes, so the type tells a CSV from a workbook before a
+	parser trips over the wrong one: a text file named .xlsx raised a TypeError, and a workbook
+	renamed .csv an "Unknown file encoding"."""
+	content = file_doc.get_content()
+	if cstr(file_doc.file_name).lower().endswith(".csv"):
+		return read_csv_content(content) if isinstance(content, str) else None
+	if not isinstance(content, bytes) or not content:
+		return None
+	try:
+		return read_xlsx_file_from_attached_file(fcontent=content)
+	except NOT_A_WORKBOOK_ERRORS:
+		return None
 
 
 def get_contained_field(text, taken):
@@ -146,7 +172,7 @@ def parse_and_validate(
 	merchant can match them in the Map step."""
 	rows = read_uploaded_rows(file_url)
 	if not rows:
-		frappe.throw(_("The file has no rows"))
+		frappe.throw(_("Your file has no rows. Add a header row and your products, then upload it again."))
 
 	headers = [cstr(cell) for cell in rows[0]]
 	data_rows = rows[1:]
@@ -273,13 +299,13 @@ class RowChecker:
 
 	def check_required(self, row, parsed):
 		if not parsed["title"]:
-			return error(_("Product title is missing"))
+			return error(_("Product title is missing."))
 		if not parsed["collection"]:
-			return error(_("Collection is missing"))
+			return error(_("Collection is missing."))
 		if not self.has_collection(parsed["collection"]):
-			return error(_('Collection "{0}" does not exist. Create it first').format(parsed["collection"]))
+			return error(_('Collection "{0}" does not exist. Create it first.').format(parsed["collection"]))
 		if not self.text(row, "sale_price"):
-			return error(_("Price is missing"))
+			return error(_("Price is missing."))
 		# The same rule, in the same words, as the Add product dialog.
 		if parsed["sale_price"] <= 0:
 			return error(_("Enter a price above zero."))
@@ -320,7 +346,7 @@ class RowChecker:
 		key = (parsed["title"].casefold(), parsed["color"].casefold(), parsed["size"].casefold())
 		if key in self.seen_variants:
 			return error(
-				_("Duplicate of row {0} (same title, color and size)").format(self.seen_variants[key])
+				_("Repeats row {0}, with the same title, color and size.").format(self.seen_variants[key])
 			)
 		self.seen_variants[key] = parsed["row"]
 
@@ -331,15 +357,15 @@ class RowChecker:
 		title, row = parsed["title"], first["row"]
 		if parsed["collection"] != first["collection"]:
 			return error(
-				_('Collection does not match row {0} for "{1}" ({2})').format(row, title, first["collection"])
+				_('Collection does not match row {0} of "{1}", which is in {2}.').format(row, title, first["collection"])
 			)
 		if bool(parsed["color"]) != bool(first["color"]):
 			return error(
-				_('Row {0} of "{1}" differs: give every row of a product a color, or none').format(row, title)
+				_('Row {0} of "{1}" differs. Give every row of a product a color, or none.').format(row, title)
 			)
 		if bool(parsed["size"]) != bool(first["size"]):
 			return error(
-				_('Row {0} of "{1}" differs: give every row of a product a size, or none').format(row, title)
+				_('Row {0} of "{1}" differs. Give every row of a product a size, or none.').format(row, title)
 			)
 		return self.check_against_color(parsed)
 

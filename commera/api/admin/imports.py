@@ -199,7 +199,7 @@ def parse_complete_file(file_url, column_mapping, default_collection):
 	result = parse_and_validate(file_url, column_mapping, default_collection)
 	if result["missing"]:
 		frappe.throw(
-			_("Match a column to {0} first").format(
+			_("Match a column to {0} first.").format(
 				", ".join(_(FIELD_LABELS[field]) for field in result["missing"])
 			)
 		)
@@ -289,7 +289,7 @@ def attach_group_images(item_template, group, file_urls_by_key):
 	for option, file_urls in file_urls_by_option.items():
 		variant_name = variant_by_option.get(option)
 		if not variant_name:
-			frappe.throw(_("{0} has no {1} to put photos on").format(group["title"], option))
+			frappe.throw(_("{0} has no {1} to put photos on.").format(group["title"], option))
 		# ponytail: one get_doc per color because add_images validates and saves the variant,
 		# revisit if a single import ever carries more colors than a page of variants.
 		frappe.get_doc("Style Attribute Variant", variant_name).add_images(file_urls)
@@ -372,7 +372,9 @@ def create_group_product(group):
 
 
 def row_messages(rows, message):
-	return [{"row": row["row"], "message": message} for row in rows]
+	"""One entry per spreadsheet row, named by its number and its title so the result card can say
+	which product it was without the merchant going back to the file."""
+	return [{"row": row["row"], "title": row["title"], "message": message} for row in rows]
 
 
 def import_group(group, file_urls_by_key, outcome):
@@ -413,14 +415,14 @@ def get_orphan_image_errors(parsed_rows, file_urls_by_key, used_image_keys):
 			continue
 		row = first_row_by_key.get(key, {})
 		name = " · ".join(filter(None, [row.get("title"), row.get("color")])) or key
-		errors.append(
-			{
-				"row": row.get("row"),
-				"message": _("No product was created for {0}, so its {1} photos were not attached").format(
-					name, len(file_urls)
-				),
-			}
+		message = (
+			_("No product was created for {0}, so its photo was not attached.").format(name)
+			if len(file_urls) == 1
+			else _("No product was created for {0}, so its {1} photos were not attached.").format(
+				name, len(file_urls)
+			)
 		)
+		errors.append({"row": row.get("row"), "title": row.get("title"), "message": message})
 	return errors
 
 
@@ -459,10 +461,14 @@ def run_import(
 		import_group(group, file_urls_by_key, outcome)
 
 	# Rows that never made it into a group at all kept their own validation message from the dry run.
-	validation_errors = [
-		{"row": row["row"], "message": row["issue"]["text"]}
-		for row in result["rows"]
-		if row["issue"] and row["issue"]["level"] == "error"
+	validation_errors = row_issues(result["rows"], "error")
+	# A warning row was written, minus what the warning says was left out; the result names it so the
+	# merchant knows which product to check.
+	created_titles = {product["title"].casefold() for product in outcome["created"]}
+	warnings = [
+		issue
+		for issue in row_issues(result["rows"], "warning")
+		if issue["title"].casefold() in created_titles
 	]
 	orphan_errors = get_orphan_image_errors(result["rows"], file_urls_by_key, outcome["used_image_keys"])
 
@@ -470,10 +476,19 @@ def run_import(
 		"created": outcome["created"],
 		"created_count": len(outcome["created"]),
 		"row_errors": validation_errors + outcome["row_errors"],
+		"row_warnings": warnings,
 		"counts": result["counts"],
 		"images_attached": outcome["images_attached"],
 		"image_errors": outcome["image_errors"] + orphan_errors,
 	}
+
+
+def row_issues(parsed_rows, level):
+	return [
+		{"row": row["row"], "title": row["title"], "message": row["issue"]["text"]}
+		for row in parsed_rows
+		if row["issue"] and row["issue"]["level"] == level
+	]
 
 
 @frappe.whitelist(methods=["POST"])
