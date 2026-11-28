@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@head-->
+<title>The collection · Émail</title>
+</head>
+<body data-page="collection">
+<!--@header-->
+<main tabindex="-1" id="main">
+	<div class="container">
+		<nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a>{icon:chev-right}<a href="collection.html">Shop</a>{icon:chev-right}<span aria-current="page" data-collection-crumb>The collection</span></nav>
+		<header class="collection-head">
+			<h1 class="h1" data-collection-title>The collection</h1>
+			<p class="lead">Useful things, with stories to tell. Vintage enamelware for cooking, pouring and gathering around the table.</p>
+		</header>
+
+		<div class="collection-bar">
+			<div class="subcats" role="group" aria-label="Category" data-categories></div>
+			<div class="collection-tools">
+				<button class="btn btn-secondary btn-sm filter-toggle" aria-expanded="false" aria-controls="filters">{icon:sliders icon-sm} Filters <span data-filter-count></span></button>
+				<label class="sort"><span class="muted">Sort</span>
+					<select data-collection-sort><option value="featured">Featured</option><option value="price-asc">Price, low to high</option><option value="price-desc">Price, high to low</option></select>
+					{icon:chev-down icon-sm}
+				</label>
+			</div>
+		</div>
+
+		<div class="collection-layout">
+			<button class="filter-scrim" aria-label="Close filters" tabindex="-1" data-close-filters></button>
+			<aside class="filters" id="filters" aria-label="Filters">
+				<div class="filter-head"><h2>Filters</h2><button class="link small" data-clear-filters>Clear all</button><button class="icon-btn" data-close-filters aria-label="Close filters">{icon:x}</button></div>
+				<details open>
+					<summary>Colour {icon:chev-down icon-sm}</summary>
+					<div data-colour-filters></div>
+				</details>
+				<details open>
+					<summary>Price {icon:chev-down icon-sm}</summary>
+					<div class="price-range">
+						<label class="field"><span class="muted">$</span><input type="number" min="0" inputmode="decimal" placeholder="0" aria-label="Minimum price" data-min-price></label>
+						<span class="muted">to</span>
+						<label class="field"><span class="muted">$</span><input type="number" min="0" inputmode="decimal" placeholder="120" aria-label="Maximum price" data-max-price></label>
+					</div>
+				</details>
+				<label class="check"><input type="checkbox" data-sale-only>On sale</label>
+			</aside>
+
+			<section aria-label="Products">
+				<h2 class="sr-only">Available pieces</h2>
+				<p class="result-count small muted num" role="status" aria-live="polite" data-collection-count></p>
+				<div class="grid grid-3" data-collection-grid></div>
+				<div class="collection-empty" data-collection-empty hidden><h2 class="h3">No pieces in this selection</h2><p class="muted">Try another colour or a wider price range.</p><button class="btn btn-secondary" data-clear-filters>Clear filters</button></div>
+				<p class="collection-end" data-collection-end></p>
+			</section>
+		</div>
+	</div>
+	<!--@values-->
+</main>
+<!--@footer-->
+<script src="collection.js"></script>
+</body>
+</html>

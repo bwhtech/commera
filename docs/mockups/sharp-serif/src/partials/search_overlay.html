@@ -1,0 +1,43 @@
+<div class="search" id="search" role="dialog" aria-modal="true" aria-label="Search" aria-hidden="true" inert>
+	<div class="search-scrim" data-close-search></div>
+	<div class="search-panel">
+		<div class="search-bar">
+			<form class="container search-form" action="search.html" role="search">
+				{icon:search}
+				<label class="sr-only" for="search-input">Search the shop</label>
+				<input id="search-input" name="q" type="search" enterkeyhint="search" placeholder="Search pots, cups, colours" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-autocomplete="list">
+				<button type="button" class="search-clear small" data-clear-search hidden>Clear</button>
+				<button type="button" class="icon-btn" data-close-search aria-label="Close search">{icon:x}</button>
+			</form>
+		</div>
+		<div class="search-body">
+			<div class="container search-idle">
+				<aside class="search-aside">
+					<p class="eyebrow">Popular searches</p>
+					<ul class="search-terms">
+						<li><a href="search.html?q=casserole">casserole</a></li>
+						<li><a href="search.html?q=mint">mint</a></li>
+						<li><a href="search.html?q=coffee+pot">coffee pot</a></li>
+						<li><a href="search.html?q=saucepan">saucepan</a></li>
+						<li><a href="search.html?q=delft">delft</a></li>
+						<li><a href="search.html?q=sale">sale</a></li>
+					</ul>
+					<p class="eyebrow">Collections</p>
+					<ul class="search-links">
+						<li><a href="collection.html?category=Cookware">Cookware <span class="num">{{count:Cookware}}</span></a></li>
+						<li><a href="collection.html?category=Tableware">Tableware <span class="num">{{count:Tableware}}</span></a></li>
+						<li><a href="collection.html?category=Coffee+%26+tea">Coffee &amp; tea <span class="num">{{count:Coffee & tea}}</span></a></li>
+						<li><a href="collection.html?category=Kitchen+tools">Kitchen tools <span class="num">{{count:Kitchen tools}}</span></a></li>
+					</ul>
+				</aside>
+				<div>
+					<p class="eyebrow">Trending now</p>
+					<div class="grid grid-4 search-trending">
+						<!--@cards:casserole-tomato,cup-jade,jug-delft,saucepan-butter-->
+					</div>
+				</div>
+			</div>
+			<div class="container search-live" id="search-live" hidden></div>
+		</div>
+	</div>
+</div>

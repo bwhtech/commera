@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@head-->
+<title>Search · Émail</title>
+</head>
+<body data-page="search">
+<!--@header-->
+<main tabindex="-1" id="main" data-search-page>
+	<div class="container">
+		<header class="search-head">
+			<p class="eyebrow">Search</p>
+			<h1 class="h1" data-title>Results for <span data-query></span></h1>
+			<form class="search-page-form" action="search.html" role="search">
+				<label class="sr-only" for="search-page-input">Search the shop</label>
+				<div class="input-group">
+					<div class="field">{icon:search icon-sm}<input id="search-page-input" name="q" type="search" enterkeyhint="search" placeholder="Search pots, cups, colours" autocomplete="off"></div>
+					<button class="btn btn-primary">Search</button>
+				</div>
+			</form>
+		</header>
+
+		<div data-results>
+			<div class="search-collections" data-collections-row>
+				<span class="small muted">Collections</span>
+				<div class="subcats" data-collections></div>
+			</div>
+			<div class="search-toolbar">
+				<p class="small muted num" data-count></p>
+				<label class="sort"><span class="muted">Sort</span>
+					<select data-sort><option value="relevance">Relevance</option><option value="price-asc">Price, low to high</option><option value="price-desc">Price, high to low</option></select>
+					{icon:chev-down icon-sm}
+				</label>
+			</div>
+			<div class="grid grid-4 search-grid" data-grid></div>
+		</div>
+
+		<section class="search-none" data-empty hidden>
+			<div class="search-none-copy">
+				<h2 class="h3">Try a different search</h2>
+				<p class="lead">Check the spelling, use fewer words, or search by colour. Most pieces are listed by what they are and the colour of the enamel.</p>
+				<ul class="search-terms">
+					<li><a href="search.html?q=casserole">casserole</a></li>
+					<li><a href="search.html?q=mint">mint</a></li>
+					<li><a href="search.html?q=coffee+pot">coffee pot</a></li>
+					<li><a href="search.html?q=saucepan">saucepan</a></li>
+					<li><a href="search.html?q=delft">delft</a></li>
+					<li><a href="search.html?q=sale">sale</a></li>
+				</ul>
+			</div>
+			<div class="section-head search-none-head">
+				<div><p class="eyebrow">Most loved</p><h2 class="h2">Start with a bestseller</h2></div>
+				<a href="collection.html" class="arrow-link">Shop all {icon:arrow icon-sm}</a>
+			</div>
+			<div class="grid grid-4">
+				<!--@cards:casserole-mint,cup-jade,gratin-pan-saffron,casserole-black-->
+			</div>
+		</section>
+	</div>
+	<!--@values-->
+</main>
+<!--@footer-->
+</body>
+</html>
