@@ -4,6 +4,7 @@ import json
 
 import frappe
 
+from commera.builder_themes.agent_tools import CHECK_PAGE
 from commera.builder_themes.page_data import get_data_for
 from commera.builder_themes.pages import (
 	HOME,
@@ -109,6 +110,10 @@ Rules:
 - Cart, checkout and account are Commera's own pages; link to them, never build them. A cart drawer is
   not a cart page: it is fine to build."""
 
+CHECK = f"""\
+Done means checked: before you finish a turn that changed this page, call {CHECK_PAGE} and fix every problem
+it lists, then call it again. Check each other theme page you edited too, with its page id."""
+
 
 def get_agent_context(page_id: str) -> str | None:
 	"""The builder_agent_context hook: None for a page outside every Commera theme."""
@@ -125,8 +130,16 @@ def get_agent_context(page_id: str) -> str | None:
 			BEHAVIOURS,
 			CART_DRAWER,
 			RULES.format(prefix=frappe.scrub(role.theme).replace("_", "-")),
+			*([CHECK] if has_check_tool() else []),
 		]
 	)
+
+
+def has_check_tool() -> bool:
+	"""False on a Builder from before apps could give Bob tools: then Bob must not be told to call one."""
+	from builder.ai.agent.registry import build_default_registry
+
+	return bool(build_default_registry().get(CHECK_PAGE))
 
 
 def get_role_text(role, pages: dict) -> str:
