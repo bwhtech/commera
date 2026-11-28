@@ -28,6 +28,8 @@ const props = defineProps({
   // Something typed or picked that closing would throw away. A caller that closes the dialog
   // itself after a save sets `open` directly, which is never guarded.
   dirty: { type: Boolean, default: false },
+  // See DialogShell: where focus goes after closing when the control that opened this is gone.
+  returnFocus: { type: Function, default: null },
 })
 
 const open = defineModel('open', { type: Boolean, required: true })
@@ -67,6 +69,7 @@ function onOpenChange(value) {
     :dismissible="shellDismissible"
     :close-disabled="!props.dismissible || props.loading"
     focus-body
+    :return-focus="props.returnFocus"
     @update:open="onOpenChange"
   >
     <template v-if="props.description" #header>

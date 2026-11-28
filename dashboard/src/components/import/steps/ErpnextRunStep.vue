@@ -11,7 +11,7 @@ import {
 } from '../../../data/erpnextImport'
 import { runPercent } from '../../../data/erpnextImportState'
 import { productRoute } from '../../../ia/routes'
-import { doneTitle, publishedBody } from '../../../data/importCounts'
+import { doneTitle, notPublishedBody, publishAllLabel, publishedBody } from '../../../data/importCounts'
 import ImportResult from '../ImportResult.vue'
 import NotPublishedList from '../NotPublishedList.vue'
 import ImportRowList from '../ImportRowList.vue'
@@ -36,8 +36,7 @@ const failureEntries = computed(() =>
 const doneBody = computed(() => {
   if (published.value != null) return publishedBody(published.value, notPublished.value.length)
   if (!created.value) return __('Fix the items below in ERPNext, then import them again.')
-  // The title already says "not published yet"; the body only says what to do about it.
-  return __('Publish them now, or later from each product page.')
+  return notPublishedBody(created.value)
 })
 
 const router = useRouter()
@@ -82,7 +81,7 @@ function finish(path) {
     <template v-else-if="imp.phase === 'failed'">
       <ImportResult
         failed
-        :title="__('The import could not finish')"
+        :title="imp.erpnext.otherImportRunning ? __('These items were not imported') : __('The import could not finish')"
         :body="imp.erpnext.error || __('It stopped before the end. The products it already made are kept, so running it again picks up the rest.')"
       >
         <Button :label="__('Close')" @click="closeImport" />
@@ -103,7 +102,7 @@ function finish(path) {
         </template>
         <template v-if="published == null && created">
           <Button :label="__('View products')" @click="finish('/products')" />
-          <Button variant="solid" theme="gray" :label="__('Publish all')" :loading="publishAction.loading" @click="publishErpnextImport" />
+          <Button variant="solid" theme="gray" :label="publishAllLabel(created)" :loading="publishAction.loading" @click="publishErpnextImport" />
         </template>
         <Button v-else variant="solid" theme="gray" :label="__('View products')" @click="finish('/products')" />
       </ImportResult>

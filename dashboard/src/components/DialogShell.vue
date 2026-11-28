@@ -10,6 +10,7 @@ import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, ref, w
 import { BottomSheet, Button, Dialog } from 'frappe-ui'
 import { DialogTitle, injectDialogRootContext } from 'reka-ui'
 import { useDialogLayer } from '../utils/dialogLayers'
+import { endStaleSheetGestures } from '../utils/sheetGesture'
 import { useIsMobile } from '../utils/useIsMobile'
 
 const props = defineProps({
@@ -30,6 +31,12 @@ const props = defineProps({
   // Marks the body for frappe-ui Dialog's open focus: its first control takes focus instead of
   // the ×. Desktop only: a sheet focuses itself, so a phone's keyboard stays down until a tap.
   focusBody: { type: Boolean, default: false },
+  // Where focus goes once the dialog has closed, when the control that opened it is gone. reka
+  // returns focus to the element focused before the open; a "New collection" opened from the
+  // Collection select's list footer was opened by a button that left with the list, so reka's
+  // return lands on <body> and the form under it loses the merchant's place. A function that moves
+  // focus to the control to go back to.
+  returnFocus: { type: Function, default: null },
 })
 
 const open = defineModel('open', { type: Boolean, required: true })
@@ -47,7 +54,21 @@ watch(open, (value) => {
 })
 
 function onAfterLeave() {
-  if (!open.value) rendered.value = false
+  if (open.value) return
+  rendered.value = false
+  restoreFocus()
+}
+
+// After the leave animation reka has already made its own return, so this only steps in when that
+// return found nothing to land on: a focus the merchant moved elsewhere is left alone. A frame later,
+// because the content element (and the focus it held) is removed on the render after after-leave.
+function restoreFocus() {
+  if (!props.returnFocus) return
+  requestAnimationFrame(() => {
+    const active = document.activeElement
+    if (active && active !== document.body) return
+    props.returnFocus()
+  })
 }
 
 // Dialog's own frame takes this much of the window (its py-4 + my-8 centred, or the 2rem top
@@ -115,13 +136,19 @@ function whenFocusLeaves(element, callback) {
  *   every aria-live region and its ancestors exposed, and FormDialog's footer reason line is one. So
  *   the form under a confirm stayed in the accessibility tree. Inert takes it out until the top one
  *   closes; it is removed as soon as the top one starts closing, so its focus return lands.
+ * - a sheet's leftover mouse gesture: ended before a hover can drag it (utils/sheetGesture.js).
  */
 const ContentAttributes = defineComponent({
-  props: { covered: { type: Boolean, default: false } },
+  props: {
+    covered: { type: Boolean, default: false },
+    // A BottomSheet: its mouse gestures are guarded (see utils/sheetGesture.js).
+    sheet: { type: Boolean, default: false },
+  },
   setup(attributeProps) {
     const context = injectDialogRootContext()
     const content = ref(null)
     let stopWaiting = null
+    let stopGestureGuard = null
 
     function cover(covered) {
       stopWaiting?.()
@@ -146,9 +173,13 @@ const ContentAttributes = defineComponent({
         element.setAttribute('aria-describedby', context.descriptionId)
       }
       cover(attributeProps.covered)
+      if (attributeProps.sheet) stopGestureGuard = endStaleSheetGestures(element)
     })
     watch(() => attributeProps.covered, cover)
-    onBeforeUnmount(() => cover(false))
+    onBeforeUnmount(() => {
+      cover(false)
+      stopGestureGuard?.()
+    })
 
     return () => null
   },
@@ -165,7 +196,7 @@ const ContentAttributes = defineComponent({
     :dismissible="props.dismissible"
     @after-leave="onAfterLeave"
   >
-    <ContentAttributes :covered="isCovered" />
+    <ContentAttributes :covered="isCovered" sheet />
     <!-- The sheet's own scroll region holds all of this, so the header and the footer are pinned
          with sticky rather than taken out of the flow: a short sheet still hugs its content.
          z-20 keeps them over body content that is itself positioned, such as OptionSizeGrid's

@@ -58,7 +58,7 @@ test('an original price below the price is refused', () => {
   const draft = usePriceDraft(() => rates(40))
   draft.start('Black')
   draft.originalPrice.value = 30
-  assert.equal(draft.originalError.value, 'Original price must be higher than the price.')
+  assert.equal(draft.originalError.value, 'Must be higher than the price.')
   draft.price.value = 0
   assert.equal(draft.priceError.value, 'Enter a price above zero.')
 })

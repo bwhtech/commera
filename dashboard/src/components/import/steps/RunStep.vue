@@ -14,7 +14,7 @@ import {
   publishImported,
 } from '../../../data/importFlow'
 import { useAdminAction, trySubmit } from '../../../data/api'
-import { doneTitle, photoCount, publishedBody, resultRowName } from '../../../data/importCounts'
+import { doneTitle, notPublishedBody, publishAllLabel, photoCount, publishedBody, resultRowName } from '../../../data/importCounts'
 import { errorMessage } from '../../../data/errors'
 import { __ } from '../../../data/translation'
 import { productRoute } from '../../../ia/routes'
@@ -90,8 +90,7 @@ const warningsTitle = computed(() =>
 const doneBody = computed(() => {
   if (published.value != null) return publishedBody(published.value, notPublished.value.length)
   if (!imp.created.length) return __('Fix the rows below in your file, then import it again.')
-  // The title already says "not published yet"; the body only says what to do about it.
-  return __('Publish them now, or later from each product page.')
+  return notPublishedBody(imp.created.length)
 })
 </script>
 
@@ -131,7 +130,7 @@ const doneBody = computed(() => {
         </template>
         <template v-if="published == null && imp.created.length">
           <Button :label="__('View products')" @click="finish('/products')" />
-          <Button variant="solid" theme="gray" :label="__('Publish all')" :loading="publishImportAction.loading" @click="publishImported" />
+          <Button variant="solid" theme="gray" :label="publishAllLabel(imp.created.length)" :loading="publishImportAction.loading" @click="publishImported" />
         </template>
         <Button v-else variant="solid" theme="gray" :label="__('View products')" @click="finish('/products')" />
       </ImportResult>

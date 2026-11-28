@@ -325,17 +325,63 @@ class TestErpnextImport(ProductOnboardingTestCase):
 
 		self.assertEqual([(line.item_code, line.size) for line in lines], [(plain, DEFAULT_SIZE_VALUE)])
 
-	def test_starting_while_an_import_runs_answers_with_the_running_one(self):
-		item_code = self.make_plain_item()
+	def queue_running_import(self, item_codes, status="queued"):
+		"""An import of `item_codes` the worker has not finished, as queue_import leaves it."""
 		erpnext_import.set_status(
-			erpnext_import.JOB_ID, erpnext_import.get_new_progress("running", "RUNNING-LOG")
+			erpnext_import.JOB_ID,
+			erpnext_import.get_new_progress(
+				status, "RUNNING-LOG", selection=erpnext_import.get_selection_key(item_codes)
+			),
 		)
 		self.addCleanup(frappe.cache.delete_value, erpnext_import.status_key(erpnext_import.JOB_ID))
 
-		with patch.object(erpnext_import, "is_job_enqueued", return_value=True):
-			started = start_erpnext_import([item_code])
+	def test_starting_the_same_items_while_they_import_picks_up_that_import(self):
+		"""A page reloaded during an import starts it again for the same items, in any order."""
+		first, second = self.make_plain_item(), self.make_plain_item()
+		for status in ("queued", "running"):
+			self.queue_running_import([first, second], status)
 
-		self.assertEqual(started, {"job_id": erpnext_import.JOB_ID, "log": "RUNNING-LOG"})
+			with patch.object(erpnext_import, "is_job_enqueued", return_value=True):
+				started = start_erpnext_import([second, first])
+
+			self.assertEqual(started, {"job_id": erpnext_import.JOB_ID, "log": "RUNNING-LOG"})
+
+	def test_starting_other_items_while_an_import_runs_is_refused(self):
+		"""Answering with the running import showed its result as the result of the new selection."""
+		running, other = self.make_plain_item(), self.make_plain_item()
+		for selection in ([running], None):
+			self.queue_running_import(selection)
+
+			with patch.object(erpnext_import, "is_job_enqueued", return_value=True):
+				with self.assertRaisesRegex(
+					erpnext_import.ImportAlreadyRunningError, "An import is already running"
+				):
+					start_erpnext_import([other])
+
+	def test_after_an_import_finishes_other_items_start_their_own(self):
+		running, other = self.make_plain_item(), self.make_plain_item()
+		self.queue_running_import([running], "done")
+
+		with (
+			patch.object(erpnext_import, "is_job_enqueued", return_value=False),
+			patch.object(frappe, "enqueue") as enqueue,
+		):
+			started = start_erpnext_import([other])
+
+		self.assertNotEqual(started["log"], "RUNNING-LOG")
+		self.assertEqual(enqueue.call_args.kwargs["item_codes"], [other])
+		status = erpnext_import.get_status(erpnext_import.JOB_ID)
+		self.assertEqual(
+			(status["log"], status["selection"]),
+			(started["log"], erpnext_import.get_selection_key([other])),
+		)
+
+	def test_the_running_status_keeps_the_selection(self):
+		"""import_items rewrites the status when it starts; a reload after that must still resume."""
+		plain = self.make_plain_item()
+		_log, status = self.run_import([plain])
+
+		self.assertEqual(status["selection"], erpnext_import.get_selection_key([plain]))
 
 	def test_a_dead_job_reads_as_failed(self):
 		erpnext_import.set_status(f"dead-{self.suffix}", erpnext_import.get_new_progress("running", "LOG"))

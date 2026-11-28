@@ -40,7 +40,7 @@ test('the original price must be higher than the price', () => {
   assert.equal(isOriginalPriceValid({ price: 999, originalPrice: '' }), true)
   assert.equal(isOriginalPriceValid({ price: 999, originalPrice: 1299 }), true)
   assert.equal(isOriginalPriceValid({ price: 999, originalPrice: 999 }), false)
-  assert.equal(originalPriceError({ price: 999, originalPrice: 500 }), 'Original price must be higher than the price.')
+  assert.equal(originalPriceError({ price: 999, originalPrice: 500 }), 'Must be higher than the price.')
   assert.equal(originalPriceError({ price: 999, originalPrice: null }), '')
 })
 

@@ -86,6 +86,7 @@ async function receive() {
   <FormDialog
     v-model:open="open"
     :title="__('Add stock')"
+    :description="__('Adds to what you already have.')"
     :primary-label="__('Add stock')"
     :primary-disabled="!lines.length"
     :reason="lines.length ? '' : __('Enter a quantity to add.')"
@@ -93,14 +94,12 @@ async function receive() {
     :dirty="isDirty"
     @submit="receive"
   >
-    <p class="text-p-sm text-ink-gray-6">{{ __('Adds to what you already have.') }}</p>
-
-    <div v-if="!labelEachRow" class="mt-4 flex gap-3 border-b border-outline-gray-1 pb-1.5 text-sm text-ink-gray-6">
+    <div v-if="!labelEachRow" class="flex gap-3 border-b border-outline-gray-1 pb-1.5 text-sm text-ink-gray-6">
       <span class="flex-1">{{ __('Variant') }}</span>
       <span class="w-28">{{ __('Quantity to add') }}</span>
       <span class="w-40">{{ __('Cost per item (optional)') }}</span>
     </div>
-    <div class="divide-y divide-outline-gray-1" :class="labelEachRow ? 'mt-4' : 'mt-3'">
+    <div class="divide-y divide-outline-gray-1" :class="{ 'mt-3': !labelEachRow }">
       <!-- One labelled row lines its inputs up on their bottom edge, under their labels; rows under
            the shared header have no labels, so their inputs centre on the name and stock lines. -->
       <div

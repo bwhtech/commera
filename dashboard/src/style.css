@@ -148,8 +148,8 @@ a {
   @apply text-ink-red-7;
 }
 
-/* A field error under a half-width field ("Original price must be higher than the price.") wrapped
-   with one word on its second line. `pretty` lets the browser even the lines out. */
+/* A field error under a half-width field can wrap with one word on its second line. `pretty` lets
+   the browser even the lines out. */
 [data-slot='error'][role='alert'] {
   text-wrap: pretty;
 }

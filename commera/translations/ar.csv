@@ -2551,7 +2551,6 @@ Add “{0}”,إضافة “{0}”
 Color,اللون
 "Add your first product, or import the ones you already sell.",أضف منتجك الأول، أو استورد المنتجات التي تبيعها بالفعل.
 Change the filters or the search.,غيّر عوامل التصفية أو البحث.
-Original price must be higher than the price.,يجب أن يكون السعر الأصلي أعلى من السعر.
 Name every color that has sizes.,سمِّ كل لون له مقاسات.
 ERPNext's preset collections could not be read.,تعذرت قراءة المجموعات المعدّة مسبقًا في ERPNext.
 {0} · {1} in stock,{0} · {1} في المخزون
@@ -2820,3 +2819,9 @@ Tick a size for each {0} to continue.,اختر مقاسًا واحدًا على 
 Shown crossed out next to the price.,يظهر مشطوبًا بجانب السعر.
 "Publish them now, or later from each product page.",انشرها الآن، أو لاحقًا من صفحة كل منتج.
 Fix the highlighted fields to save.,صحّح الحقول المميزة للحفظ.
+"An import is already running. Wait for it to finish, then import these items.",يوجد استيراد قيد التشغيل بالفعل. انتظر حتى ينتهي، ثم استورد هذه العناصر.
+These items were not imported,لم تُستورد هذه العناصر
+"Publish it now, or later from its product page.",انشره الآن، أو لاحقًا من صفحة المنتج.
+Choose your spreadsheet,اختر جدول البيانات
+Choose your photos,اختر صورك
+Must be higher than the price.,يجب أن يكون أعلى من السعر.

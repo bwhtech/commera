@@ -8,9 +8,13 @@ import CoachTip from '../CoachTip.vue'
 import ToneBadge from '../ToneBadge.vue'
 import EmptyState from '../../EmptyState.vue'
 import { __ } from '../../../data/translation'
+import { useIsMobile } from '../../../utils/useIsMobile'
 
 const { upload } = useFileUpload()
 const matchAction = useAdminAction('imports.match_import_images')
+
+// A phone has no drag: its drop zone names the button a thumb taps instead.
+const isMobile = useIsMobile()
 
 const uploading = computed(() => imp.phase === 'uploading')
 const chosenCount = ref(0)
@@ -204,7 +208,7 @@ onMounted(() => {
         <div class="flex size-11 items-center justify-center rounded-full bg-surface-base text-ink-gray-6 shadow-sm">
           <span class="lucide-images size-5" aria-hidden="true" />
         </div>
-        <p class="mt-3 text-base text-ink-gray-7">{{ __('Drop your photos here') }}</p>
+        <p class="mt-3 text-base text-ink-gray-7">{{ isMobile ? __('Choose your photos') : __('Drop your photos here') }}</p>
         <p class="mt-1 max-w-md text-p-sm text-ink-gray-6">
           {{ matchExample[0] }}<span class="whitespace-nowrap text-ink-gray-7">oversized-tee-black-1.jpg</span>{{ matchExample[1] }}
         </p>

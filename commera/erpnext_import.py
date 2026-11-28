@@ -1,6 +1,8 @@
 """Turn existing ERPNext Items into draft Commera products. The Items, their prices and their stock stay
 as they are: only a Style Attribute Configurator, its options and their size rows are added around them."""
 
+import hashlib
+
 import frappe
 from frappe import _
 from frappe.utils import create_batch, now
@@ -245,13 +247,35 @@ def get_preview(search: str | None, start: int, page_length: int) -> dict:
 	return {"items": items, "skipped": skipped, "total": len(importable)}
 
 
+class ImportAlreadyRunningError(frappe.ValidationError):
+	pass
+
+
+def get_selection_key(item_codes: list | None) -> str:
+	"""Names what an import was started for, so a second start can tell the same items (a page
+	reloaded while they import) from other ones. None is every importable item. A digest, not the
+	codes, because the status rides every progress update to the browser."""
+	if item_codes is None:
+		return "all"
+	return hashlib.sha256("\n".join(sorted(set(item_codes))).encode()).hexdigest()
+
+
 def queue_import(item_codes: list | None) -> dict:
-	"""One import at a time: a second start while one runs answers with the running one."""
+	"""One import at a time. A second start for the same items picks up the running import. One for
+	other items is refused: answering with the running import showed its result as theirs."""
+	selection = get_selection_key(item_codes)
 	if is_job_enqueued(JOB_ID) and (running := frappe.cache.get_value(status_key(JOB_ID))):
-		return {"job_id": JOB_ID, "log": running["log"]}
+		if running.get("selection") == selection:
+			return {"job_id": JOB_ID, "log": running["log"]}
+		frappe.throw(
+			_("An import is already running. Wait for it to finish, then import these items."),
+			ImportAlreadyRunningError,
+		)
 
 	log = create_configurator_log()
-	set_status(JOB_ID, get_new_progress("queued", log.name, total=len(item_codes or [])))
+	set_status(
+		JOB_ID, get_new_progress("queued", log.name, total=len(item_codes or []), selection=selection)
+	)
 	frappe.enqueue(
 		import_items,
 		queue="long",
@@ -275,7 +299,9 @@ def import_items(item_codes: list | None, log_name: str, import_id: str = JOB_ID
 	importable_codes = [item_code for item_code in importable_codes if item_code in requested_codes]
 	skipped_count = len(requested) - len(importable_codes)
 
-	progress = get_new_progress("running", log_name, total=len(requested))
+	progress = get_new_progress(
+		"running", log_name, total=len(requested), selection=get_selection_key(item_codes)
+	)
 	progress.update(done=skipped_count, skipped=skipped_count)
 	set_status(import_id, progress)
 
@@ -465,8 +491,9 @@ def publish_imported_products(log: str) -> dict:
 	return publish_drafts(drafts)
 
 
-def get_new_progress(status: str, log_name: str, total: int = 0) -> dict:
+def get_new_progress(status: str, log_name: str, total: int = 0, selection: str | None = None) -> dict:
 	return {
+		"selection": selection,
 		"status": status,
 		"done": 0,
 		"total": total,

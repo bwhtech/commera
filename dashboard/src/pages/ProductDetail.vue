@@ -322,7 +322,9 @@ const loadFailure = computed(() =>
         <StatusBadge class="ms-1 shrink-0" :status="statusKeys[product.status]" :label="statusLabels[product.status]" />
       </template>
       <template #actions>
-        <Dropdown :options="moreActions">
+        <!-- align="end": start-aligned, the menu overran the window and frappe-ui's collision
+             handling pushed it flush against the screen edge. -->
+        <Dropdown :options="moreActions" align="end">
           <Button icon="lucide-ellipsis" :label="__('More actions')" />
         </Dropdown>
         <template v-if="isDirty">

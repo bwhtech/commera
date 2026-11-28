@@ -49,17 +49,32 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]):not([type="hidd
 // modal for the page behind it. The new step's heading takes focus instead (every step opens with
 // one), which also reads the step out to a screen reader. One scroll box serves every step, so it
 // goes back to the top first.
+async function focusStepHeading() {
+  await nextTick()
+  const heading = stepBody.value?.querySelector('h2')
+  if (!heading) return
+  heading.tabIndex = -1
+  heading.focus({ preventScroll: true })
+}
+
 watch(
   () => imp.step,
-  async () => {
+  () => {
     shell.value?.scrollToTop()
-    await nextTick()
-    const heading = stepBody.value?.querySelector('h2')
-    if (!heading) return
-    heading.tabIndex = -1
-    heading.focus({ preventScroll: true })
+    focusStepHeading()
   },
 )
+
+// The run step swaps its body twice without a step change: the running card for the result when the
+// run ends, and the result's buttons for "… are live" after Publish all. Each time the focused heading
+// or button leaves, so the result's heading takes focus, and a screen reader reads the outcome out.
+const runOutcome = computed(() => {
+  if (imp.phase !== 'done' && imp.phase !== 'failed') return null
+  return `${imp.phase}:${Boolean(imp.published || imp.erpnext.published)}`
+})
+watch(runOutcome, (outcome) => {
+  if (outcome) focusStepHeading()
+})
 
 // On open, focus goes to the first control of the first step rather than ×, the way FormDialog opens
 // on its first field. It waits for the step itself: on a first open the body is a spinner until

@@ -73,6 +73,9 @@ function blankImport() {
       status: null,
       poll: 'off',
       error: '',
+      // The start was refused because another import (other items) is still running: nothing
+      // started, so the result card says that instead of "could not finish".
+      otherImportRunning: false,
       published: null,
     },
   }

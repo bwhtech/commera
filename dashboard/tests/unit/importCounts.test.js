@@ -4,10 +4,12 @@ import {
   doneTitle,
   erpnextImportLabel,
   importLabel,
+  notPublishedBody,
   photoGroupKind,
   photoGroupsHavePhoto,
   photoGroupsNeedPhoto,
   resultRowName,
+  publishAllLabel,
   publishedBody,
   reviewSummary,
   showsOriginalPrice,
@@ -102,4 +104,11 @@ test('the published line agrees with the number of live products', () => {
   assert.equal(publishedBody(1, 0), 'Customers can find it on your store now.')
   assert.equal(publishedBody(3, 0), 'Customers can find them on your store now.')
   assert.equal(publishedBody(0, 2), '2 products could not go live yet. Each one below says what it still needs.')
+})
+
+test('one imported product is offered as "it", with a plain Publish', () => {
+  assert.equal(notPublishedBody(1), 'Publish it now, or later from its product page.')
+  assert.equal(notPublishedBody(3), 'Publish them now, or later from each product page.')
+  assert.equal(publishAllLabel(1), 'Publish')
+  assert.equal(publishAllLabel(2), 'Publish all')
 })

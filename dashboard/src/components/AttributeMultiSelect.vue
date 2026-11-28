@@ -22,6 +22,21 @@ const selected = defineModel({ type: Array, required: true })
 // Surfaced so the host dialog can stand down from outside-dismissal while this popover owns the click.
 const open = defineModel('open', { type: Boolean, default: false })
 
+// frappe-ui's MultiSelect prevents its popover's unmount autofocus and returns focus nowhere, so
+// Escape left focus on <body> and the next Tab went nowhere inside the dialog. Once the list has
+// closed, focus that is on nothing goes back to the trigger through MultiSelect's own focus(). Focus
+// the merchant moved by clicking another control is somewhere, so it is left there. A frame later,
+// because the list (and the search input that held focus) is removed on the render after the close.
+// ponytail: drop this once frappe-ui's MultiSelect returns focus on Escape (council v10 upstream diff).
+const picker = ref(null)
+watch(open, (isOpen) => {
+  if (isOpen) return
+  requestAnimationFrame(() => {
+    const active = document.activeElement
+    if (!active || active === document.body) picker.value?.focus({ preventScroll: true })
+  })
+})
+
 const emit = defineEmits(['values'])
 
 const valuesRequest = useAdminRead('catalog.get_attribute_values', {
@@ -71,6 +86,7 @@ function addTypedValue() {
 
 <template>
   <MultiSelect
+    ref="picker"
     v-model="selected"
     v-model:open="open"
     v-model:query="query"

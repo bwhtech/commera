@@ -33,8 +33,10 @@ export function isOriginalPriceValid({ price, originalPrice }) {
   return !hasPrice(originalPrice) || Number(originalPrice) > Number(price)
 }
 
+// Said under the "Original price" label, so the label is not repeated: the full sentence wrapped to
+// two uneven lines in the half-width column.
 export function originalPriceError(inputs) {
-  return isOriginalPriceValid(inputs) ? '' : __('Original price must be higher than the price.')
+  return isOriginalPriceValid(inputs) ? '' : __('Must be higher than the price.')
 }
 
 // An empty Original price writes the price to both lists: Item Prices cannot be deleted through

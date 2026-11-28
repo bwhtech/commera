@@ -95,6 +95,12 @@ function addCollection() {
   newCollection.open = true
 }
 
+// "New collection" is opened from the Collection list's footer, and that button leaves with the
+// list, so closing the child (Cancel, Discard or a create) returns the merchant to Collection.
+// frappe-ui's Select exposes focus(), which moves focus to its trigger.
+const collectionSelect = ref(null)
+const focusCollection = () => collectionSelect.value?.focus({ preventScroll: true })
+
 async function saveCollection() {
   const title = newCollection.title.trim()
   if (!title || createCollectionAction.loading) return
@@ -303,6 +309,7 @@ async function submit() {
       />
 
       <Select
+        ref="collectionSelect"
         v-model="collection"
         :label="__('Collection')"
         :description="__('Collections group products in your store, like Shirts or Candles.')"
@@ -407,6 +414,7 @@ async function submit() {
     :reason="newCollection.title.trim() ? '' : __('Enter a name to continue.')"
     :loading="createCollectionAction.loading"
     :dirty="Boolean(newCollection.title.trim())"
+    :return-focus="focusCollection"
     @submit="saveCollection"
   >
     <FormControl v-model="newCollection.title" :label="__('Name')" required @keydown.enter.prevent="saveCollection" />

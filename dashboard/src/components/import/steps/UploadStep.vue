@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { Button, Spinner, useFileUpload } from 'frappe-ui'
 import { trySubmit } from '../../../data/api'
 import { errorMessage } from '../../../data/errors'
@@ -15,8 +15,12 @@ import {
 } from '../../../data/importFlow'
 import { fileSize } from '../../../data/importMapping'
 import { __ } from '../../../data/translation'
+import { useIsMobile } from '../../../utils/useIsMobile'
 
 const { upload } = useFileUpload()
+
+// A phone has no drag: its drop zone names the button a thumb taps instead.
+const isMobile = useIsMobile()
 
 // "The first 3 of 3 rows" reads like part of the file is hidden, so a short file says it is all there.
 const previewLine = computed(() => {
@@ -25,6 +29,23 @@ const previewLine = computed(() => {
   if (total === 1) return __('Your 1 row, as it is in your file.')
   return __('All {0} rows, as they are in your file.', [total])
 })
+
+// Picking a file swaps the drop zone (and its Browse files) for the file card, and removing it swaps
+// them back, so the button that had focus leaves each time and focus would fall to the dialog. It
+// goes to the swapped-in button instead: Remove file once the file is read (a spinner holds its place
+// while it is), Browse files after a remove. Both are frappe-ui Buttons, whose root is the <button>.
+const browseButton = ref(null)
+const removeButton = ref(null)
+
+async function focusButton(button) {
+  await nextTick()
+  button.value?.$el?.focus()
+}
+
+function removeFile() {
+  clearImportFile()
+  focusButton(browseButton)
+}
 
 const TEMPLATE_URL = '/api/method/commera.api.admin.imports.download_product_template'
 
@@ -59,7 +80,7 @@ async function pick(event) {
     if (!isCurrentImport(ticket)) return
     imp.fileError = __('{0} did not upload. Check your connection, then try again.', [file.name])
   } finally {
-    endPhase(ticket)
+    if (endPhase(ticket)) focusButton(removeButton)
   }
   if (imp.parsed) fillDefaultCollection()
 }
@@ -83,10 +104,10 @@ async function pick(event) {
       <div class="flex size-11 items-center justify-center rounded-full bg-surface-base text-ink-gray-6 shadow-sm">
         <span class="lucide-upload size-5" aria-hidden="true" />
       </div>
-      <p class="mt-3 text-base text-ink-gray-7">{{ __('Drop your spreadsheet here') }}</p>
+      <p class="mt-3 text-base text-ink-gray-7">{{ isMobile ? __('Choose your spreadsheet') : __('Drop your spreadsheet here') }}</p>
       <p class="mt-1 text-sm text-ink-gray-6">{{ __('.csv or .xlsx') }}</p>
       <input ref="fileInput" type="file" accept=".csv,.xlsx" class="hidden" @change="pick" />
-      <Button class="mt-3" variant="solid" theme="gray" :label="__('Browse files')" @click="$refs.fileInput.click()" />
+      <Button ref="browseButton" class="mt-3" variant="solid" theme="gray" :label="__('Browse files')" @click="$refs.fileInput.click()" />
     </div>
 
     <div v-else class="rounded-5 border border-outline-gray-1 p-4">
@@ -105,7 +126,7 @@ async function pick(event) {
           </div>
         </div>
         <Spinner v-if="imp.phase === 'parsing'" class="size-4" />
-        <Button v-else variant="ghost" icon="lucide-x" :label="__('Remove file')" @click="clearImportFile" />
+        <Button v-else ref="removeButton" variant="ghost" icon="lucide-x" :label="__('Remove file')" @click="removeFile" />
       </div>
 
       <p v-if="imp.phase === 'parsing'" class="mt-3 text-sm text-ink-gray-6">{{ __('Reading your file…') }}</p>

@@ -41,6 +41,14 @@ export function doneTitle(created, published) {
   return created === 1 ? __('1 product added, not published yet') : __('{0} products added, not published yet', [created])
 }
 
+// The line under "… added, not published yet": the title already says it, so this only says what to do.
+export function notPublishedBody(created) {
+  return created === 1 ? __('Publish it now, or later from its product page.') : __('Publish them now, or later from each product page.')
+}
+
+// "Publish all" over one product reads as if there were more.
+export const publishAllLabel = (created) => (created === 1 ? __('Publish') : __('Publish all'))
+
 // The line under the result title once Publish all has run.
 export function publishedBody(published, notPublished) {
   if (notPublished) {
