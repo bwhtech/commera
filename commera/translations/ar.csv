@@ -2028,7 +2028,7 @@ Collection {0} does not exist.,المجموعة {0} غير موجودة.
 Add at least one image,أضف صورة واحدة على الأقل
 Add at least one size,أضف مقاسًا واحدًا على الأقل
 Enter a collection name,أدخل اسم المجموعة
-Collection {0} already exists.,المجموعة {0} موجودة بالفعل.
+A collection with this name already exists.,توجد مجموعة بهذا الاسم بالفعل.
 Select at least one product.,اختر منتجًا واحدًا على الأقل.
 Add at most {0} products to a collection at a time.,أضف {0} منتجًا كحد أقصى إلى المجموعة في المرة الواحدة.
 Abbreviation {0} is already used by another value on {1}.,الاختصار {0} مستخدم بالفعل لقيمة أخرى في {1}.

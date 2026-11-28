@@ -10,6 +10,8 @@ import ReceiveStockDialog from './ReceiveStockDialog.vue'
 // dialog naming the placeholder variant. The prices are part of the page's draft and save with
 // Save; stock is added straight away, as everywhere else.
 const props = defineProps({
+  // Bumped by the page each time the draft is reset (Discard) or saved.
+  draftVersion: { type: Number, default: 0 },
   product: { type: Object, required: true },
   draft: { type: Object, required: true },
   priceError: { type: String, default: '' },
@@ -25,7 +27,10 @@ const stockRows = computed(() => [{ id: size.value.item_code, title: props.produ
 
 <template>
   <ProductSection id="product-pricing" :title="__('Price and stock')">
+    <!-- Keyed on the draft's version: an Original price revealed with "+ Add original price" but left
+         empty is local state, so Discard (which changes no value) would otherwise leave it showing. -->
     <PriceFields
+      :key="draftVersion"
       v-model:price="draft.price"
       v-model:original-price="draft.originalPrice"
       :price-error="priceError"

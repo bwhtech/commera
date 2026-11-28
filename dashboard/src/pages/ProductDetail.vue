@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { useEventListener, useMediaQuery } from '@vueuse/core'
 import { Alert, Breadcrumbs, Button, Dropdown, ScrollArea, Skeleton, toast } from 'frappe-ui'
@@ -176,10 +176,31 @@ async function save() {
     }
     saving.value = false
   }
+  // Reached only when every write took (a refusal returns above); with nothing typed meanwhile,
+  // Save and Discard are gone from the header.
+  if (!isDirty.value) {
+    draftVersion.value += 1
+    focusMoreActions()
+  }
+}
+
+// Save and Discard leave the header as they finish (the header swaps them for the status button),
+// so the button that had focus unmounts and focus would fall to the page. It goes to More actions:
+// not to Publish, where a second Enter would publish with no confirmation.
+const moreActionsButton = ref(null)
+// A reset or saved draft starts its form afresh: see ProductPricing's PriceFields key.
+const draftVersion = ref(0)
+
+async function focusMoreActions() {
+  await nextTick()
+  if (document.activeElement && document.activeElement !== document.body) return
+  moreActionsButton.value?.$el?.focus({ preventScroll: true })
 }
 
 function discard() {
   draft.value = storedDraft(stored.value, Object.keys(stored.value))
+  draftVersion.value += 1
+  focusMoreActions()
 }
 
 const leaveUnsaved = () =>
@@ -230,9 +251,21 @@ const addPriceAction = computed(() =>
   isMissingPrice.value ? { label: __('Add price'), variant: 'subtle', theme: 'gray', onClick: goToPrice } : undefined,
 )
 
+// The status button shows a spinner while its request runs, and the browser drops focus from a
+// disabled button to the page. Once it settles, a keyboard user is handed back to the same button
+// (now Unpublish, Publish or Restore); a click elsewhere meanwhile keeps its own focus.
+const statusButton = ref(null)
+
+async function refocusStatusButton() {
+  await nextTick()
+  if (document.activeElement && document.activeElement !== document.body) return
+  statusButton.value?.$el?.focus({ preventScroll: true })
+}
+
 async function togglePublish() {
   const publish = !isLive.value
   const toggled = await trySubmit(publishAction, { item_template: product.value.id, publish })
+  refocusStatusButton()
   if (!toggled) return
   const result = publishAction.data
   reloadProduct()
@@ -248,10 +281,30 @@ async function togglePublish() {
 async function toggleArchive() {
   const disabled = product.value.status !== 'archived'
   const saved = await trySubmit(updateAction, { item_template: product.value.id, disabled: disabled ? 1 : 0 })
+  refocusStatusButton()
   if (!saved) return
   toast.success(disabled ? __('Archived') : __('Restored'))
   reloadProduct()
 }
+
+// Restore, Unpublish and Publish are one button whose label and action follow the status, so the
+// element that was pressed is the one that stays: three v-if buttons swapped on every toggle, and
+// the pressed one unmounted with keyboard focus inside it.
+const statusAction = computed(() => {
+  if (product.value?.status === 'archived') {
+    return { label: __('Restore'), variant: 'subtle', loading: updateAction.loading, disabled: false, onClick: toggleArchive }
+  }
+  if (isLive.value) {
+    return { label: __('Unpublish'), variant: 'subtle', loading: publishAction.loading, disabled: false, onClick: togglePublish }
+  }
+  return {
+    label: __('Publish'),
+    variant: 'solid',
+    loading: publishAction.loading,
+    disabled: Boolean(publishBlocker.value),
+    onClick: togglePublish,
+  }
+})
 
 const actions = computed(() =>
   product.value
@@ -325,7 +378,7 @@ const loadFailure = computed(() =>
         <!-- align="end": start-aligned, the menu overran the window and frappe-ui's collision
              handling pushed it flush against the screen edge. -->
         <Dropdown :options="moreActions" align="end">
-          <Button icon="lucide-ellipsis" :label="__('More actions')" />
+          <Button ref="moreActionsButton" icon="lucide-ellipsis" :label="__('More actions')" />
         </Dropdown>
         <template v-if="isDirty">
           <!-- The error in the red of the field errors below it, as on a phone; plain unsaved work
@@ -344,29 +397,14 @@ const loadFailure = computed(() =>
           />
         </template>
         <Button
-          v-else-if="product.status === 'archived'"
-          :label="__('Restore')"
-          variant="subtle"
-          theme="gray"
-          :loading="updateAction.loading"
-          @click="toggleArchive"
-        />
-        <Button
-          v-else-if="isLive"
-          :label="__('Unpublish')"
-          variant="subtle"
-          theme="gray"
-          :loading="publishAction.loading"
-          @click="togglePublish"
-        />
-        <Button
           v-else
-          :label="__('Publish')"
-          variant="solid"
+          ref="statusButton"
+          :label="statusAction.label"
+          :variant="statusAction.variant"
           theme="gray"
-          :loading="publishAction.loading"
-          :disabled="Boolean(publishBlocker)"
-          @click="togglePublish"
+          :loading="statusAction.loading"
+          :disabled="statusAction.disabled"
+          @click="statusAction.onClick"
         />
       </template>
     </AppPageHeader>
@@ -394,6 +432,7 @@ const loadFailure = computed(() =>
               :key="singleItem.name"
               :product="product"
               :draft="draft"
+              :draft-version="draftVersion"
               :price-error="priceError"
               :original-price-error="originalPriceMessage"
               @received="reloadProduct"

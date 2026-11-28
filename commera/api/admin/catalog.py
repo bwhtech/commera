@@ -989,7 +989,7 @@ def create_collection(title: str):
 		frappe.throw(_("Enter a collection name"))
 	if frappe.db.exists("Item Group", title):
 		# Typed, so Add product can say it on the Name field instead of in a toast.
-		frappe.throw(_("Collection {0} already exists.").format(title), frappe.DuplicateEntryError)
+		frappe.throw(_("A collection with this name already exists."), frappe.DuplicateEntryError)
 
 	item_group = frappe.qb.DocType("Item Group")
 	parent = (
