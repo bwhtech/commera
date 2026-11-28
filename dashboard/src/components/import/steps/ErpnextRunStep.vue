@@ -56,7 +56,7 @@ function finish(path) {
     <template v-if="imp.phase === 'running'">
       <div>
         <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Importing your ERPNext items') }}</h2>
-        <p class="mt-1 text-p-base text-ink-gray-6">{{ __('You can close this window. The import keeps running.') }}</p>
+        <p class="mt-1.5 text-pretty text-p-base text-ink-gray-6">{{ __('You can close this window. The import keeps running.') }}</p>
       </div>
 
       <div class="rounded-5 border border-outline-gray-1 p-5">

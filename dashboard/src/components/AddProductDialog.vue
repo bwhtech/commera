@@ -87,13 +87,27 @@ watch(title, () => (titleError.value = ''))
 // The two "new" forms are FormDialogs over this one, not frappe-ui's dialog.prompt: a prompt stays
 // a centred modal on a phone, logs a Vue warning for its reactive component, and drops its typed
 // name to Escape without asking.
-const createCollectionAction = useAdminAction('catalog.create_collection')
-const newCollection = reactive({ open: false, title: '' })
+// Quiet for the same reason as createAction: a taken name is said once, under Name, like a taken
+// product title. Every other refusal still gets its one toast.
+const createCollectionAction = useAdminAction('catalog.create_collection', {
+  quiet: true,
+  onError: (error) => {
+    if (error?.type !== 'DuplicateEntryError') toast.error(errorMessage(error))
+  },
+})
+const newCollection = reactive({ open: false, title: '', error: '' })
+const collectionNameField = ref(null)
 
 function addCollection() {
   newCollection.title = ''
+  newCollection.error = ''
   newCollection.open = true
 }
+
+watch(
+  () => newCollection.title,
+  () => (newCollection.error = ''),
+)
 
 // "New collection" is opened from the Collection list's footer, and that button leaves with the
 // list, so closing the child (Cancel, Discard or a create) returns the merchant to Collection.
@@ -105,7 +119,16 @@ async function saveCollection() {
   const title = newCollection.title.trim()
   if (!title || createCollectionAction.loading) return
   const created = await trySubmit(createCollectionAction, { title })
-  if (!created) return
+  if (!created) {
+    if (createCollectionAction.error?.type === 'DuplicateEntryError') {
+      newCollection.error = errorMessage(createCollectionAction.error)
+      await nextTick()
+      const input = collectionNameField.value?.querySelector('input')
+      input?.focus()
+      input?.select()
+    }
+    return
+  }
   newCollection.open = false
   await collectionsRequest.reload()
   collection.value = createCollectionAction.data.name
@@ -417,7 +440,15 @@ async function submit() {
     :return-focus="focusCollection"
     @submit="saveCollection"
   >
-    <FormControl v-model="newCollection.title" :label="__('Name')" required @keydown.enter.prevent="saveCollection" />
+    <div ref="collectionNameField">
+      <FormControl
+        v-model="newCollection.title"
+        :label="__('Name')"
+        :error="newCollection.error"
+        required
+        @keydown.enter.prevent="saveCollection"
+      />
+    </div>
   </FormDialog>
 
   <FormDialog

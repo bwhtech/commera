@@ -23,6 +23,8 @@ const originalPrice = defineModel('originalPrice', { default: null })
 
 const currencySymbol = symbolFor()
 // Revealed, it stays while the field is cleared mid-typing; a stored value shows it on its own.
+// Focusing a stored one reveals it too: backspacing it to empty must not unmount the field under
+// the cursor and lose what is typed next. Only × hides it.
 const revealed = ref(false)
 const showOriginalPrice = computed(() => revealed.value || hasPrice(originalPrice.value))
 
@@ -68,7 +70,7 @@ async function addOriginalPrice() {
            whatever the label, description or error around the input measure. The description fits
            one line in the half-width column; the error states the "higher than the price" rule
            when it is broken. -->
-      <div v-if="showOriginalPrice" ref="originalPriceField">
+      <div v-if="showOriginalPrice" ref="originalPriceField" @focusin="revealed = true">
         <FormControl
           v-model.number="originalPrice"
           type="number"
