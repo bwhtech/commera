@@ -22,6 +22,11 @@ from commera.tests.test_product_onboarding import ProductOnboardingTestCase
 
 
 class TestAddProduct(ProductOnboardingTestCase):
+	def setUp(self):
+		super().setUp()
+		# Several tests add a Color product. In CI's test order nothing may have created Color yet.
+		ensure_attribute_exists("Color", "Red", "RED")
+
 	def add_product(self, **kwargs):
 		kwargs.setdefault("title", f"Add Product {frappe.generate_hash(length=6).upper()}")
 		kwargs.setdefault("collection", self.item_group)
@@ -114,8 +119,7 @@ class TestAddProduct(ProductOnboardingTestCase):
 		return item_group.name
 
 	def test_size_and_the_placeholder_are_not_option_axes(self):
-		# Made here, not assumed: in CI's test order nothing may have created Color or Size yet.
-		ensure_attribute_exists("Color", "Red", "RED")
+		# Made here, not assumed: in CI's test order nothing may have created Size yet.
 		ensure_attribute_exists(SIZE_ATTRIBUTE, DEFAULT_SIZE_VALUE, "OS")
 		options = {row["name"]: row["is_option"] for row in get_attributes()}
 
