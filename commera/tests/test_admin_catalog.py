@@ -28,7 +28,7 @@ from commera.api.admin.catalog import (
 	update_product,
 )
 from commera.patches import add_products_to_their_collection, move_collections_under_store_collections
-from commera.product_collections import STORE_COLLECTIONS, add_store_collections_parent
+from commera.product_collections import STORE_COLLECTIONS, add_first_collection, add_store_collections_parent
 from commera.tests.test_product_onboarding import ProductOnboardingTestCase
 
 
@@ -571,6 +571,31 @@ class TestStoreCollections(DeleteProductTestCase):
 		self.assertEqual(self.get_parent(title), STORE_COLLECTIONS)
 		self.assertEqual(get_collections(search_text=title), [title])
 		self.assertEqual(self.get_listed(title), [title])
+
+	def empty_store_collections(self):
+		for name in frappe.get_all(
+			"Item Group", filters={"parent_item_group": add_store_collections_parent()}, pluck="name"
+		):
+			item_group = frappe.get_doc("Item Group", name)
+			item_group.parent_item_group = get_root_of("Item Group")
+			item_group.save()
+
+	def test_a_new_store_starts_with_a_collection_named_for_what_it_sells(self):
+		self.empty_store_collections()
+
+		add_first_collection("Fashion")
+
+		self.assertEqual(get_collections(), ["Clothing"])
+		self.assertEqual(self.get_parent("Clothing"), STORE_COLLECTIONS)
+
+	def test_a_store_that_already_has_a_collection_gets_no_first_one(self):
+		self.empty_store_collections()
+		title = f"Store Collection {self.suffix}"
+		create_collection(title)
+
+		add_first_collection("Beauty")
+
+		self.assertEqual(get_collections(), [title])
 
 	def test_the_picker_and_the_list_leave_out_groups_outside_store_collections(self):
 		raw_material = self.add_item_group("Raw Material")

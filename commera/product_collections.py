@@ -13,6 +13,14 @@ PRODUCT_COLLECTION = "Product Collection"
 COLLECTIONS_FIELD = "custom_collections"
 STORE_COLLECTIONS = "Store Collections"
 ERPNEXT_ITEM_GROUPS = ("Products", "Raw Material", "Services", "Sub Assemblies", "Consumable")
+FIRST_COLLECTIONS = {
+	"Fashion": "Clothing",
+	"Beauty": "Skin Care",
+	"Home": "Home Decor",
+	"Food": "Pantry",
+	"Electronics": "Gadgets",
+}
+DEFAULT_FIRST_COLLECTION = "All Products"
 
 
 def sync_collections(doc, method=None):
@@ -111,6 +119,21 @@ def add_store_collections_parent() -> str:
 			}
 		).insert(ignore_permissions=True)
 	return STORE_COLLECTIONS
+
+
+def add_first_collection(category: str | None = None):
+	parent = add_store_collections_parent()
+	lft, rgt = frappe.db.get_value("Item Group", parent, ["lft", "rgt"])
+	if rgt - lft > 1:
+		return
+	title = FIRST_COLLECTIONS.get(category or "", DEFAULT_FIRST_COLLECTION)
+	if frappe.db.exists("Item Group", title):
+		return
+	collection = frappe.new_doc("Item Group")
+	collection.item_group_name = title
+	collection.parent_item_group = parent
+	collection.custom_displayname = title
+	collection.insert(ignore_permissions=True)
 
 
 def add_to_store_collections(item_groups):
