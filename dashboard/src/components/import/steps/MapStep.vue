@@ -1,7 +1,7 @@
 <script setup>
-import { computed, reactive } from 'vue'
-import { Alert, Button, FormControl, Select, Spinner } from 'frappe-ui'
-import { trySubmit, useAdminAction, useAdminRead } from '../../../data/api'
+import { computed, ref } from 'vue'
+import { Alert, Button, Select, Spinner } from 'frappe-ui'
+import { useAdminRead } from '../../../data/api'
 import {
   checkMapping,
   imp,
@@ -12,7 +12,7 @@ import {
 import { TARGET_FIELDS, fieldLabel, isSameMapping, stillNeeded } from '../../../data/importMapping'
 import { __ } from '../../../data/translation'
 import ToneBadge from '../ToneBadge.vue'
-import FormDialog from '../../FormDialog.vue'
+import NewCollectionDialog from '../../NewCollectionDialog.vue'
 
 const mapped = computed(() => Object.values(imp.mapping).filter(Boolean).length)
 
@@ -30,24 +30,16 @@ const collectionOptions = computed(() => [
   ...(collectionsRequest.data ?? []).map((name) => ({ label: name, value: name })),
 ])
 
-// The same New collection dialog as Add product's: frappe-ui's dialog.prompt logged a Vue
-// "reactive component" warning and a reka "Missing Description" warning on every open, and was a
-// centred modal on a phone where every other dialog here is a sheet.
-const createCollectionAction = useAdminAction('catalog.create_collection')
-const newCollection = reactive({ open: false, title: '' })
+// The same New collection dialog as Add product's, so a taken name is said under Name there too.
+const newCollectionOpen = ref(false)
 
 function addCollection() {
-  newCollection.title = ''
-  newCollection.open = true
+  newCollectionOpen.value = true
 }
 
-async function saveCollection() {
-  const title = newCollection.title.trim()
-  if (!title || createCollectionAction.loading) return
-  if (!(await trySubmit(createCollectionAction, { title }))) return
-  newCollection.open = false
+async function useNewCollection(name) {
   await collectionsRequest.reload()
-  setDefaultCollection(createCollectionAction.data.name)
+  setDefaultCollection(name)
 }
 
 // A guess from a header that only contains a known name ("Variant Size"). The merchant's own pick is
@@ -149,19 +141,6 @@ const hasOwnChanges = computed(() => !isSameMapping(imp.mapping, imp.suggestedMa
       {{ __('Checking your columns…') }}
     </div>
 
-    <FormDialog
-      v-model:open="newCollection.open"
-      size="md"
-      :title="__('New collection')"
-      :description="__('Collections group products in your store, like Shirts or Candles.')"
-      :primary-label="__('Add collection')"
-      :primary-disabled="!newCollection.title.trim()"
-      :reason="newCollection.title.trim() ? '' : __('Enter a name to continue.')"
-      :loading="createCollectionAction.loading"
-      :dirty="Boolean(newCollection.title.trim())"
-      @submit="saveCollection"
-    >
-      <FormControl v-model="newCollection.title" :label="__('Name')" required @keydown.enter.prevent="saveCollection" />
-    </FormDialog>
+    <NewCollectionDialog v-model:open="newCollectionOpen" @created="useNewCollection" />
   </div>
 </template>

@@ -17,6 +17,7 @@ import { errorMessage } from '../data/errors'
 import { __ } from '../data/translation'
 import AttributeMultiSelect from './AttributeMultiSelect.vue'
 import FormDialog from './FormDialog.vue'
+import NewCollectionDialog from './NewCollectionDialog.vue'
 import OptionSizeGrid from './OptionSizeGrid.vue'
 import PriceFields from './PriceFields.vue'
 
@@ -84,30 +85,13 @@ watch(
 
 watch(title, () => (titleError.value = ''))
 
-// The two "new" forms are FormDialogs over this one, not frappe-ui's dialog.prompt: a prompt stays
-// a centred modal on a phone, logs a Vue warning for its reactive component, and drops its typed
-// name to Escape without asking.
-// Quiet for the same reason as createAction: a taken name is said once, under Name, like a taken
-// product title. Every other refusal still gets its one toast.
-const createCollectionAction = useAdminAction('catalog.create_collection', {
-  quiet: true,
-  onError: (error) => {
-    if (error?.type !== 'DuplicateEntryError') toast.error(errorMessage(error))
-  },
-})
-const newCollection = reactive({ open: false, title: '', error: '' })
-const collectionNameField = ref(null)
+// "New collection" is a NewCollectionDialog over this one, and New option a FormDialog: not frappe-ui's
+// dialog.prompt, which stays a centred modal on a phone and drops a typed name to Escape.
+const newCollectionOpen = ref(false)
 
 function addCollection() {
-  newCollection.title = ''
-  newCollection.error = ''
-  newCollection.open = true
+  newCollectionOpen.value = true
 }
-
-watch(
-  () => newCollection.title,
-  () => (newCollection.error = ''),
-)
 
 // "New collection" is opened from the Collection list's footer, and that button leaves with the
 // list, so closing the child (Cancel, Discard or a create) returns the merchant to Collection.
@@ -115,23 +99,9 @@ watch(
 const collectionSelect = ref(null)
 const focusCollection = () => collectionSelect.value?.focus({ preventScroll: true })
 
-async function saveCollection() {
-  const title = newCollection.title.trim()
-  if (!title || createCollectionAction.loading) return
-  const created = await trySubmit(createCollectionAction, { title })
-  if (!created) {
-    if (createCollectionAction.error?.type === 'DuplicateEntryError') {
-      newCollection.error = errorMessage(createCollectionAction.error)
-      await nextTick()
-      const input = collectionNameField.value?.querySelector('input')
-      input?.focus()
-      input?.select()
-    }
-    return
-  }
-  newCollection.open = false
+async function useNewCollection(name) {
   await collectionsRequest.reload()
-  collection.value = createCollectionAction.data.name
+  collection.value = name
 }
 
 // The option axis is any attribute catalog.get_attributes marks as one: never Size, which is the
@@ -429,29 +399,7 @@ async function submit() {
     </div>
   </FormDialog>
 
-  <FormDialog
-    v-model:open="newCollection.open"
-    size="md"
-    :title="__('New collection')"
-    :description="__('Collections group products in your store, like Shirts or Candles.')"
-    :primary-label="__('Add collection')"
-    :primary-disabled="!newCollection.title.trim()"
-    :reason="newCollection.title.trim() ? '' : __('Enter a name to continue.')"
-    :loading="createCollectionAction.loading"
-    :dirty="Boolean(newCollection.title.trim())"
-    :return-focus="focusCollection"
-    @submit="saveCollection"
-  >
-    <div ref="collectionNameField">
-      <FormControl
-        v-model="newCollection.title"
-        :label="__('Name')"
-        :error="newCollection.error"
-        required
-        @keydown.enter.prevent="saveCollection"
-      />
-    </div>
-  </FormDialog>
+  <NewCollectionDialog v-model:open="newCollectionOpen" :return-focus="focusCollection" @created="useNewCollection" />
 
   <FormDialog
     v-model:open="newOption.open"
