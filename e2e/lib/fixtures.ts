@@ -1,6 +1,6 @@
 import { type Page, test as base } from '@playwright/test';
 
-function watchPage(page: Page, problems: string[]) {
+export function watchPage(page: Page, problems: string[]) {
 	page.on('console', (message) => {
 		if (message.type() === 'error') problems.push(`CONSOLE: ${message.text()}`);
 	});
@@ -17,13 +17,17 @@ function watchPage(page: Page, problems: string[]) {
 const KNOWN_PROBLEMS = [
 	'favicon',
 	'summer_theme/images/shap.svg', // https://github.com/bwhtech/commera/issues/605
+	/programming error:\s+AbortError: signal is aborted without reason/, // https://github.com/bwhtech/commera/issues/610
 ];
 
 export function realProblems(problems: string[]) {
 	return [...new Set(problems)].filter(
 		(entry) =>
-			!KNOWN_PROBLEMS.some((needle) => entry.includes(needle)) &&
-			!entry.startsWith('CONSOLE: Failed to load resource'),
+			!KNOWN_PROBLEMS.some((needle) =>
+				typeof needle === 'string'
+					? entry.includes(needle)
+					: needle.test(entry),
+			) && !entry.startsWith('CONSOLE: Failed to load resource'),
 	);
 }
 

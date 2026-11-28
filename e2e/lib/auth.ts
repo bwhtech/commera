@@ -13,13 +13,14 @@ export async function login(
 	request: APIRequestContext,
 	email: string,
 	password: string,
+	base = BASE,
 ) {
-	const response = await request.post(`${BASE}/api/method/login`, {
+	const response = await request.post(`${base}/api/method/login`, {
 		data: { usr: email, pwd: password },
 	});
 	if (!response.ok()) {
 		throw new Error(
-			`login as ${email} failed at ${BASE}: HTTP ${response.status()}`,
+			`login as ${email} failed at ${base}: HTTP ${response.status()}`,
 		);
 	}
 }

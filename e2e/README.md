@@ -44,6 +44,7 @@ Never point the suite at `commera-demo.localhost`. Journeys change gateway and s
 | Variable | Default | Meaning |
 |---|---|---|
 | `COMMERA_BASE` | `http://e2e.localhost:8000` | Site URL |
+| `COMMERA_FRESH_BASE` | unset | A second site where setup never ran, for fresh-site onboarding |
 | `COMMERA_SITE` | host name of `COMMERA_BASE` | Site name passed to `bench --site` |
 | `COMMERA_BENCH` | `~/frappe-bench` | Bench directory for the bench helper |
 | `COMMERA_ADMIN_PASSWORD` | `admin` | Administrator's password |
