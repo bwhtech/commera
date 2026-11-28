@@ -5,7 +5,7 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Alert, Button, Spinner, toast } from 'frappe-ui'
+import { Alert, Button, Spinner } from 'frappe-ui'
 import { bootValue } from '../../data/boot'
 import {
   completeOnboarding,
@@ -53,15 +53,6 @@ const PROGRESS = ['scale-x-[0.04]', 'scale-x-50', 'scale-x-100']
 const SLIDES = {
   forward: { enter: 'translate-x-4 opacity-0 motion-reduce:translate-x-0', leave: '-translate-x-4 opacity-0 motion-reduce:translate-x-0' },
   back: { enter: '-translate-x-4 opacity-0 motion-reduce:translate-x-0', leave: 'translate-x-4 opacity-0 motion-reduce:translate-x-0' },
-}
-
-const MISSING_MESSAGES = {
-  fullName: __('Add your full name to continue'),
-  password: __('Add a password to continue'),
-  storeName: __('Add your store name to continue'),
-  country: __('Pick your country to continue'),
-  company: __('Pick your company to continue'),
-  priceList: __('Pick a price list to continue'),
 }
 
 const router = useRouter()
@@ -152,7 +143,6 @@ const missing = computed(() =>
 async function next() {
   if (missing.value) {
     flow.showErrors = true
-    toast.error(MISSING_MESSAGES[missing.value])
     return
   }
   // Enter in a field submits the form even while the Continue button shows its spinner.

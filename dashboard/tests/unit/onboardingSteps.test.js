@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  BUILD_DWELL,
+  FINAL_BUILD,
   SETUP_STAGES,
   STEP_INDEX,
   abbreviate,
+  buildDwell,
   canFinish,
   clampStep,
   missingField,
@@ -122,4 +125,14 @@ test('setupPollDelay slows after a minute and stops after ten', () => {
   assert.equal(setupPollDelay(61000), 10000)
   assert.equal(setupPollDelay(10 * 60000), 10000)
   assert.equal(setupPollDelay(10 * 60000 + 1), null)
+})
+
+test('the store preview paces itself to the piece before the products, then plays what the setup reached', () => {
+  assert.equal(buildDwell(0, 0, false), BUILD_DWELL.pacedMs)
+  assert.equal(buildDwell(FINAL_BUILD - 2, 0, false), BUILD_DWELL.pacedMs)
+  assert.equal(buildDwell(FINAL_BUILD - 1, 0, false), null)
+  assert.equal(buildDwell(0, FINAL_BUILD, false), BUILD_DWELL.reachedMs)
+  assert.equal(buildDwell(FINAL_BUILD - 1, FINAL_BUILD, false), BUILD_DWELL.reachedMs)
+  assert.equal(buildDwell(FINAL_BUILD, FINAL_BUILD, false), BUILD_DWELL.reachedMs)
+  assert.equal(buildDwell(FINAL_BUILD, FINAL_BUILD, true), BUILD_DWELL.welcomeMs)
 })

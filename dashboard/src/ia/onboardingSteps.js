@@ -54,9 +54,23 @@ export function storePicks(existingStore, company) {
 
 export const SETUP_STAGES = ['company', 'storefront', 'payments']
 
+export const FINAL_BUILD = SETUP_STAGES.length + 1
+
 export function setupBuildLevel(setupStatus, stage) {
-  if (setupStatus === 'done') return SETUP_STAGES.length + 1
+  if (setupStatus === 'done') return FINAL_BUILD
   return SETUP_STAGES.indexOf(stage) + 1
+}
+
+// How long the store preview holds its current piece, or null to wait for the setup. The setup wizard
+// clears the cache that carries the stage, so the stages reach the poll together with `done`: the
+// preview paces itself up to the piece before the products rather than sit on one for the whole wait.
+export const BUILD_DWELL = { reachedMs: 900, pacedMs: 3000, welcomeMs: 1800 }
+
+export function buildDwell(shownBuild, reachedBuild, isWelcome) {
+  if (isWelcome) return BUILD_DWELL.welcomeMs
+  if (shownBuild < reachedBuild || shownBuild === FINAL_BUILD) return BUILD_DWELL.reachedMs
+  if (shownBuild < FINAL_BUILD - 1) return BUILD_DWELL.pacedMs
+  return null
 }
 
 // The setup must have finished before the dashboard opens: every screen behind it reads the company.
