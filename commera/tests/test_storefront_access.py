@@ -96,10 +96,6 @@ class TestStorefrontAccess(IntegrationTestCase):
 		self.assertFalse(get_home()["can_publish"])
 		self.assertRaises(frappe.PermissionError, set_storefront_published, 1)
 
-	def test_only_a_theme_editor_may_capture_the_store_preview(self):
-		frappe.set_user(STORE_ADMIN)
-		self.assertFalse(get_home()["preview"]["can_capture"])
-
 	def test_home_reports_every_setup_task(self):
 		self.assertEqual(set(get_home()["tasks"]), {"products", "payments", "shipping", "brand"})
 

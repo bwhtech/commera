@@ -1,19 +1,16 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
-from zoneinfo import ZoneInfo
-
 import frappe
-from frappe.utils import get_system_timezone
 from frappe.utils.data import cint
 
 from commera.api.admin.integrations import is_profile_enabled
 from commera.api.admin.payments import get_payment_registry
-from commera.api.admin.theme_layout import EDITOR_ROLES
 from commera.builder_themes.pages import get_home_page_preview
 from commera.roles import COMMERA_ADMIN
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	BUILDER_THEME_TYPE,
+	get_shipped_preview,
 	get_theme_context,
 	resolve_active_theme,
 )
@@ -42,23 +39,21 @@ def has_shipping(settings) -> bool:
 	return bool(settings.shipping_rule or frappe.db.exists("Shipping Service", {"enabled": 1}))
 
 
-def get_store_preview(theme: str) -> dict:
-	theme_type = get_theme_context(theme)["theme_type"]
-	if theme_type == BUILDER_THEME_TYPE and (image := get_home_page_preview(theme)):
-		return {"image": image, "captured_on": None, "can_capture": False}
+def get_store_preview(theme: str | None) -> dict:
+	if not theme:
+		return {"image": None, "image_dark": None}
 
-	image = frappe.db.get_value("Shop Theme", theme, "thumbnail")
-	captured_on = image and frappe.db.get_value(
-		"File",
-		{"file_url": image, "attached_to_doctype": "Shop Theme", "attached_to_name": theme},
-		"creation",
-	)
-	return {
-		"image": image,
-		"captured_on": captured_on
-		and captured_on.replace(tzinfo=ZoneInfo(get_system_timezone())).isoformat(),
-		"can_capture": theme_type == "Sections" and bool(set(EDITOR_ROLES) & set(frappe.get_roles())),
-	}
+	theme_context = get_theme_context(theme)
+	if theme_context["theme_type"] == BUILDER_THEME_TYPE and (image := get_home_page_preview(theme)):
+		return {"image": image, "image_dark": image}
+
+	captured = frappe.db.get_value("Shop Theme", theme, ["thumbnail", "thumbnail_dark"], as_dict=True)
+	if captured and captured.thumbnail:
+		image, image_dark = captured.thumbnail, captured.thumbnail_dark
+	else:
+		shipped = get_shipped_preview(theme, theme_context["apps"].get(theme))
+		image, image_dark = shipped.get("light"), shipped.get("dark")
+	return {"image": image, "image_dark": image_dark or image}
 
 
 @frappe.whitelist(methods=["GET"])

@@ -19,6 +19,7 @@ from commera.builder_themes.theme import create_builder_theme as create_theme_in
 from commera.shop_themes.doctype.shop_theme.shop_theme import (
 	BASE_THEME,
 	BUILDER_THEME_TYPE,
+	get_shipped_preview,
 	get_theme_context,
 	resolve_active_theme,
 )
@@ -56,6 +57,9 @@ def build_themes(active_theme):
 			theme.builder_editor_url = get_builder_editor_url(theme.name)
 			if preview := get_home_page_preview(theme.name):
 				theme.thumbnail, theme.thumbnail_dark = preview, None
+		elif not theme.thumbnail and (shipped := get_shipped_preview(theme.name, theme.app)):
+			theme.thumbnail = shipped.get("light")
+			theme.thumbnail_dark = shipped.get("dark") or theme.thumbnail
 
 	return sorted(themes, key=lambda theme: not theme.live)
 

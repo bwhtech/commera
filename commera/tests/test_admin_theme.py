@@ -10,6 +10,7 @@ import frappe.handler
 from frappe.tests import IntegrationTestCase
 from frappe.website.serve import get_response_content
 
+from commera.api.admin.home import get_store_preview
 from commera.api.admin.pages import save_page
 from commera.api.admin.theme import (
 	activate_theme,
@@ -92,6 +93,34 @@ class TestAdminTheme(IntegrationTestCase):
 
 		self.assertEqual(data["active_theme"], BASE_THEME)
 		self.assertEqual(frappe.db.get_single_value("Shop Theme Settings", "active_theme"), BASE_THEME)
+
+	def set_thumbnails(self, theme, light, dark):
+		frappe.db.set_value("Shop Theme", theme, {"thumbnail": light, "thumbnail_dark": dark})
+
+	def test_a_theme_never_captured_shows_the_preview_it_ships(self):
+		self.set_thumbnails(STARTER_THEME, None, None)
+		shipped = {
+			"image": "/assets/commera/themes/commera_standard/preview.webp",
+			"image_dark": "/assets/commera/themes/commera_standard/preview-dark.webp",
+		}
+
+		self.assertEqual(get_store_preview(STARTER_THEME), shipped)
+		listed = self.find_theme(build_editor_data()["themes"], STARTER_THEME)
+		self.assertEqual((listed.thumbnail, listed.thumbnail_dark), (shipped["image"], shipped["image_dark"]))
+
+	def test_a_captured_preview_wins_over_the_shipped_one(self):
+		self.set_thumbnails(STARTER_THEME, "/files/light.webp", "/files/dark.webp")
+
+		self.assertEqual(
+			get_store_preview(STARTER_THEME), {"image": "/files/light.webp", "image_dark": "/files/dark.webp"}
+		)
+
+	def test_a_preview_without_a_dark_image_shows_the_light_one_in_dark_mode(self):
+		self.set_thumbnails(STARTER_THEME, "/files/light.webp", None)
+		self.assertEqual(get_store_preview(STARTER_THEME)["image_dark"], "/files/light.webp")
+
+		self.set_thumbnails(BASE_THEME, None, None)
+		self.assertEqual(get_store_preview(BASE_THEME), {"image": None, "image_dark": None})
 
 	def test_activate_theme_refuses_a_theme_that_is_not_installed(self):
 		self.assertRaises(frappe.ValidationError, activate_theme, "ZZ No Such Theme")
