@@ -63,6 +63,7 @@ page_renderer = [
 # Frappe Builder hooks (read only when Builder is installed): data and agent instructions for theme pages.
 builder_page_data = ["commera.builder_themes.page_data.get_page_data"]
 builder_agent_context = ["commera.builder_themes.agent_context.get_agent_context"]
+builder_agent_tools = ["commera.builder_themes.agent_tools.get_tools"]
 # The theme bar in the Builder editor. `bench build` builds it into public/builder_plugins/builder_plugin.
 builder_plugins = ["builder_plugin"]
 
