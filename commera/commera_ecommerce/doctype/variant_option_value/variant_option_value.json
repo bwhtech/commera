@@ -1,0 +1,56 @@
+{
+	"actions": [],
+	"creation": "2026-11-28 12:00:00.000000",
+	"doctype": "DocType",
+	"editable_grid": 1,
+	"engine": "InnoDB",
+	"field_order": ["item_code", "attribute", "column_break_value", "value", "position"],
+	"fields": [
+		{
+			"fieldname": "item_code",
+			"fieldtype": "Link",
+			"in_list_view": 1,
+			"label": "Item Code",
+			"options": "Item",
+			"reqd": 1
+		},
+		{
+			"fieldname": "attribute",
+			"fieldtype": "Link",
+			"in_list_view": 1,
+			"label": "Attribute",
+			"options": "Item Attribute",
+			"reqd": 1
+		},
+		{
+			"fieldname": "column_break_value",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "value",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"label": "Value",
+			"reqd": 1
+		},
+		{
+			"fieldname": "position",
+			"fieldtype": "Int",
+			"in_list_view": 1,
+			"label": "Position",
+			"reqd": 1
+		}
+	],
+	"index_web_pages_for_search": 1,
+	"istable": 1,
+	"links": [],
+	"modified": "2026-11-28 12:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "Commera Ecommerce",
+	"name": "Variant Option Value",
+	"owner": "Administrator",
+	"permissions": [],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"states": []
+}

@@ -14,6 +14,7 @@ from commera.api.variant_pricing import (
 	insert_item_prices,
 )
 from commera.plugin_events import add_changed_products
+from commera.product_options import MAX_PRODUCT_OPTIONS
 
 
 class StyleAttributeVariant(Document):
@@ -31,6 +32,9 @@ class StyleAttributeVariant(Document):
 		from commera.commera_ecommerce.doctype.color_size_item.color_size_item import (
 			ColorSizeItem,
 		)
+		from commera.commera_ecommerce.doctype.variant_option_value.variant_option_value import (
+			VariantOptionValue,
+		)
 
 		attribute_name: DF.Data | None
 		attribute_value: DF.Data
@@ -47,13 +51,19 @@ class StyleAttributeVariant(Document):
 		meta_title: DF.Data | None
 		noindex: DF.Check
 		og_image: DF.AttachImage | None
+		option_values: DF.Table[VariantOptionValue]
 		review_count: DF.Int
 		route: DF.Data | None
 		sizes: DF.Table[ColorSizeItem]
 
 	# end: auto-generated types
 	def validate(self):
+		self.validate_option_count()
 		self.unpublish_if_incomplete_data()
+
+	def validate_option_count(self):
+		if any(row.position > MAX_PRODUCT_OPTIONS for row in self.option_values):
+			frappe.throw(_("A product can have at most {0} options").format(MAX_PRODUCT_OPTIONS))
 
 	@staticmethod
 	def get_translation_sources(field: str, names: list[str]) -> dict[str, str | None]:

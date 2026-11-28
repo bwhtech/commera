@@ -53,6 +53,7 @@ class StyleAttributeConfigurator(Document):
 		)
 		for item in all_attributes:
 			grouped_by_parent_items.setdefault(item.parent, []).append(item)
+		option_positions = self.get_option_positions(attribute_name_field)
 
 		result = {}
 		for parent, variant_attributes in grouped_by_parent_items.items():
@@ -83,8 +84,12 @@ class StyleAttributeConfigurator(Document):
 					result[color_value] = {
 						"attribute_name": attribute_name,
 						"items": [],
+						"option_values": [],
 					}
 				result[color_value]["items"].append(item_info)
+				result[color_value]["option_values"].extend(
+					get_option_values(parent, variant_attributes, option_positions)
+				)
 		for color, variants in result.items():
 			item_template_name = frappe.get_value("Item", self.item_template, "item_name")
 			if not item_template_name:
@@ -98,11 +103,40 @@ class StyleAttributeConfigurator(Document):
 						"attribute_value": color,
 						"attribute_name": variants["attribute_name"],
 						"sizes": variants["items"],
+						"option_values": variants["option_values"],
 						"is_published": False,
 					}
 				).insert()
 			except frappe.exceptions.DuplicateEntryError:
 				pass
 
+	def get_option_positions(self, attribute_name_field: str | None) -> dict:
+		template_attributes = frappe.get_all(
+			"Item Variant Attribute",
+			filters={"parenttype": "Item", "parent": self.item_template},
+			order_by="idx asc",
+			pluck="attribute",
+		)
+		option_attributes = [
+			attribute
+			for attribute in template_attributes
+			if attribute not in (self.item_attribute, attribute_name_field)
+		]
+		return {attribute: position for position, attribute in enumerate(option_attributes, start=2)}
+
 	def get_total_variants(self):
 		return frappe.db.count("Style Attribute Variant", {"configurator": self.name})
+
+
+def get_option_values(item_code: str, variant_attributes: list, option_positions: dict) -> list:
+	rows = [
+		{
+			"item_code": item_code,
+			"attribute": row.attribute,
+			"value": row.attribute_value,
+			"position": option_positions[row.attribute],
+		}
+		for row in variant_attributes
+		if row.attribute in option_positions
+	]
+	return sorted(rows, key=lambda row: row["position"])
