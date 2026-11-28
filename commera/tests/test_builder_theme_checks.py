@@ -53,6 +53,23 @@ def block(element="div", *children, bind=None, attrs=None, repeat=None, visible=
 	return made
 
 
+def instance(component: str, root: dict) -> dict:
+	"""A component on a page, as the editor saves it: its children only point at the component's blocks."""
+
+	def point_at(children):
+		return [
+			{
+				"blockId": frappe.generate_hash(length=8),
+				"referenceBlockId": child["blockId"],
+				"isChildOfComponent": component,
+				"children": point_at(child["children"]),
+			}
+			for child in children
+		]
+
+	return block(root["element"], *point_at(root["children"]), component=component)
+
+
 def header():
 	count = block("span", attrs={"data-commera-cart-count": ""})
 	return block("a", count, bind={"href": "commera.shop.cart_url"})
@@ -310,6 +327,17 @@ class TestThemePageChecks(ProductDetailPriceTestCase):
 		styled["dynamicValues"] = [{"key": "commera.shop.cart_url", "property": "href", "type": "style"}]
 		self.assert_one_problem(check_page(HOME, block("div", styled, products)), "No link to the cart")
 
+	def test_the_later_binding_of_a_property_is_the_one_that_counts(self):
+		products = block("div", card(), repeat="commera.featured_products")
+		link = block("a")
+		link["dynamicValues"] = [
+			{"key": f"commera.shop.{name}", "property": "href", "type": "attribute"}
+			for name in ("cart_url", "home_url")
+		]
+		self.assert_one_problem(check_page(HOME, block("div", link, products)), "No link to the cart")
+		link["dynamicValues"].reverse()
+		self.assertEqual(messages(check_page(HOME, block("div", link, products))), [])
+
 	def test_a_repeaters_own_text_binding_is_not_rendered_so_not_checked(self):
 		products = block("div", card(), repeat="commera.featured_products")
 		products["dynamicValues"] = [{"key": "commera.shop.nmae", "property": "innerHTML", "type": "key"}]
@@ -389,54 +417,53 @@ class TestBobChecksThemePages(ProductDetailPriceTestCase):
 
 	def test_a_component_is_checked_with_the_page(self):
 		wrong = block("p", bind={"innerHTML": "commera.shop.nmae"})
-		component = frappe.get_doc(
-			{
-				"doctype": "Builder Component",
-				"component_name": "Checked Header",
-				"block": frappe.as_json(block("div", header(), wrong)),
-			}
-		).insert()
+		root = block("div", header(), wrong)
+		component = self.make_component("Checked Header", root)
 		page = product_page()
-		page["children"][0] = block("div", component=component.name)
+		page["children"][0] = instance(component, root)
 		reply = self.check(PRODUCT_DETAIL, page)
 		self.assertTrue(reply.startswith("FAILED: 1 to fix"), reply)
-		self.assertIn(f"- block {wrong['blockId']} of component {component.name}: 'commera.shop.nmae'", reply)
+		self.assertIn(f"- block {wrong['blockId']} of component {component}: 'commera.shop.nmae'", reply)
+
+	def test_an_instance_with_no_children_publishes_empty(self):
+		root = block("div", header())
+		page = product_page()
+		page["children"][0] = block("div", component=self.make_component("Checked Empty Header", root))
+		self.assertIn("No link to the cart", self.check(PRODUCT_DETAIL, page))
 
 	def make_component(self, name, root):
 		component = {"doctype": "Builder Component", "component_name": name, "block": frappe.as_json(root)}
 		return frappe.get_doc(component).insert().name
 
 	def test_an_instance_is_checked_with_what_the_page_changes_on_it(self):
-		cart = header()
-		name = block("p", bind={"innerHTML": "commera.shop.nmae"})
-		component = self.make_component("Checked Shop Name", block("div", cart, name))
+		root = block("div", header(), block("p", bind={"innerHTML": "commera.shop.nmae"}))
+		component = self.make_component("Checked Shop Name", root)
 
-		def instance(key):
+		def rebound(key):
 			"""The component on a page, which binds its name block to another key."""
-			changed = block("p", bind={"innerHTML": key})
-			changed["referenceBlockId"] = name["blockId"]
-			kept = block("a")
-			kept["referenceBlockId"] = cart["blockId"]
-			return block("div", kept, changed, component=component)
+			placed = instance(component, root)
+			placed["children"][1]["dynamicValues"] = [{"key": key, "property": "innerHTML", "type": "key"}]
+			return placed
 
 		page = product_page()
-		page["children"][0] = instance("commera.shop.name")
+		page["children"][0] = rebound("commera.shop.name")
 		self.assertEqual(
 			self.check(PRODUCT_DETAIL, page), "OK: the Product Detail page passes Commera's checks."
 		)
-		page["children"][0] = instance("commera.shop.nam")
+		page["children"][0] = rebound("commera.shop.nam")
 		self.assertIn("'commera.shop.nam' is not a key", self.check(PRODUCT_DETAIL, page))
 
 	def test_a_component_is_checked_in_each_place_it_is_used(self):
-		component = self.make_component("Checked Card", card())
+		root = card()
+		component = self.make_component("Checked Card", root)
 		home = block(
 			"div",
 			header(),
-			block("div", block("a", component=component), repeat="commera.featured_products"),
-			block("div", block("a", component=component), repeat="commera.sale_products"),
+			block("div", instance(component, root), repeat="commera.featured_products"),
+			block("div", instance(component, root), repeat="commera.sale_products"),
 		)
 		self.assertEqual(self.check(HOME, home), "OK: the Home page passes Commera's checks.")
-		home["children"].append(block("div", block("a", component=component), repeat="commera.footer"))
+		home["children"].append(block("div", instance(component, root), repeat="commera.footer"))
 		self.assertIn("'url' is not a key of an item of 'commera.footer'", self.check(HOME, home))
 
 	def test_a_page_the_user_cannot_read_does_not_show_its_role(self):
@@ -464,11 +491,11 @@ class TestBobChecksThemePages(ProductDetailPriceTestCase):
 			}
 		).insert()
 		page = product_page()
-		page["children"][0] = block("div", component=component)
+		page["children"][0] = instance(component, wrong)
 		self.assertIn("'commera.shop.nmae'", self.check(PRODUCT_DETAIL, page))
-		page["children"][0]["componentVersion"] = version.name
+		page["children"][0] = {**instance(component, right), "componentVersion": version.name}
 		self.assertEqual(
 			self.check(PRODUCT_DETAIL, page), "OK: the Product Detail page passes Commera's checks."
 		)
-		page["children"][0]["componentVersion"] = "a version that is gone"
+		page["children"][0] = {**instance(component, wrong), "componentVersion": "a version that is gone"}
 		self.assertIn("'commera.shop.nmae'", self.check(PRODUCT_DETAIL, page))

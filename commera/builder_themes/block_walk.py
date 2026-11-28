@@ -93,22 +93,27 @@ class BlockWalk:
 			self.visit(child, scope)
 
 	def check_bindings(self, block: dict, scope: Scope | None) -> None:
+		rendered = set()
 		for binding in get_bindings(block):
+			target = (binding.get("property"), binding.get("type"))
 			if binding.get("type") == "attribute":
 				self.usage.attributes.add(binding.get("property"))
 			if is_page_data(binding):
-				self.check_key(block, scope, binding)
+				# a later binding of the same property wins, so an earlier one is only checked
+				self.check_key(block, scope, binding, is_rendered=target not in rendered)
+			rendered.add(target)
 		self.usage.attributes.update(block.get("attributes") or {}, block.get("customAttributes") or {})
 		visible = get_visibility(block)
 		if visible and is_page_data(visible):
 			self.resolve(block, scope, visible["key"])
 
-	def check_key(self, block: dict, scope: Scope | None, binding: dict) -> None:
+	def check_key(self, block: dict, scope: Scope | None, binding: dict, is_rendered: bool) -> None:
 		key = binding["key"]
 		shape = self.resolve(block, scope, key)
 		if shape is MISSING:
 			return
-		self.usage.add(block, binding, scope.key(key))
+		if is_rendered:
+			self.usage.add(block, binding, scope.key(key))
 		if isinstance(shape, list):
 			self.report(block, f"'{key}' is a list. Repeat it with a repeater, then bind its item's keys.")
 		elif isinstance(shape, dict):
@@ -177,9 +182,10 @@ def is_repeater(block: dict) -> bool:
 
 
 def get_bindings(block: dict) -> list[dict]:
-	"""The bindings Builder renders on the block. A repeater shows no text of its own, and a block that
-	does not repeat can also hold the older single `dataKey` binding."""
-	bindings = get_dynamic_values(block)
+	"""The bindings Builder renders on the block, the one that wins first: a later entry beats an earlier one
+	of the same property. A repeater shows no text of its own, and a block that does not repeat can also
+	hold the older single `dataKey` binding, which every other binding beats."""
+	bindings = get_dynamic_values(block)[::-1]
 	if block.get("isRepeaterBlock"):
 		return [binding for binding in bindings if binding.get("type") != "key"]
 	data_key = block.get("dataKey") or {}
@@ -237,15 +243,16 @@ def merge_instance(definition: dict, instance: dict) -> dict:
 
 
 def merge_children(definition: dict, instance: dict) -> list[dict]:
-	own = [child for child in definition.get("children") or [] if isinstance(child, dict)]
-	placed = [child for child in instance.get("children") or [] if isinstance(child, dict)]
-	if not placed:
-		# the editor fills in an instance's children when it next opens the page
-		return own
-	by_id = {child.get("blockId"): child for child in own}
+	"""The instance's children, each merged with the component block it points at. Builder renders only
+	these: an instance with no children publishes empty."""
+	own = {
+		child.get("blockId"): child for child in definition.get("children") or [] if isinstance(child, dict)
+	}
 	merged = []
-	for child in placed:
-		match = by_id.get(child.get("blockId")) or by_id.get(child.get("referenceBlockId"))
+	for child in instance.get("children") or []:
+		if not isinstance(child, dict):
+			continue
+		match = own.get(child.get("blockId")) or own.get(child.get("referenceBlockId"))
 		merged.append(merge_instance(match, child) if match else child)
 	return merged
 
