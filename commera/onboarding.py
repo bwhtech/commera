@@ -352,7 +352,9 @@ def run_store_setup(setup_args: dict):
 		set_setup_stage("company")
 		run_frappe_setup(setup_args)
 		set_setup_stage("storefront")
-		seed_commera_settings(setup_args["company_name"])
+		company = setup_args["company_name"]
+		sale_price_list = get_or_create_selling_price_list(f"{company} Sale", setup_args["currency"])
+		seed_commera_settings(company, sale_price_list=sale_price_list)
 		set_setup_stage("payments")
 		# The COD Mode of Payment was made before the company had a cash account to link.
 		create_payment_modes()
