@@ -38,7 +38,7 @@ class RequiredParts:
 
 	def check_shared_parts(self) -> None:
 		self.need(
-			self.usage.binds("href", "commera.shop.cart_url"),
+			"commera.shop.cart_url" in self.usage.links,
 			"No link to the cart. Bind a link's href to commera.shop.cart_url, in the header.",
 		)
 		self.need(
@@ -51,7 +51,7 @@ class RequiredParts:
 		for name in CARD_LISTS:
 			path = f"{ROOT_KEY}.{name}"
 			self.need(
-				path not in self.usage.repeated or self.usage.binds("href", f"{path}.url"),
+				path not in self.usage.repeated or f"{path}.url" in self.usage.links,
 				f"The cards of '{path}' do not link to their product. Bind a link's href to the item's url.",
 			)
 
@@ -70,8 +70,7 @@ class RequiredParts:
 			"The listing shows no products. Repeat commera.products with one card as the item.",
 		)
 		self.need(
-			self.usage.binds("href", "commera.pagination.next_url")
-			or self.usage.binds("href", "commera.pagination.pages.url"),
+			bool({"commera.pagination.next_url", "commera.pagination.pages.url"} & self.usage.links),
 			"No pagination links, so shoppers cannot go past the first page. Bind links' href to "
 			"commera.pagination.previous_url and next_url, or repeat commera.pagination.pages with a link "
 			"bound to the item's url.",

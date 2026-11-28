@@ -300,6 +300,21 @@ class TestThemePageChecks(ProductDetailPriceTestCase):
 		page["children"][-1] = block("div", number, repeat="commera.pagination.pages")
 		self.assertEqual(check_page(PRODUCT_LISTING, page), [])
 
+	def test_a_link_is_an_anchor_with_a_bound_href(self):
+		products = block("div", card(), repeat="commera.featured_products")
+		not_an_anchor = block("div", bind={"href": "commera.shop.cart_url"})
+		self.assert_one_problem(
+			check_page(HOME, block("div", not_an_anchor, products)), "No link to the cart"
+		)
+		styled = block("a")
+		styled["dynamicValues"] = [{"key": "commera.shop.cart_url", "property": "href", "type": "style"}]
+		self.assert_one_problem(check_page(HOME, block("div", styled, products)), "No link to the cart")
+
+	def test_a_repeaters_own_text_binding_is_not_rendered_so_not_checked(self):
+		products = block("div", card(), repeat="commera.featured_products")
+		products["dynamicValues"] = [{"key": "commera.shop.nmae", "property": "innerHTML", "type": "key"}]
+		self.assertEqual(check_page(HOME, block("div", header(), products)), [])
+
 	def test_custom_attributes_count(self):
 		page = product_page()
 		for child in page["children"]:
@@ -434,3 +449,26 @@ class TestBobChecksThemePages(ProductDetailPriceTestCase):
 		for page in (self.pages[PRODUCT_LISTING], other.name):
 			reply = self.check(HOME, block("div"), page=page)
 			self.assertEqual(reply, f"FAILED: you cannot read page {page}.")
+
+	def test_an_instance_pinned_to_a_version_is_checked_as_that_version(self):
+		wrong = block("div", header(), block("p", bind={"innerHTML": "commera.shop.nmae"}))
+		component = self.make_component("Checked Pinned Header", wrong)
+		right = block("div", header(), block("p", bind={"innerHTML": "commera.shop.name"}))
+		version = frappe.get_doc(
+			{
+				"doctype": "Builder Snapshot",
+				"reference_doctype": "Builder Component",
+				"reference_name": component,
+				"snapshot_type": "Component Version",
+				"data": frappe.as_json({"block": frappe.as_json(right)}),
+			}
+		).insert()
+		page = product_page()
+		page["children"][0] = block("div", component=component)
+		self.assertIn("'commera.shop.nmae'", self.check(PRODUCT_DETAIL, page))
+		page["children"][0]["componentVersion"] = version.name
+		self.assertEqual(
+			self.check(PRODUCT_DETAIL, page), "OK: the Product Detail page passes Commera's checks."
+		)
+		page["children"][0]["componentVersion"] = "a version that is gone"
+		self.assertIn("'commera.shop.nmae'", self.check(PRODUCT_DETAIL, page))

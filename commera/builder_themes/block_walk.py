@@ -9,6 +9,8 @@ import frappe
 from commera.builder_themes.schema import MISSING, ROOT_KEY, list_keys, resolve
 
 PAGE_DATA_SOURCE = "dataScript"
+# Builder keeps a component's older versions here, and an instance can stay on one.
+VERSION_DOCTYPE = "Builder Snapshot"
 
 
 @dataclass
@@ -36,17 +38,27 @@ class Scope:
 class Usage:
 	"""What the page binds, gathered on the walk for the required-part checks."""
 
+	# keys shown as text or set on an attribute
 	keys: set = field(default_factory=set)
 	repeated: set = field(default_factory=set)
 	attributes: set = field(default_factory=set)
-	by_property: dict = field(default_factory=dict)
+	by_attribute: dict = field(default_factory=dict)
+	# keys a link goes to
+	links: set = field(default_factory=set)
 
-	def add(self, prop: str, key: str) -> None:
+	def add(self, block: dict, binding: dict, key: str) -> None:
+		"""Count a binding as Builder renders it: text, or an attribute. A style binding shows nothing."""
+		kind, prop = binding.get("type"), binding.get("property")
+		if kind not in ("key", "attribute"):
+			return
 		self.keys.add(key)
-		self.by_property.setdefault(prop, set()).add(key)
+		if kind == "attribute":
+			self.by_attribute.setdefault(prop, set()).add(key)
+			if prop == "href" and block.get("element") == "a":
+				self.links.add(key)
 
-	def binds(self, prop: str, key: str) -> bool:
-		return key in self.by_property.get(prop, ())
+	def binds(self, attribute: str, key: str) -> bool:
+		return key in self.by_attribute.get(attribute, ())
 
 
 class BlockWalk:
@@ -61,7 +73,8 @@ class BlockWalk:
 
 	def visit(self, block: dict, scope: Scope | None) -> None:
 		component = block.get("extendedFromComponent")
-		definition = None if component in self.open_components else get_component_block(component)
+		is_open = component in self.open_components
+		definition = None if is_open else get_component_block(component, block.get("componentVersion"))
 		if not definition:
 			self.visit_block(block, scope)
 			return
@@ -81,23 +94,21 @@ class BlockWalk:
 
 	def check_bindings(self, block: dict, scope: Scope | None) -> None:
 		for binding in get_bindings(block):
-			prop = binding.get("property") or ""
 			if binding.get("type") == "attribute":
-				self.usage.attributes.add(prop)
+				self.usage.attributes.add(binding.get("property"))
 			if is_page_data(binding):
-				self.check_key(block, scope, binding["key"], prop)
+				self.check_key(block, scope, binding)
 		self.usage.attributes.update(block.get("attributes") or {}, block.get("customAttributes") or {})
 		visible = get_visibility(block)
 		if visible and is_page_data(visible):
-			self.check_key(block, scope, visible["key"], "visible")
+			self.resolve(block, scope, visible["key"])
 
-	def check_key(self, block: dict, scope: Scope | None, key: str, prop: str) -> None:
+	def check_key(self, block: dict, scope: Scope | None, binding: dict) -> None:
+		key = binding["key"]
 		shape = self.resolve(block, scope, key)
 		if shape is MISSING:
 			return
-		self.usage.add(prop, scope.key(key))
-		if prop == "visible":
-			return
+		self.usage.add(block, binding, scope.key(key))
 		if isinstance(shape, list):
 			self.report(block, f"'{key}' is a list. Repeat it with a repeater, then bind its item's keys.")
 		elif isinstance(shape, dict):
@@ -166,12 +177,13 @@ def is_repeater(block: dict) -> bool:
 
 
 def get_bindings(block: dict) -> list[dict]:
-	"""Every binding of the block. On a block that does not repeat, Builder also reads the older `dataKey` one."""
+	"""The bindings Builder renders on the block. A repeater shows no text of its own, and a block that
+	does not repeat can also hold the older single `dataKey` binding."""
 	bindings = get_dynamic_values(block)
+	if block.get("isRepeaterBlock"):
+		return [binding for binding in bindings if binding.get("type") != "key"]
 	data_key = block.get("dataKey") or {}
-	if data_key.get("key") and not block.get("isRepeaterBlock"):
-		bindings.append(data_key)
-	return bindings
+	return [*bindings, data_key] if data_key.get("key") else bindings
 
 
 def get_dynamic_values(block: dict) -> list[dict]:
@@ -212,6 +224,7 @@ def merge_instance(definition: dict, instance: dict) -> dict:
 	merged["dynamicValues"] = overrides + [
 		binding for binding in get_dynamic_values(definition) if binding.get("property") not in overridden
 	]
+	merged["element"] = instance.get("element") or definition.get("element")
 	merged["visibilityCondition"] = instance.get("visibilityCondition") or definition.get(
 		"visibilityCondition"
 	)
@@ -237,10 +250,21 @@ def merge_children(definition: dict, instance: dict) -> list[dict]:
 	return merged
 
 
-def get_component_block(component: str | None) -> dict | None:
-	raw = component and frappe.db.get_value("Builder Component", component, "block")
+def get_component_block(component: str | None, version: str | None = None) -> dict | None:
+	"""The component's block: the version the instance is pinned to, or the latest when that one is gone."""
+	if not component:
+		return None
+	raw = get_pinned_block(component, version) or frappe.db.get_value("Builder Component", component, "block")
 	try:
 		block = json.loads(raw) if raw else None
 	except json.JSONDecodeError:
 		return None
 	return block if isinstance(block, dict) else None
+
+
+def get_pinned_block(component: str, version: str | None) -> str | None:
+	if not (version and frappe.db.table_exists(VERSION_DOCTYPE)):
+		return None
+	filters = {"name": version, "reference_doctype": "Builder Component", "reference_name": component}
+	data = frappe.db.get_value(VERSION_DOCTYPE, {**filters, "snapshot_type": "Component Version"}, "data")
+	return (frappe.parse_json(data) or {}).get("block") if data else None
