@@ -94,6 +94,7 @@ LIST_FIELDS = (
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_discounts(
 	tab: str = "all", search: str | None = None, start: int = 0, page_length: int = PAGE_LENGTH
 ):
@@ -194,6 +195,7 @@ def get_code_summaries(discounts: list[str]) -> dict[str, dict]:
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_discount(name: str) -> dict:
 	frappe.has_permission(DOCTYPE, ptype="read", throw=True)
 	discount = frappe.get_doc(DOCTYPE, name)
