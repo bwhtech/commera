@@ -53,7 +53,8 @@ Never point the suite at `commera-demo.localhost`. Journeys change gateway and s
 ## Seed
 
 `seed()` runs `commera.install.before_tests`, then the Summer demo without its analytics step.
-Then it adds an outgoing Email Account with no real SMTP (emails only queue), turns on guest
+Then it adds an outgoing Email Account with no real SMTP and sets `mute_emails`, so emails only
+queue: a sign-in code is sent at once and would fail against that server. It turns on guest
 checkout and COD, marks onboarding as done, and creates the merchant user. Each helper in
 `commera/tests/e2e_support.py` refuses to run unless `allow_tests` is set in the site config.
 

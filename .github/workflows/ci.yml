@@ -129,7 +129,8 @@ jobs:
         run: |
           echo "127.0.0.1 test_site" | sudo tee -a /etc/hosts
           nohup bench serve --port 8000 > web.log 2>&1 &
-          nohup bench worker > worker.log 2>&1 &
+          nohup env -u CI bench worker --queue short,default > worker.log 2>&1 &
+          nohup env -u CI bench worker --queue long > worker-long.log 2>&1 &
           nohup node apps/frappe/socketio.js > socketio.log 2>&1 &
           for attempt in $(seq 1 60); do
             curl -sf http://test_site:8000/api/method/frappe.ping && exit 0
@@ -165,5 +166,5 @@ jobs:
         if: failure()
         working-directory: /home/runner/frappe-bench
         run: |
-          cat web.log worker.log socketio.log || true
+          cat web.log worker.log worker-long.log socketio.log fresh_site.log || true
           cat logs/*.log || true

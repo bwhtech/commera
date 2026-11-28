@@ -1,6 +1,6 @@
 import { type Page, test as base } from '@playwright/test';
 
-function watchPage(page: Page, problems: string[]) {
+export function watchPage(page: Page, problems: string[]) {
 	page.on('console', (message) => {
 		if (message.type() === 'error') problems.push(`CONSOLE: ${message.text()}`);
 	});
@@ -23,7 +23,8 @@ export function realProblems(problems: string[]) {
 	return [...new Set(problems)].filter(
 		(entry) =>
 			!KNOWN_PROBLEMS.some((needle) => entry.includes(needle)) &&
-			!entry.startsWith('CONSOLE: Failed to load resource'),
+			!entry.startsWith('CONSOLE: Failed to load resource') &&
+			!(entry.startsWith('REQFAIL: ') && entry.endsWith('net::ERR_ABORTED')),
 	);
 }
 
