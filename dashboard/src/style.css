@@ -245,3 +245,23 @@ h2[tabindex='-1']:focus {
 [data-theme='dark'] {
   --focus-outline-default: 3px solid var(--outline-gray-5);
 }
+
+/* frappe-ui's MultiSelect list takes at least its trigger's width and grows with its longest value,
+   with no ceiling: a 70-character color opened it 503px wide on a 390px phone, past the screen edge.
+   Capped to the room reka measures (with a 1rem margin each side as the floor), a long value wraps
+   inside its row instead, so the whole name stays readable. */
+[role='listbox'][data-slot='content'] {
+  max-width: min(var(--reka-combobox-content-available-width, 100vw), calc(100vw - 2rem));
+}
+
+/* On a phone the field already spans the form, so the list matches it and lines up under it. */
+@media (max-width: 639px) {
+  [role='listbox'][data-slot='content'] {
+    max-width: var(--reka-combobox-trigger-width);
+  }
+}
+
+[role='listbox'][data-slot='content'] [data-slot='item'] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
