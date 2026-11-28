@@ -62,7 +62,7 @@ function finish(path) {
       <div class="rounded-5 border border-outline-gray-1 p-5">
         <div class="flex items-center gap-3">
           <Spinner class="size-4" />
-          <span class="text-base text-ink-gray-8">
+          <span class="text-base tabular-nums text-ink-gray-8">
             {{ status?.total ? __('{0} of {1} items done', [status.done, status.total]) : __('Starting the import…') }}
           </span>
         </div>
@@ -80,7 +80,8 @@ function finish(path) {
 
     <template v-else-if="imp.phase === 'failed'">
       <ImportResult
-        failed
+        :failed="!imp.erpnext.otherImportRunning"
+        :waiting="imp.erpnext.otherImportRunning"
         :title="imp.erpnext.otherImportRunning ? __('These items were not imported') : __('The import could not finish')"
         :body="imp.erpnext.error || __('It stopped before the end. The products it already made are kept, so running it again picks up the rest.')"
       >

@@ -11,12 +11,15 @@ const props = defineProps({
   // The run itself was refused or stopped. Both import sources end on this one card either way, so a
   // failure has the same layout, margins and button order (Close, then the way back) as a success.
   failed: { type: Boolean, default: false },
+  // Refused only because another import is still running: nothing went wrong, it has to wait.
+  waiting: { type: Boolean, default: false },
   title: { type: String, required: true },
   body: { type: String, default: '' },
 })
 
 // Green only when something went live: a Publish all that published nothing is not a success.
 const tone = computed(() => {
+  if (props.waiting) return { icon: 'lucide-clock', surface: 'bg-surface-amber-2 text-ink-amber-7' }
   if (props.failed) return { icon: 'lucide-triangle-alert', surface: 'bg-surface-red-2 text-ink-red-7' }
   if (props.published === 0) return { icon: 'lucide-triangle-alert', surface: 'bg-surface-amber-2 text-ink-amber-7' }
   if (props.published != null) return { icon: 'lucide-circle-check', surface: 'bg-surface-green-2 text-ink-green-7' }
@@ -29,7 +32,8 @@ const tone = computed(() => {
     <div class="mx-auto flex size-12 items-center justify-center rounded-full" :class="tone.surface">
       <span :class="[tone.icon, 'size-6']" aria-hidden="true" />
     </div>
-    <h2 class="mt-4 text-xl-semibold text-ink-gray-9">{{ title }}</h2>
+    <!-- text-balance: centred on a phone, "4 products added, not published yet" left "yet" alone. -->
+    <h2 class="mt-4 text-balance text-xl-semibold text-ink-gray-9">{{ title }}</h2>
     <!-- text-pretty: centred, a one-word last line ("page.") reads as a stray. -->
     <p v-if="body" class="mx-auto mt-1.5 max-w-md text-pretty text-p-base text-ink-gray-6">{{ body }}</p>
     <slot name="details" />

@@ -26,14 +26,18 @@ const currencySymbol = symbolFor()
 const revealed = ref(false)
 const showOriginalPrice = computed(() => revealed.value || hasPrice(originalPrice.value))
 
-function removeOriginalPrice() {
+// Adding and removing swap the field and the "+ Add original price" button, and the control that
+// had focus unmounts with the swap: focus would fall to the dialog and the next Tab would start
+// again at the top of the form. Each side hands focus to what replaced it.
+const originalPriceField = ref(null)
+const addButton = ref(null)
+
+async function removeOriginalPrice() {
   originalPrice.value = null
   revealed.value = false
+  await nextTick()
+  addButton.value?.$el?.focus()
 }
-
-// The add button unmounts as the field appears, so focus would fall to the dialog and the next Tab
-// would start again at the top of the form. The new field takes it, ready to type in.
-const originalPriceField = ref(null)
 
 async function addOriginalPrice() {
   revealed.value = true
@@ -93,6 +97,7 @@ async function addOriginalPrice() {
     <!-- -ms-2 lines the ghost button's text up with the field labels: its own px-2 would indent it. -->
     <Button
       v-if="!showOriginalPrice"
+      ref="addButton"
       class="mt-1.5 -ms-2"
       variant="ghost"
       icon-left="lucide-plus"
