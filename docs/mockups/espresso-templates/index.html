@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Commera templates, batch A</title>
+<style>
+	body { font-family: system-ui, sans-serif; margin: 24px; background: #f3f3f3; color: #0f0f0f; }
+	h1 { font-size: 22px; margin: 0 0 4px; }
+	h2 { font-size: 17px; margin: 40px 0 4px; }
+	p { margin: 0 0 12px; color: #525252; font-size: 14px; }
+	.row { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+	figure { margin: 0; background: #fff; padding: 12px; border-radius: 8px; }
+	figcaption { font-size: 13px; margin-top: 8px; color: #525252; }
+	a { color: #0f0f0f; }
+	.desktop { width: 480px; display: block; }
+	.mobile { width: 260px; display: block; }
+	.pdf { width: 480px; display: block; }
+</style>
+</head>
+<body>
+<h1>Commera templates, batch A</h1>
+<p>Espresso theme. Sample order SO-26-00482 for Aisha Rahman at Verano Studio. Rebuild with <code>./render.sh</code>.</p>
+
+<h2>E1 Order confirmation, Classic</h2>
+<div class="row">
+	<figure><img class="desktop" src="out/emails/order-confirmation-classic-desktop.png" alt=""><figcaption>Desktop 720px. <a href="out/emails/order-confirmation-classic.html">Open email HTML</a></figcaption></figure>
+	<figure><img class="mobile" src="out/emails/order-confirmation-classic-mobile.png" alt=""><figcaption>Mobile 390px</figcaption></figure>
+</div>
+
+<h2>E1 Order confirmation, Lookbook</h2>
+<div class="row">
+	<figure><img class="desktop" src="out/emails/order-confirmation-lookbook-desktop.png" alt=""><figcaption>Desktop 720px. <a href="out/emails/order-confirmation-lookbook.html">Open email HTML</a></figcaption></figure>
+	<figure><img class="mobile" src="out/emails/order-confirmation-lookbook-mobile.png" alt=""><figcaption>Mobile 390px</figcaption></figure>
+</div>
+
+<h2>E2 Order cancelled, Classic</h2>
+<div class="row">
+	<figure><img class="desktop" src="out/emails/order-cancelled-classic-desktop.png" alt=""><figcaption>Desktop 720px. <a href="out/emails/order-cancelled-classic.html">Open email HTML</a></figcaption></figure>
+	<figure><img class="mobile" src="out/emails/order-cancelled-classic-mobile.png" alt=""><figcaption>Mobile 390px</figcaption></figure>
+</div>
+
+<h2>E3 Back in stock</h2>
+<div class="row">
+	<figure><img class="desktop" src="out/emails/back-in-stock-desktop.png" alt=""><figcaption>Desktop 720px. <a href="out/emails/back-in-stock.html">Open email HTML</a></figcaption></figure>
+	<figure><img class="mobile" src="out/emails/back-in-stock-mobile.png" alt=""><figcaption>Mobile 390px</figcaption></figure>
+</div>
+
+<h2>E4 Your order link</h2>
+<div class="row">
+	<figure><img class="desktop" src="out/emails/order-link-desktop.png" alt=""><figcaption>Desktop 720px. <a href="out/emails/order-link.html">Open email HTML</a></figcaption></figure>
+	<figure><img class="mobile" src="out/emails/order-link-mobile.png" alt=""><figcaption>Mobile 390px</figcaption></figure>
+</div>
+
+<h2>E5 Sign-in code</h2>
+<div class="row">
+	<figure><img class="desktop" src="out/emails/sign-in-code-desktop.png" alt=""><figcaption>Desktop 720px. <a href="out/emails/sign-in-code.html">Open email HTML</a></figcaption></figure>
+	<figure><img class="mobile" src="out/emails/sign-in-code-mobile.png" alt=""><figcaption>Mobile 390px</figcaption></figure>
+</div>
+
+<h2>P1 Order confirmation PDF, Classic</h2>
+<div class="row">
+	<figure><img class="pdf" src="out/pdfs/order-confirmation-page1.png" alt=""><figcaption>A4, 1 page. <a href="out/pdfs/order-confirmation.pdf">Open PDF</a></figcaption></figure>
+</div>
+
+<h2>Checks</h2>
+<p>Hide empty sections: no notes, billing same as shipping, no customer GSTIN. Merchant text: a changed heading, intro, button and closing.</p>
+<div class="row">
+	<figure><img class="desktop" src="out/emails/order-confirmation-classic-minimal-desktop.png" alt=""><figcaption>E1 Classic, minimal order. <a href="out/emails/order-confirmation-classic-minimal.html">Open email HTML</a></figcaption></figure>
+	<figure><img class="pdf" src="out/pdfs/order-confirmation-minimal-page1.png" alt=""><figcaption>P1, minimal order. <a href="out/pdfs/order-confirmation-minimal.pdf">Open PDF</a></figcaption></figure>
+	<figure><img class="desktop" src="out/emails/order-confirmation-classic-merchant-text-desktop.png" alt=""><figcaption>E1 Classic, merchant text. <a href="out/emails/order-confirmation-classic-merchant-text.html">Open email HTML</a></figcaption></figure>
+</div>
+</body>
+</html>
