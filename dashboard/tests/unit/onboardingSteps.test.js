@@ -70,24 +70,25 @@ test('the store step asks for a company or price list only when it shows that pi
 })
 
 test('a reload resumes at the saved step, unless the store setup never started', () => {
-  assert.equal(resumeStep('store', 'idle'), STEP_INDEX.store)
+  assert.equal(resumeStep('store', 'running'), STEP_INDEX.store)
+  assert.equal(resumeStep('store', 'failed'), STEP_INDEX.store)
   assert.equal(resumeStep('done', 'running'), STEP_INDEX.done)
-  assert.equal(resumeStep('done', 'idle'), STEP_INDEX.store)
-  assert.equal(resumeStep(null, 'idle'), 0)
+  assert.equal(resumeStep('done', 'done'), STEP_INDEX.done)
+  for (const saved of ['store', 'done', 'brand', '1', '5', null]) assert.equal(resumeStep(saved, 'idle'), STEP_INDEX.you)
   assert.equal(resumeStep('gone', 'done'), 0)
   assert.equal(clampStep(Number.NaN), 0)
 })
 
 test('a retired step resumes at the store, or at done once the setup finished', () => {
   for (const key of ['brand', 'theme', 'selling', 'products']) {
-    for (const status of ['idle', 'running', 'failed']) assert.equal(resumeStep(key, status), STEP_INDEX.store)
+    for (const status of ['running', 'failed']) assert.equal(resumeStep(key, status), STEP_INDEX.store)
     assert.equal(resumeStep(key, 'done'), STEP_INDEX.done)
   }
 })
 
 test('a step saved as an index by an older build resumes at a step that still exists', () => {
-  assert.equal(resumeStep('0', 'idle'), STEP_INDEX.you)
-  assert.equal(resumeStep('1', 'idle'), STEP_INDEX.store)
+  assert.equal(resumeStep('0', 'running'), STEP_INDEX.you)
+  assert.equal(resumeStep('1', 'running'), STEP_INDEX.store)
   for (const index of ['2', '3', '4', '5']) {
     assert.equal(resumeStep(index, 'running'), STEP_INDEX.store)
     assert.equal(resumeStep(index, 'done'), STEP_INDEX.done)
