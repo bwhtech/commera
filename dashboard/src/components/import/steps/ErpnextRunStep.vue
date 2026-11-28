@@ -28,7 +28,7 @@ const published = computed(() => imp.erpnext.published?.published ?? null)
 const doneBody = computed(() => {
   if (published.value != null) return publishedBody(published.value, notPublished.value.length)
   if (!created.value) return __('Fix the items below in ERPNext, then import them again.')
-  return __('Drafts are not on your store yet. Publish them now, or later from each product page.')
+  return __('These products are not published yet. Publish them now, or later from each product page.')
 })
 
 const router = useRouter()
@@ -67,7 +67,7 @@ function finish(path) {
         :description="__('This is taking longer than usual. It may still be running.')"
         :primary-action="{ label: __('Check again'), onClick: resumeErpnextPolling }"
       />
-      <Alert v-else :description="__('Every item lands as a draft product. Nothing goes live until you publish.')" />
+      <Alert v-else :description="__('Every item comes in as not published. Nothing goes live until you publish.')" />
     </template>
 
     <template v-else-if="imp.phase === 'failed'">

@@ -15,7 +15,7 @@ const url = computed(() => storefrontUrl(props.product))
 const hint = computed(() => {
   if (props.product.status === 'archived') return __('Archived. Shoppers cannot see this product.')
   if (props.isLive) return __('Live. Shoppers can find and buy this product.')
-  return __('Draft. Shoppers cannot see this product until you publish it.')
+  return __('Not published. Shoppers cannot see this product until you publish it.')
 })
 </script>
 

@@ -56,7 +56,7 @@ const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'er
     <div>
       <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Check before importing') }}</h2>
       <p class="mt-1.5 text-p-base text-ink-gray-6">
-        {{ __('Nothing is saved yet. Every product is added as a draft, so nothing is on your store until you publish it. Rows with an error are skipped.') }}
+        {{ __('Nothing is saved yet. Every product is added as not published, so nothing is on your store until you publish it. Rows with an error are skipped.') }}
       </p>
     </div>
 

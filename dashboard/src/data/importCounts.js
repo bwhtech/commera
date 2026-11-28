@@ -37,7 +37,7 @@ export function doneTitle(created, published) {
   if (published === 0) return __('No products were published')
   if (published != null) return published === 1 ? __('1 product is live') : __('{0} products are live', [published])
   if (!created) return __('No products were added')
-  return created === 1 ? __('1 product added as a draft') : __('{0} products added as drafts', [created])
+  return created === 1 ? __('1 product added, not published yet') : __('{0} products added, not published yet', [created])
 }
 
 // The line under the result title once Publish all has run.

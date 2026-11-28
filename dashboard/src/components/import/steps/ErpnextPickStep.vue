@@ -90,7 +90,7 @@ const tabs = computed(() => [
     <div>
       <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Pick the items to bring in') }}</h2>
       <p class="mt-1.5 text-p-base text-ink-gray-6">
-        {{ __('Each one becomes a draft product. Prices and stock keep coming from ERPNext, and nothing in ERPNext changes.') }}
+        {{ __('Each one becomes a product that is not published yet. Prices and stock keep coming from ERPNext, and nothing in ERPNext changes.') }}
       </p>
     </div>
 

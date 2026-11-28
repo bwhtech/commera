@@ -248,7 +248,7 @@ async function submit() {
     :primary-disabled="Boolean(missingReason)"
     :loading="createAction.loading"
     :reason="missingReason"
-    :note="__('Saved as a draft. You add photos next.')"
+    :note="__('Saved, but not published yet. You add photos next.')"
     :dismissible="!pickerOpen"
     @submit="submit"
   >

@@ -100,7 +100,7 @@ const consequenceHint = computed(() =>
     removedCount.value &&
       __('Unticked variants leave the store but are not deleted: past orders keep them, and ticking one again brings it back with its stock and price.'),
     addedCount.value &&
-      __('A new size takes the price of its {0}. A new {0} takes the product price and starts as a draft.', [
+      __('A new size takes the price of its {0}. A new {0} takes the product price and starts as not published.', [
         optionLabel.value.toLowerCase(),
       ]),
   ]

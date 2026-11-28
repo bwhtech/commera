@@ -35,7 +35,7 @@ import { __ } from '../data/translation'
 const STATUS_TABS = [
   { label: __('All'), value: 'all' },
   { label: __('Live'), value: 'published' },
-  { label: __('Draft'), value: 'unpublished' },
+  { label: __('Not published'), value: 'unpublished' },
 ]
 
 const status = ref('all')
@@ -191,7 +191,7 @@ const skeletonColumns = computed(() => (isMobile.value ? 2 : 5))
 
 function productStatus(product) {
   if (product.disabled) return { status: 'archived' }
-  return product.published_count ? { status: 'published', label: __('Live') } : { status: 'draft', label: __('Draft') }
+  return product.published_count ? { status: 'published', label: __('Live') } : { status: 'draft', label: __('Not published') }
 }
 
 // The item code is shown only when it says something the title does not: a dashboard product is

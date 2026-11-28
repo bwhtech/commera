@@ -201,7 +201,7 @@ async function togglePublish() {
     const reasons = [...new Set(result.skipped.flatMap((skipped) => skipped.blockers))].join('. ')
     toast.warning(__('Live, except {0}. {1}.', [options, reasons]))
   } else {
-    toast.success(publish ? __('Live on your store') : __('Back to draft. Shoppers cannot see it.'))
+    toast.success(publish ? __('Live on your store') : __('Not published. Shoppers cannot see it.'))
   }
 }
 
@@ -233,7 +233,7 @@ const hasRail = useMediaQuery('(min-width: 1024px)')
 
 const moreActions = computed(() => [...asDropdownOptions(actions.value.groups), actionGroup.value].filter(Boolean))
 
-const statusLabels = { draft: __('Draft'), live: __('Live'), archived: __('Archived') }
+const statusLabels = { draft: __('Not published'), live: __('Live'), archived: __('Archived') }
 // format.js themes `published` green; Live is that state under its seller-facing name.
 const statusKeys = { draft: 'draft', live: 'published', archived: 'archived' }
 

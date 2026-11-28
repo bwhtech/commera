@@ -179,7 +179,7 @@ async function togglePublish(variant) {
   if (!toggled) return
   toast.success(
     variant.is_published
-      ? __('{0} is now a draft', [colorLabel(variant)])
+      ? __('{0} is no longer published', [colorLabel(variant)])
       : __('{0} is live', [colorLabel(variant)]),
   )
   emit('saved')
@@ -231,8 +231,8 @@ function rowActions(variant) {
 // Phones get three tracks (name, status, menu) and read price and stock off the name's second
 // line; from sm up those two get their own columns. The cells for them carry max-sm:hidden to match.
 const columns = {
-  base: ['minmax(0,1fr)', '3.5rem', '2rem'],
-  sm: ['minmax(0,1fr)', '7.5rem', '5.5rem', '5.5rem', '2rem'],
+  base: ['minmax(0,1fr)', 'auto', '2rem'],
+  sm: ['minmax(0,1fr)', '7.5rem', '5.5rem', '7rem', '2rem'],
 }
 // Sizes alone have no status of their own: the product's status in the page header is theirs.
 const sizeColumns = {
@@ -434,11 +434,11 @@ const sizeColumns = {
               <ListCell>
                 <Badge v-if="item.is_published" :label="__('Live')" theme="green" variant="subtle" />
                 <Tooltip v-else-if="item.blockers?.length" :text="item.blockers.join(', ')">
-                  <Badge :label="__('Draft')" theme="gray" variant="subtle">
+                  <Badge :label="__('Not published')" theme="gray" variant="subtle">
                     <template #suffix><span class="lucide-info size-3" aria-hidden="true" /></template>
                   </Badge>
                 </Tooltip>
-                <Badge v-else :label="__('Draft')" theme="gray" variant="subtle" />
+                <Badge v-else :label="__('Not published')" theme="gray" variant="subtle" />
               </ListCell>
               <ListCell class="justify-end">
                 <Dropdown :options="rowActions(item)" @click.stop>

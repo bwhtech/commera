@@ -72,7 +72,7 @@ const notPublished = computed(() => imp.published?.not_published ?? [])
 const doneBody = computed(() => {
   if (published.value != null) return publishedBody(published.value, notPublished.value.length)
   if (!imp.created.length) return __('Fix the rows below in your file, then import it again.')
-  return __('Drafts are not on your store yet. Publish them now, or later from each product page.')
+  return __('These products are not published yet. Publish them now, or later from each product page.')
 })
 </script>
 
@@ -87,7 +87,7 @@ const doneBody = computed(() => {
       <div class="flex items-center gap-3 rounded-5 border border-outline-gray-1 p-5">
         <Spinner class="size-4" />
         <span class="text-base text-ink-gray-8">
-          {{ imp.counts.products === 1 ? __('Adding 1 product as a draft…') : __('Adding {0} products as drafts…', [imp.counts.products]) }}
+          {{ imp.counts.products === 1 ? __('Adding 1 product…') : __('Adding {0} products…', [imp.counts.products]) }}
         </span>
       </div>
 

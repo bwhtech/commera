@@ -2432,7 +2432,7 @@ Import {0} items,استيراد {0} عناصر
 Items ({0}),العناصر ({0})
 Skipped ({0}),المتخطاة ({0})
 Pick the items to bring in,اختر العناصر التي تريد نقلها
-"Each one becomes a draft product. Prices and stock keep coming from ERPNext, and nothing in ERPNext changes.",يصبح كل عنصر منتجًا في المسودة. تبقى الأسعار والمخزون تأتي من ERPNext، ولا يتغير شيء في ERPNext.
+"Each one becomes a product that is not published yet. Prices and stock keep coming from ERPNext, and nothing in ERPNext changes.",يصبح كل عنصر منتجًا غير منشور بعد. تبقى الأسعار والمخزون تأتي من ERPNext، ولا يتغير شيء في ERPNext.
 {0} of {1} selected,تم تحديد {0} من {1}
 Clear selection,مسح التحديد
 No items to import,لا توجد عناصر للاستيراد
@@ -2449,7 +2449,7 @@ You can close this window. The import keeps running.,يمكنك إغلاق هذ�
 {0} of {1} items done,تم {0} من {1} عنصر
 Starting the import…,جارٍ بدء الاستيراد…
 This is taking longer than usual. It may still be running.,يستغرق هذا وقتًا أطول من المعتاد. قد يكون لا يزال قيد التشغيل.
-Every item lands as a draft product. Nothing goes live until you publish.,يصل كل عنصر كمنتج في المسودة. لا يظهر شيء في المتجر حتى تنشره.
+Every item comes in as not published. Nothing goes live until you publish.,يصل كل عنصر غير منشور. لا يظهر شيء في المتجر حتى تنشره.
 The import could not finish,تعذّر إكمال الاستيراد
 "It stopped before the end. The products it already made are kept, so running it again picks up the rest.",توقف قبل النهاية. تُحفظ المنتجات التي أنشأها، لذا يكمل التشغيل مرة أخرى الباقي.
 Back to items,العودة إلى العناصر
@@ -2552,7 +2552,7 @@ Material,الخامة
 "{0}, one for each size",{0}، واحد لكل مقاس
 Enter a price above zero to continue.,أدخل سعرًا أكبر من صفر للمتابعة.
 A product with this title already exists.,يوجد منتج بهذا العنوان بالفعل.
-Saved as a draft. You add photos next.,يُحفظ كمسودة. تضيف الصور بعد ذلك.
+"Saved, but not published yet. You add photos next.",يُحفظ دون نشره بعد. تضيف الصور بعد ذلك.
 Original price,السعر الأصلي
 Shown crossed out next to the price. Must be higher than the price.,يظهر مشطوبًا بجانب السعر. يجب أن يكون أعلى من السعر.
 Add original price,إضافة السعر الأصلي
@@ -2574,10 +2574,10 @@ Added {0}.,تمت إضافة {0}.
 Added {0} across {1} sizes.,تمت إضافة {0} على {1} مقاسات.
 Adds to what you already have.,تُضاف إلى ما لديك بالفعل.
 Archived. Shoppers cannot see this product.,مؤرشف. لا يمكن للمتسوقين رؤية هذا المنتج.
-Back to draft. Shoppers cannot see it.,عاد إلى مسودة. لا يمكن للمتسوقين رؤيته.
+Not published. Shoppers cannot see it.,غير منشور. لا يمكن للمتسوقين رؤيته.
 Cost per item for {0},تكلفة القطعة لـ {0}
 Cost per item (optional),تكلفة القطعة (اختياري)
-Draft. Shoppers cannot see this product until you publish it.,مسودة. لا يمكن للمتسوقين رؤية هذا المنتج حتى تنشره.
+Not published. Shoppers cannot see this product until you publish it.,غير منشور. لا يمكن للمتسوقين رؤية هذا المنتج حتى تنشره.
 Each {0} has its own photos. The first one is the cover. Photos save as you add them.,لكل {0} صوره الخاصة. الصورة الأولى هي الغلاف. تُحفظ الصور فور إضافتها.
 Enter a price above zero.,أدخل سعرًا أكبر من صفر.
 Enter a quantity to add.,أدخل كمية لإضافتها.
@@ -2601,7 +2601,7 @@ To publish: {0},للنشر: {0}
 Needs stock,يحتاج إلى مخزون
 1 variant.,متغيّر واحد.
 1 will leave the store,سيغادر واحد المتجر
-A new size takes the price of its {0}. A new {0} takes the product price and starts as a draft.,يأخذ المقاس الجديد سعر {0} الخاص به. يأخذ {0} الجديد سعر المنتج ويبدأ كمسودة.
+A new size takes the price of its {0}. A new {0} takes the product price and starts as not published.,يأخذ المقاس الجديد سعر {0} الخاص به. يأخذ {0} الجديد سعر المنتج ويبدأ غير منشور.
 Add options,إضافة خيارات
 Add photos,إضافة صور
 Adding options replaces the current item,إضافة الخيارات تستبدل الصنف الحالي
@@ -2633,7 +2633,7 @@ The current item goes off sale and keeps its {0} in stock and its past orders. T
 Undo,تراجع
 "Unticked variants leave the store, they are not deleted",المتغيّرات غير المحددة تغادر المتجر ولا تُحذف
 {0} back in the store,{0} عاد إلى المتجر
-{0} is now a draft,{0} أصبح مسودة الآن
+{0} is no longer published,{0} لم يعد منشورًا
 {0} taken out of the store,{0} أُزيل من المتجر
 {0} variants.,{0} متغيّرات.
 {0} will leave the store,سيغادر {0} المتجر
@@ -2658,10 +2658,10 @@ Many products to go,ما زالت منتجات كثيرة
 {0} could not go live yet. Open them from your products to finish them.,تعذّر نشر {0} بعد. افتحها من منتجاتك لإكمالها.
 Customers can find them on your store now.,يمكن للعملاء العثور عليها في متجرك الآن.
 "Fix the rows below in your file, then import it again.",أصلح الصفوف أدناه في ملفك، ثم استورده مرة أخرى.
-"Drafts are not on your store yet. Publish them now, or later from each product page.",المسودات ليست في متجرك بعد. انشرها الآن، أو لاحقًا من صفحة كل منتج.
+"These products are not published yet. Publish them now, or later from each product page.",هذه المنتجات غير منشورة بعد. انشرها الآن، أو لاحقًا من صفحة كل منتج.
 Importing your products,جارٍ استيراد منتجاتك
-Adding 1 product as a draft…,جارٍ إضافة منتج واحد كمسودة…
-Adding {0} products as drafts…,جارٍ إضافة {0} منتجات كمسودات…
+Adding 1 product…,جارٍ إضافة منتج واحد…
+Adding {0} products…,جارٍ إضافة {0} منتجات…
 "This is taking longer than usual. It is still running: you can close this window, and the products appear in your catalog when it finishes.",يستغرق هذا وقتًا أطول من المعتاد. ما زال يعمل: يمكنك إغلاق هذه النافذة، وستظهر المنتجات في كتالوجك عند انتهائه.
 {0} added to them.,أُضيفت إليها {0}.
 View products,عرض المنتجات
@@ -2669,8 +2669,8 @@ View products,عرض المنتجات
 {0} rows were skipped,تم تخطي {0} صفوف
 Photos that did not attach,صور لم تُرفق
 Add them from each product page.,أضفها من صفحة كل منتج.
-1 product added as a draft,أُضيف منتج واحد كمسودة
-{0} products added as drafts,أُضيفت {0} منتجات كمسودات
+"1 product added, not published yet",أُضيف منتج واحد، ولم يُنشر بعد
+"{0} products added, not published yet",أُضيفت {0} منتجات، ولم تُنشر بعد
 "A CSV or Excel file with one row per product, or per color and size of it. Only a title and a price are needed, and the columns can have any names.",ملف CSV أو Excel فيه صف لكل منتج، أو لكل لون ومقاس منه. لا يلزم إلا العنوان والسعر، ويمكن أن تحمل الأعمدة أي أسماء.
 .csv or .xlsx,.csv أو ‎.xlsx
 1 row,صف واحد
@@ -2680,7 +2680,7 @@ Remove it and try another file.,أزله وجرّب ملفًا آخر.
 You can import again later from the other one.,يمكنك الاستيراد لاحقًا من المصدر الآخر.
 "Shopify, WooCommerce and more are coming soon.",Shopify وWooCommerce وغيرها قريبًا.
 Check before importing,راجع قبل الاستيراد
-"Nothing is saved yet. Every product is added as a draft, so nothing is on your store until you publish it. Rows with an error are skipped.",لم يُحفظ شيء بعد. يُضاف كل منتج كمسودة، فلا يظهر شيء في متجرك حتى تنشره. تُتخطى الصفوف التي فيها خطأ.
+"Nothing is saved yet. Every product is added as not published, so nothing is on your store until you publish it. Rows with an error are skipped.",لم يُحفظ شيء بعد. يُضاف كل منتج غير منشور، فلا يظهر شيء في متجرك حتى تنشره. تُتخطى الصفوف التي فيها خطأ.
 No rows here.,لا توجد صفوف هنا.
 We matched {0} of {1} columns for you. Columns set to Don't import are left out.,طابقنا لك {0} من {1} أعمدة. تُترك الأعمدة المضبوطة على «لا تستورد».
 Use our suggestions,استخدم اقتراحاتنا

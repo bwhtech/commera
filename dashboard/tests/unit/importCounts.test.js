@@ -37,8 +37,8 @@ test('the review summary names problems only when there are some', () => {
 })
 
 test('a finished import says drafts until they are published', () => {
-  assert.equal(doneTitle(1, null), '1 product added as a draft')
-  assert.equal(doneTitle(4, null), '4 products added as drafts')
+  assert.equal(doneTitle(1, null), '1 product added, not published yet')
+  assert.equal(doneTitle(4, null), '4 products added, not published yet')
   assert.equal(doneTitle(0, null), 'No products were added')
   assert.equal(doneTitle(4, 4), '4 products are live')
 })
