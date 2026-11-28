@@ -338,6 +338,15 @@ class TestThemePageChecks(ProductDetailPriceTestCase):
 		link["dynamicValues"].reverse()
 		self.assertEqual(messages(check_page(HOME, block("div", link, products))), [])
 
+	def test_a_binding_stays_the_fallback_of_a_key_that_may_be_empty(self):
+		products = block("div", card(), repeat="commera.featured_products")
+		link = block("a")
+		link["dynamicValues"] = [
+			{"key": key, "property": "href", "type": "attribute"}
+			for key in ("commera.shop.cart_url", "merchant_cart_url")
+		]
+		self.assertEqual(messages(check_page(HOME, block("div", link, products))), [])
+
 	def test_a_repeaters_own_text_binding_is_not_rendered_so_not_checked(self):
 		products = block("div", card(), repeat="commera.featured_products")
 		products["dynamicValues"] = [{"key": "commera.shop.nmae", "property": "innerHTML", "type": "key"}]

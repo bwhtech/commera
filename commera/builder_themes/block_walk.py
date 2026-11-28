@@ -93,31 +93,35 @@ class BlockWalk:
 			self.visit(child, scope)
 
 	def check_bindings(self, block: dict, scope: Scope | None) -> None:
-		rendered = set()
+		hidden = set()
 		for binding in get_bindings(block):
 			target = (binding.get("property"), binding.get("type"))
 			if binding.get("type") == "attribute":
 				self.usage.attributes.add(binding.get("property"))
-			if is_page_data(binding):
-				# a later binding of the same property wins, so an earlier one is only checked
-				self.check_key(block, scope, binding, is_rendered=target not in rendered)
-			rendered.add(target)
+			if is_page_data(binding) and self.check_key(
+				block, scope, binding, is_rendered=target not in hidden
+			):
+				# Builder falls back to an earlier binding of the property only while this one is empty.
+				# A Commera key is taken as set; a key Commera does not own may be empty, so it hides nothing.
+				hidden.add(target)
 		self.usage.attributes.update(block.get("attributes") or {}, block.get("customAttributes") or {})
 		visible = get_visibility(block)
 		if visible and is_page_data(visible):
 			self.resolve(block, scope, visible["key"])
 
-	def check_key(self, block: dict, scope: Scope | None, binding: dict, is_rendered: bool) -> None:
+	def check_key(self, block: dict, scope: Scope | None, binding: dict, is_rendered: bool) -> bool:
+		"""Check one binding, and count it when Builder renders it. True when the key is one of Commera's."""
 		key = binding["key"]
 		shape = self.resolve(block, scope, key)
 		if shape is MISSING:
-			return
+			return False
 		if is_rendered:
 			self.usage.add(block, binding, scope.key(key))
 		if isinstance(shape, list):
 			self.report(block, f"'{key}' is a list. Repeat it with a repeater, then bind its item's keys.")
 		elif isinstance(shape, dict):
 			self.report(block, f"'{key}' is a group of keys. Bind one of: {', '.join(list_keys(shape))}.")
+		return True
 
 	def get_item_scope(self, block: dict, scope: Scope | None) -> Scope | None:
 		"""The scope of a repeater's child: the item's keys, or None when Commera does not own the list."""
