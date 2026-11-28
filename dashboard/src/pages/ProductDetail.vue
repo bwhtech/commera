@@ -19,14 +19,7 @@ import PluginSlot from '../components/PluginSlot.vue'
 import { useAdminRead, useAdminAction, trySubmit } from '../data/api'
 import { errorMessage } from '../data/errors'
 import { priceRange } from '../data/format'
-import {
-  hasPrice,
-  originalPriceError,
-  priceInputRates,
-  priceInputs,
-  productOptions,
-  useProductStats,
-} from '../data/product'
+import { hasPrice, originalPriceError, priceInputRates, priceInputs, productOptions, useProductStats, titleLengthError } from '../data/product'
 import { changedFields, rebaseDraft, storedDraft } from '../data/productDraft'
 import { useRecordPlugins } from '../data/recordPlugins'
 import { __ } from '../data/translation'
@@ -126,7 +119,9 @@ watch(
 const changed = computed(() => (draft.value ? changedFields(draft.value, stored.value) : []))
 const isDirty = computed(() => changed.value.length > 0)
 
-const titleError = computed(() => (draft.value?.title.trim() ? '' : __('Enter a title.')))
+const titleError = computed(() =>
+  draft.value?.title.trim() ? titleLengthError(draft.value.title) : __('Enter a title.'),
+)
 const priceError = computed(() =>
   changed.value.includes('price') && !hasPrice(draft.value.price) ? __('Enter a price above zero.') : '',
 )

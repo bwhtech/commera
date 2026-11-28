@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { trySubmit, useAdminAction, useAdminRead } from './api'
 import { errorMessage } from './errors'
+import { __ } from './translation'
 import { beginPhase, endPhase, imp, isCurrentImport } from './importFlow'
 import { isRunSettled, itemCodesToImport, preselectedCodes } from './erpnextImportState'
 import { setupPollDelay } from '../ia/onboardingSteps'
@@ -102,7 +103,7 @@ export async function startErpnextImport() {
   const started = await trySubmit(startAction, itemCodes ? { item_codes: itemCodes } : {})
   if (!isCurrentImport(ticket)) return
   if (!started) {
-    imp.erpnext.error = errorMessage(startAction.error)
+    imp.erpnext.error = errorMessage(startAction.error, __('The import could not start. Try again in a moment.'))
     imp.erpnext.otherImportRunning = startAction.error?.type === 'ImportAlreadyRunningError'
     endPhase(ticket, 'failed')
     return

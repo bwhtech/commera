@@ -11,7 +11,7 @@ import { useRouter } from 'vue-router'
 import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { addProduct, closeAddProduct } from '../data/addProduct'
 import { newProductOptionSizes } from '../data/optionSizes'
-import { hasPrice, originalPriceError, priceInputRates } from '../data/product'
+import { hasPrice, originalPriceError, priceInputRates, titleLengthError } from '../data/product'
 import { productRoute } from '../ia/routes'
 import { errorMessage } from '../data/errors'
 import { __ } from '../data/translation'
@@ -255,9 +255,11 @@ async function focusTitle() {
 // The price is required. create_product only writes Item Prices for a rate above zero, so a product
 // created without one carries no Item Price row at all and reads as 0 until someone prices it by hand.
 // The first thing still missing is named next to the button, so a disabled button is never silent.
+const shownTitleError = computed(() => titleError.value || titleLengthError(title.value))
+
 const missingReason = computed(() => {
   if (!title.value.trim()) return __('Add a title to continue.')
-  if (titleError.value) return __('Change the title to continue.')
+  if (shownTitleError.value) return __('Change the title to continue.')
   if (!hasPrice(price.value)) return __('Enter a price above zero to continue.')
   if (priceError.value) return __('Fix the original price to continue.')
   if (!collection.value) return __('Pick a collection to continue.')
@@ -320,7 +322,7 @@ async function submit() {
           v-model="title"
           :label="__('Title')"
           :placeholder="__('Cotton oversized tee')"
-          :error="titleError"
+          :error="shownTitleError"
           required
         />
       </div>

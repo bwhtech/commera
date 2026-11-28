@@ -1406,6 +1406,16 @@ DEFAULT_OPTION_VALUE = "Standard"
 DEFAULT_SIZE_VALUE = "One Size"
 
 
+# Item code and name are 140-character columns: past that, ERPNext refuses in its own words ("Item Code
+# ... will get truncated"), naming a field the seller never saw.
+TITLE_MAX_LENGTH = 140
+
+
+def check_title_length(title: str):
+	if len(title) > TITLE_MAX_LENGTH:
+		frappe.throw(_("Use {0} characters or fewer for the title.").format(TITLE_MAX_LENGTH))
+
+
 @frappe.whitelist(methods=["POST"])
 def create_product(
 	title: str,
@@ -1426,6 +1436,7 @@ def create_product(
 	title = cstr(title).strip()
 	if not title:
 		frappe.throw(_("Enter a product title"))
+	check_title_length(title)
 
 	# An Item is named after its title (autoname "field:item_code"), so a reserved "New Item" prefix and a
 	# repeat title both surface from inside insert() as messages a shop owner cannot act on.
@@ -2002,6 +2013,7 @@ def update_product(
 		title = cstr(title).strip()
 		if not title:
 			frappe.throw(_("Title is required."))
+		check_title_length(title)
 		item.item_name = title
 	collections_changed = collections is not None or collection is not None
 	if collections is None and collection is not None:

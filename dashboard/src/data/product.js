@@ -1,6 +1,16 @@
 import { computed, unref } from 'vue'
 import { __ } from './translation.js'
 
+// An Item's code and name are 140-character columns, and a product is named after its title, so a
+// longer title is refused by the server in ERPNext's words. Say it on the field first.
+export const TITLE_MAX_LENGTH = 140
+
+export function titleLengthError(title) {
+  return (title ?? '').trim().length > TITLE_MAX_LENGTH
+    ? __('Use {0} characters or fewer for the title.', [TITLE_MAX_LENGTH])
+    : ''
+}
+
 // What a shopper is actually charged for a priced row (a size, or a pricing-screen row): the
 // storefront reads the sale price list and only falls back to the default one when there is no
 // row there at all — commera/product_detail.py's get_product_detail and commera/api/cart.py's

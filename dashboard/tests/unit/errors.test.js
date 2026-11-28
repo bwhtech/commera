@@ -14,3 +14,8 @@ test('other refusals and no error are not stale', () => {
   assert.equal(isStaleWrite(null), false)
   assert.equal(isStaleWrite(undefined), false)
 })
+
+test('a server crash reads as the fallback, never as an exception name', () => {
+  assert.equal(errorMessage(new Error('ConnectionError (Traceback)'), 'Try again.'), 'Try again.')
+  assert.equal(errorMessage(new Error('ValidationError: Enter a price above zero.'), 'Try again.'), 'Enter a price above zero.')
+})

@@ -56,6 +56,10 @@ class TestAddProduct(ProductOnboardingTestCase):
 				option_sizes=[{"option": "Red", "sizes": ["S"]}, {"option": "", "sizes": ["M"]}],
 			)
 
+	def test_a_title_past_the_item_name_column_is_refused_in_plain_words(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Use 140 characters or fewer for the title."):
+			self.add_product(title="T" * 141)
+
 	def test_a_taken_title_is_a_duplicate_entry(self):
 		title = f"Add Product {frappe.generate_hash(length=6).upper()}"
 		self.add_product(title=title)

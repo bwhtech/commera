@@ -8,7 +8,10 @@ export function errorMessage(error, fallback = __('Something went wrong')) {
     ?.replace(/^\s*[A-Za-z]*Error:\s*/, '')
     .replace(/<[^>]+>/g, '')
     .trim()
-  return message || fallback
+  // An unexpected server failure arrives as "ConnectionError (Traceback)": the class name of a crash,
+  // which tells a shop owner nothing. The fallback says it plainly; the traceback stays in the logs.
+  if (!message || /\(Traceback\)\s*$/.test(message)) return fallback
+  return message
 }
 
 // The server refuses a save made over changes the screen never loaded with Frappe's

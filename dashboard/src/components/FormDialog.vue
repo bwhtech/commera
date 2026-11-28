@@ -7,7 +7,7 @@
  */
 import { Button } from 'frappe-ui'
 import { DialogDescription } from 'reka-ui'
-import { computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import DialogShell from './DialogShell.vue'
 import { __ } from '../data/translation'
 import { confirmLeave } from '../utils/confirmLeave'
@@ -36,6 +36,19 @@ const open = defineModel('open', { type: Boolean, required: true })
 const emit = defineEmits(['submit'])
 
 const isMobile = useIsMobile()
+
+// The primary shows a spinner while it submits, and the browser drops focus from the disabled
+// button to the page. A refusal leaves the dialog open, so a keyboard user is handed back to it.
+const primaryButton = ref(null)
+watch(
+  () => props.loading,
+  async (loading, wasLoading) => {
+    if (loading || !wasLoading || !open.value) return
+    await nextTick()
+    if (document.activeElement && document.activeElement !== document.body) return
+    primaryButton.value?.$el?.focus({ preventScroll: true })
+  },
+)
 
 // From `sm`, Escape and a click outside still ask to close, and the ask is answered below. A
 // sheet's swipe cannot be asked: frappe-ui flings the sheet off screen before it reports the
@@ -95,6 +108,7 @@ function onOpenChange(value) {
         <div class="grid grid-cols-2 gap-2 sm:ms-auto sm:flex sm:items-center">
           <Button :size="buttonSize" :label="__('Cancel')" :disabled="props.loading" @click="requestClose" />
           <Button
+            ref="primaryButton"
             :size="buttonSize"
             variant="solid"
             theme="gray"
