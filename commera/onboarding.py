@@ -13,6 +13,7 @@ from frappe.utils.data import add_days, add_years, get_abbr, getdate
 
 from commera.core import latest_committed_reads
 from commera.migrate import create_payment_modes
+from commera.product_collections import add_first_collection, add_store_collections_parent
 from commera.store_options import add_store_options
 
 SETTINGS_DOCTYPE = "Commera Settings"
@@ -201,6 +202,7 @@ def adopt_existing_company(store_name: str, company: str | None = None, price_li
 		warehouse = get_company_warehouse(company) or create_store_warehouse(company)
 	seed_commera_settings(company, price_list, sale_price_list, warehouse)
 	add_store_options()
+	add_store_collections_parent()
 
 
 def get_default_company() -> str | None:
@@ -359,6 +361,7 @@ def run_store_setup(setup_args: dict):
 		# The COD Mode of Payment was made before the company had a cash account to link.
 		create_payment_modes()
 		add_store_options()
+		add_first_collection(frappe.db.get_single_value("Commera Settings", "store_category"))
 	except Exception as exception:
 		frappe.db.rollback()
 		frappe.log_error(title="Commera store setup failed")

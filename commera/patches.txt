@@ -49,3 +49,4 @@ commera.patches.create_gateway_refunds_from_refund_totals
 commera.patches.seed_customer_emails #order-event-emails
 commera.patches.delete_default_email_templates
 commera.patches.set_commera_invoice_print_format
+commera.patches.move_collections_under_store_collections

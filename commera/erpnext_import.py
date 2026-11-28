@@ -19,7 +19,7 @@ from commera.api.admin.catalog import (
 )
 from commera.commera_ecommerce.doctype.bulk_publish_variants.bulk_publish_variants import publish_variants
 from commera.commera_ecommerce.doctype.commera_settings.commera_settings import create_configurator_log
-from commera.product_collections import COLLECTIONS_FIELD, PRODUCT_COLLECTION
+from commera.product_collections import COLLECTIONS_FIELD, PRODUCT_COLLECTION, add_to_store_collections
 from commera.swatches import COLOUR_ATTRIBUTE, DUPLICATE_COLOUR_ATTRIBUTE
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 from commera.webshop_migration import apply_webshop_extras
@@ -319,6 +319,7 @@ def import_batch(plans: list, log, failed: list) -> list:
 	if created:
 		add_option_images(created)
 		add_first_collections([plan for plan, _configurator in created])
+		add_to_store_collections([plan["item_group"] for plan, _configurator in created])
 		for _plan, configurator in created:
 			log.append(
 				"configurators",

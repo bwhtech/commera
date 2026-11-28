@@ -22,6 +22,7 @@ from commera.api.admin.erpnext_import import (
 	start_erpnext_import,
 )
 from commera.commera_ecommerce.doctype.commera_settings.commera_settings import create_configurator_log
+from commera.product_collections import STORE_COLLECTIONS
 from commera.sdk.lines import LineProducts
 from commera.swatches import COLOUR_ATTRIBUTE
 from commera.tests.test_admin_orders import COMPANY, CURRENCY
@@ -161,6 +162,13 @@ class TestErpnextImport(ProductOnboardingTestCase):
 		self.run_import([plain])
 
 		self.assertEqual(LineProducts([plain]).get_order_title(plain, plain), plain)
+
+	def test_an_imported_item_group_becomes_a_store_collection(self):
+		self.run_import([self.make_plain_item()])
+
+		self.assertEqual(
+			frappe.db.get_value("Item Group", self.item_group, "parent_item_group"), STORE_COLLECTIONS
+		)
 
 	def test_a_commera_variant_line_keeps_its_item_name(self):
 		item_template = create_product(

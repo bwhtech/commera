@@ -21,6 +21,8 @@ from commera.plugin_events import add_changed_products
 from commera.product_collections import (
 	COLLECTIONS_FIELD,
 	PRODUCT_COLLECTION,
+	STORE_COLLECTIONS,
+	add_store_collections_parent,
 	get_product_collections,
 	set_collections,
 )
@@ -782,45 +784,54 @@ def get_publish_blockers(sizes):
 
 @frappe.whitelist()
 def get_collections(search_text: str | None = None):
-	"""The collections a product can be filed under, for the pickers. Leaf Item Groups only, the same
-	rule get_collection enforces on save."""
+	"""The collections a product can be filed under, for the pickers: the leaf Item Groups under
+	Store Collections."""
 	frappe.has_permission("Item Group", ptype="read", throw=True)
 
 	item_group = frappe.qb.DocType("Item Group")
 	# ponytail: first 100 matches only, paginate the picker if a store keeps more collections
 	# than a searched dropdown can show
 	query = (
-		frappe.qb.from_(item_group)
+		get_store_collections_query(item_group, search_text)
 		.select(item_group.name)
-		.where(item_group.rgt == item_group.lft + 1)
 		.orderby(item_group.name)
 		.limit(100)
 	)
-	if search_text:
-		query = query.where(item_group.name.like(f"%{cstr(search_text)}%"))
 	return query.run(pluck=True)
+
+
+def get_store_collections_query(item_group, search: str | None = None):
+	store_collections = frappe.qb.DocType("Item Group").as_("store_collections")
+	query = (
+		frappe.qb.from_(item_group)
+		.join(store_collections)
+		.on(
+			(store_collections.name == STORE_COLLECTIONS)
+			& (item_group.lft > store_collections.lft)
+			& (item_group.rgt < store_collections.rgt)
+		)
+		.where(item_group.rgt == item_group.lft + 1)
+	)
+	if search:
+		query = query.where(item_group.name.like(f"%{cstr(search)}%"))
+	return query
 
 
 @frappe.whitelist()
 def list_collections(search: str | None = None, start: int = 0, page_length: int = PAGE_LENGTH):
 	"""The Collections screen: one row per collection, with a real (not derived) product count. Collections
-	are the leaf Item Groups; structural parents are excluded by nested-set shape (lft/rgt), not by name."""
+	are the leaf Item Groups under Store Collections."""
 	frappe.has_permission("Item Group", ptype="read", throw=True)
 
 	start = cint(start)
 	page_length = cint(page_length) or PAGE_LENGTH
 
 	item_group = frappe.qb.DocType("Item Group")
-	filters = item_group.rgt == item_group.lft + 1
-	if search:
-		filters = filters & item_group.name.like(f"%{cstr(search)}%")
-
-	total = (frappe.qb.from_(item_group).select(Count(item_group.name)).where(filters)).run()[0][0]
+	total = get_store_collections_query(item_group, search).select(Count(item_group.name)).run()[0][0]
 
 	names = (
-		frappe.qb.from_(item_group)
+		get_store_collections_query(item_group, search)
 		.select(item_group.name)
-		.where(filters)
 		.orderby(item_group.name)
 		.offset(start)
 		.limit(page_length)
@@ -853,7 +864,7 @@ def get_collection_product_counts(collection_names):
 
 @frappe.whitelist(methods=["POST"])
 def create_collection(title: str):
-	"""A new collection, filed as a leaf under the same parent every other collection already uses."""
+	"""A new collection, filed as a leaf under Store Collections."""
 	frappe.has_permission("Item Group", ptype="create", throw=True)
 
 	title = cstr(title).strip()
@@ -862,22 +873,9 @@ def create_collection(title: str):
 	if frappe.db.exists("Item Group", title):
 		frappe.throw(_("Collection {0} already exists.").format(title))
 
-	item_group = frappe.qb.DocType("Item Group")
-	parent = (
-		frappe.qb.from_(item_group)
-		.select(item_group.parent_item_group)
-		.where(item_group.rgt == item_group.lft + 1)
-		.limit(1)
-	).run()
-	# A brand-new store with zero collections yet has no leaf to copy a parent from — file
-	# straight under the tree root instead.
-	parent_item_group = (
-		parent[0][0] if parent else frappe.db.get_value("Item Group", {"parent_item_group": ""})
-	)
-
 	collection = frappe.new_doc("Item Group")
 	collection.item_group_name = title
-	collection.parent_item_group = parent_item_group
+	collection.parent_item_group = add_store_collections_parent()
 	# custom_displayname is a site customization (mandatory, shopper-facing) — every existing
 	# collection just mirrors its name into it, so a new one does too.
 	collection.custom_displayname = title
