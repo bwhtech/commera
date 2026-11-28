@@ -232,3 +232,16 @@ input[type='number']::-webkit-outer-spin-button {
 h2[tabindex='-1']:focus {
   outline: none;
 }
+
+/* frappe-ui's keyboard focus outline (--focus-outline-default, applied on :focus-visible) is a pale
+   gray: 1.57:1 on a white field and 1.55-1.64:1 on dark surfaces, under the 3:1 a focus indicator
+   needs. outline-gray-5 is the Espresso step that clears 3:1 on the surfaces it sits on in both
+   themes; the widths stay frappe-ui's own (2px light, 3px dark). Recheck when frappe-ui retunes the
+   focus token upstream. */
+:root {
+  --focus-outline-default: 2px solid var(--outline-gray-5);
+}
+
+[data-theme='dark'] {
+  --focus-outline-default: 3px solid var(--outline-gray-5);
+}
