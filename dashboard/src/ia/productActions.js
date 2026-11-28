@@ -75,6 +75,7 @@ export function buildProductActions(product, router, handlers = {}) {
               type: 'number',
               value: String(product.restock_level ?? ''),
               confirmLabel: __('Save'),
+              returnFocus: handlers.returnFocus,
               submit: async (value) => {
                 // set_restock_level stores cint(level), which truncates: 2.7 is kept as 2.
                 // Truncating here too keeps the toast honest about what was stored.
@@ -110,6 +111,7 @@ export function buildProductActions(product, router, handlers = {}) {
               message: __('It leaves the storefront. Past orders keep their line items.'),
               confirmLabel: __('Archive'),
               cancelLabel: __('Cancel'),
+              returnFocus: handlers.returnFocus,
             })
             if (confirmed) handlers.onToggleArchive()
           },
@@ -127,6 +129,7 @@ export function buildProductActions(product, router, handlers = {}) {
               ),
               confirmLabel: __('Delete'),
               cancelLabel: __('Cancel'),
+              returnFocus: handlers.returnFocus,
             })
             if (!confirmed) return
             const deleted = await trySubmit(deleteAction, { item_template: product.id })

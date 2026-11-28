@@ -175,6 +175,9 @@ async function save() {
       reloadProduct()
     }
     saving.value = false
+    // A refused Save keeps Save on screen, but its spinner disabled it and the browser dropped focus
+    // to the page; a keyboard user gets it back, as after a refused Publish.
+    if (isDirty.value) refocus(saveButton)
   }
   // Reached only when every write took (a refusal returns above); with nothing typed meanwhile,
   // Save and Discard are gone from the header.
@@ -256,11 +259,15 @@ const addPriceAction = computed(() =>
 // (now Unpublish, Publish or Restore); a click elsewhere meanwhile keeps its own focus.
 const statusButton = ref(null)
 
-async function refocusStatusButton() {
+const saveButton = ref(null)
+
+async function refocus(button) {
   await nextTick()
   if (document.activeElement && document.activeElement !== document.body) return
-  statusButton.value?.$el?.focus({ preventScroll: true })
+  button.value?.$el?.focus({ preventScroll: true })
 }
+
+const refocusStatusButton = () => refocus(statusButton)
 
 async function togglePublish() {
   const publish = !isLive.value
@@ -311,6 +318,8 @@ const actions = computed(() =>
     ? buildProductActions(product.value, router, {
         onToggleArchive: toggleArchive,
         onReload: reloadProduct,
+        // A menu item unmounts with its menu, so a dialog it opened returns focus to the menu's button.
+        returnFocus: () => moreActionsButton.value?.$el?.focus({ preventScroll: true }),
       })
     : { groups: [] },
 )
@@ -388,6 +397,7 @@ const loadFailure = computed(() =>
           </span>
           <Button :label="__('Discard')" variant="subtle" theme="gray" :disabled="saving" @click="discard" />
           <Button
+            ref="saveButton"
             :label="__('Save')"
             variant="solid"
             theme="gray"

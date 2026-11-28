@@ -10,12 +10,15 @@ export const confirmState = reactive({
   confirmLabel: '',
   cancelLabel: '',
   resolve: null,
+  // Where focus goes when the dialog closes and the control that opened it is gone, as a menu item
+  // is once its menu closes. Without it focus falls to the page and the next Tab starts at the top.
+  returnFocus: null,
 })
 
-export function askConfirm({ title, message, confirmLabel, cancelLabel }) {
+export function askConfirm({ title, message, confirmLabel, cancelLabel, returnFocus = null }) {
   settleConfirm(false)
   return new Promise((resolve) => {
-    Object.assign(confirmState, { open: true, title, message, confirmLabel, cancelLabel, resolve })
+    Object.assign(confirmState, { open: true, title, message, confirmLabel, cancelLabel, resolve, returnFocus })
   })
 }
 
@@ -43,11 +46,23 @@ export const promptState = reactive({
   confirmLabel: '',
   submit: null,
   loading: false,
+  // As confirmState.returnFocus.
+  returnFocus: null,
 })
 
-export function askValue({ title, message = '', label, type = 'text', options = [], value = '', confirmLabel, submit }) {
+export function askValue({
+  title,
+  message = '',
+  label,
+  type = 'text',
+  options = [],
+  value = '',
+  confirmLabel,
+  submit,
+  returnFocus = null,
+}) {
   Object.assign(promptState, {
-    open: true, title, message, label, type, options, value, initialValue: value, confirmLabel, submit, loading: false,
+    open: true, title, message, label, type, options, value, initialValue: value, confirmLabel, submit, loading: false, returnFocus,
   })
 }
 

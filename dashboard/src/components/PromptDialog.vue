@@ -16,6 +16,7 @@ const isDirty = computed(isPromptDirty)
 
 <template>
   <FormDialog
+    :return-focus="promptState.returnFocus"
     v-model:open="promptState.open"
     size="md"
     :title="promptState.title"

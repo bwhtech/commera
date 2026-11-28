@@ -12,6 +12,7 @@ import { confirmState, settleConfirm } from '../utils/confirmDialog'
 
 <template>
   <DialogShell
+    :return-focus="confirmState.returnFocus"
     :open="confirmState.open"
     :title="confirmState.title"
     size="sm"
