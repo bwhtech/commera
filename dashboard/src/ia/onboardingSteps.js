@@ -17,15 +17,13 @@ export function clampStep(index) {
 const LEGACY_STEP_KEYS = ['you', 'store', 'brand', 'theme', 'selling', 'products', 'done']
 const RETIRED_STEP_KEYS = ['brand', 'theme', 'selling', 'products']
 
-// The step a reload resumes at. Every step after the store needs the store setup to have been
-// started; a setup that never started (or a cache that forgot it) sends the owner back to start it.
+// The step a reload resumes at. A setup that never started starts over at the welcome step: the
+// saved step outlives a site whose database was reset, and would skip the name.
 export function resumeStep(saved, setupStatus) {
+  if (setupStatus === 'idle') return STEP_INDEX.you
   const key = /^\d+$/.test(String(saved ?? '')) ? LEGACY_STEP_KEYS[Number(saved)] : saved
-  const index = RETIRED_STEP_KEYS.includes(key)
-    ? STEP_INDEX[setupStatus === 'done' ? 'done' : 'store']
-    : (STEP_INDEX[key] ?? 0)
-  if (index > STEP_INDEX.store && setupStatus === 'idle') return STEP_INDEX.store
-  return index
+  if (RETIRED_STEP_KEYS.includes(key)) return STEP_INDEX[setupStatus === 'done' ? 'done' : 'store']
+  return STEP_INDEX[key] ?? 0
 }
 
 const NO_PICKS = { companies: [], priceLists: [] }
