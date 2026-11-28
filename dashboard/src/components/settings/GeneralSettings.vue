@@ -50,7 +50,7 @@ function commitStoreField(fieldname, event, label) {
 }
 
 function commitCompany(value) {
-  commit('company', value, __('Company'), (saved) => {
+  commit('company', value, __('Business'), (saved) => {
     adopt(pickStoreFields(saved))
     return company.reload()
   })
@@ -108,20 +108,20 @@ const companyLink = computed(() =>
     <div class="mt-8 border-t border-outline-gray-1 pt-6">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <h3 class="text-base font-medium text-ink-gray-8">{{ __('Company') }}</h3>
+          <h3 class="text-base font-medium text-ink-gray-8">{{ __('Business') }}</h3>
           <p class="mt-1 text-p-sm text-ink-gray-5">
-            {{ __('Orders are booked against this company. Its details are edited on the company record.') }}
+            {{ __('The business your store sells as. Its details are edited on its own page.') }}
           </p>
         </div>
         <Button
           v-if="company.data"
-          :label="__('Open company record')"
+          :label="__('Edit business details')"
           icon-right="lucide-external-link"
           :href="companyLink"
         />
       </div>
 
-      <SettingsRow v-if="store.data" class="mt-2" :title="__('Store company')">
+      <SettingsRow v-if="store.data" class="mt-2" :title="__('Sells as')">
         <SettingsLinkControl
           :field="COMPANY_FIELD"
           :model-value="values.company ?? ''"
@@ -139,8 +139,8 @@ const companyLink = computed(() =>
         v-else-if="!company.data"
         compact
         icon="lucide-building-2"
-        :title="__('No company is set for this store yet')"
-        :description="__('Pick one above and orders will book against it.')"
+        :title="__('No business is set for this store yet')"
+        :description="__('Pick one above and orders will be made out to it.')"
       />
 
       <div v-else class="mt-2 divide-y divide-outline-gray-1">
@@ -149,7 +149,7 @@ const companyLink = computed(() =>
         </SettingsRow>
         <SettingsRow :title="__('Registered address')">
           <p class="max-w-xs whitespace-pre-line text-end text-p-base text-ink-gray-7">
-            {{ company.data.address ?? __('No address on the company record') }}
+            {{ company.data.address ?? __('No address set yet') }}
           </p>
         </SettingsRow>
         <SettingsRow :title="__('Currency')">

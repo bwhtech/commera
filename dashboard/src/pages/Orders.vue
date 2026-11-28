@@ -156,7 +156,7 @@ function printDeliveryNotes() {
   // Named, not silently dropped — otherwise a mixed selection prints short and
   // the merchant packs one parcel fewer than they selected.
   if (nothingToPrint.length) {
-    toast.warning(__('No delivery note yet for {0}, so there is nothing to print.', [nothingToPrint.join(', ')]))
+    toast.warning(__('No packing slip yet for {0}, so there is nothing to print.', [nothingToPrint.join(', ')]))
   }
   if (!deliveryNotes.length) return
 
@@ -195,7 +195,7 @@ function printDeliveryNotes() {
       @done="endSelecting"
     >
       <Button :label="__('Mark fulfilled')" :loading="bulkRunning === 'Mark fulfilled'" @click="markFulfilled" />
-      <Button :label="__('Print delivery notes')" @click="printDeliveryNotes" />
+      <Button :label="__('Print packing slips')" @click="printDeliveryNotes" />
     </BulkBar>
 
     <div class="mt-3 overflow-x-auto">

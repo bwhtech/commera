@@ -11,7 +11,7 @@ const emit = defineEmits(['remove'])
 
 const LINK_TYPES = [
   { label: __('Heading only, no link'), value: '' },
-  { label: __('Item groups'), value: 'Item Group' },
+  { label: __('Collections'), value: 'Item Group' },
   { label: __('Brand'), value: 'Brand' },
   { label: __('Custom URL'), value: 'URL' },
 ]
@@ -164,9 +164,9 @@ async function save() {
           :options="itemGroupOptions"
           :filterable="false"
           :loading="itemGroupSearch.results.loading"
-          :label="__('Item groups')"
+          :label="__('Collections')"
           :description="__('Products from every group listed here appear together under this entry.')"
-          :placeholder="__('Search item groups')"
+          :placeholder="__('Search collections')"
         />
 
         <Combobox

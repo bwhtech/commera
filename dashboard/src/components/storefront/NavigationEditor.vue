@@ -94,14 +94,14 @@ function countEntries(nodes) {
 function importGroups() {
   const parent = selectedName.value ?? ''
   dialog.prompt({
-    title: __('Build the menu from item groups'),
+    title: __('Build the menu from collections'),
     message: parent
       ? __('Entries will be added inside "{0}".', [selected.value?.label])
       : __('Entries will be added as new top-level sections.'),
     fields: [
       {
         name: 'item_group',
-        label: __('Item group'),
+        label: __('Collection'),
         type: 'combobox',
         options: itemGroupOptions.value,
         required: true,
@@ -257,7 +257,7 @@ function rowActions(node) {
 }
 
 const menuActions = computed(() => [
-  { label: __('Import from item groups'), icon: 'lucide-download', onClick: importGroups },
+  { label: __('Import from collections'), icon: 'lucide-download', onClick: importGroups },
   {
     group: __('Danger'),
     options: [
@@ -317,9 +317,9 @@ const menuActions = computed(() => [
         v-if="!menu.length"
         icon="lucide-list-tree"
         :title="__('No menu yet')"
-        :description="__('Add a section, or build one from your item groups.')"
+        :description="__('Add a section, or build one from your collections.')"
       >
-        <Button variant="subtle" theme="gray" :label="__('Import from item groups')" @click="importGroups" />
+        <Button variant="subtle" theme="gray" :label="__('Import from collections')" @click="importGroups" />
       </EmptyState>
 
       <div v-else class="mt-3 gap-6 lg:flex">

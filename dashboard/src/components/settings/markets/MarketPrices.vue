@@ -44,45 +44,45 @@ const currency = computed(() => marketStore.currencyOf(props.values.sale_price_l
     <div class="grid gap-4 sm:grid-cols-2">
       <FormControl
         type="select"
-        :label="__('Sale price list')"
+        :label="__('Selling prices')"
         required
         :model-value="values.sale_price_list"
         :options="saleOptions"
-        :placeholder="__('Choose a price list')"
+        :placeholder="__('Choose selling prices')"
         :disabled="isPrimary"
         :error="errors.sale_price_list"
-        @update:model-value="(name) => emit('change', 'sale_price_list', name, __('Sale price list'))"
+        @update:model-value="(name) => emit('change', 'sale_price_list', name, __('Selling prices'))"
       />
       <FormControl
         type="select"
-        :label="__('Compare-at price list')"
+        :label="__('Compare-at prices')"
         :description="__('Shown struck through.')"
         :model-value="values.compare_at_price_list ?? ''"
         :options="compareAtOptions"
         :disabled="isPrimary"
         :error="errors.compare_at_price_list"
-        @update:model-value="(name) => emit('change', 'compare_at_price_list', name ?? '', __('Compare-at price list'))"
+        @update:model-value="(name) => emit('change', 'compare_at_price_list', name ?? '', __('Compare-at prices'))"
       />
       <div>
         <p class="text-sm text-ink-gray-6">{{ __('Currency') }}</p>
         <p class="mt-1.5 text-base text-ink-gray-8">{{ currency || '—' }}</p>
-        <p class="mt-1 text-p-xs text-ink-gray-5">{{ __('From the sale price list.') }}</p>
+        <p class="mt-1 text-p-xs text-ink-gray-5">{{ __('From the selling prices.') }}</p>
       </div>
       <FormControl
         v-if="taxTemplates"
         type="select"
-        :label="__('Tax template')"
+        :label="__('Taxes')"
         :model-value="values.tax_template ?? ''"
         :options="taxOptions"
         :error="errors.tax_template"
-        @update:model-value="(name) => emit('change', 'tax_template', name ?? '', __('Tax template'))"
+        @update:model-value="(name) => emit('change', 'tax_template', name ?? '', __('Taxes'))"
       />
     </div>
     <p v-if="!isPrimary" class="text-p-sm text-ink-gray-5">
       {{
         values.sale_price_list
           ? __('Products without a price in {0} are not sold here.', [values.sale_price_list])
-          : __('Products without a price in the sale price list are not sold here.')
+          : __('Products without a selling price are not sold here.')
       }}
     </p>
   </section>
