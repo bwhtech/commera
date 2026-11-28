@@ -165,7 +165,7 @@ def get_runnable_method(key: str, places: frozenset, name: str | int | None = No
 	doctype = PLACES[entry["place"]]["doctype"]
 	if doctype:
 		frappe.has_permission(doctype, "read", doc=name, throw=True)
-	method = get_whitelisted_method(entry["app"], entry["method"])
+	method = get_whitelisted_method(entry["owner"], entry["method"])
 	condition_arguments = (doctype, name) if doctype else ()
 	if not (
 		method

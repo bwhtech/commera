@@ -180,7 +180,9 @@ class PluginTestCase(IntegrationTestCase):
 		asset_path = patch.object(
 			registry,
 			"get_asset_path",
-			side_effect=lambda app, relative_path: os.path.join(self.assets_folder, app, relative_path),
+			side_effect=lambda asset_dir, relative_path: os.path.join(
+				self.assets_folder, asset_dir, relative_path
+			),
 		)
 		asset_path.start()
 		self.addCleanup(asset_path.stop)
@@ -212,7 +214,12 @@ class PluginTestCase(IntegrationTestCase):
 		)
 
 	def write_manifest(
-		self, entries: list, app: str = APP, api_version: int = API_VERSION, **manifest_fields
+		self,
+		entries: list,
+		app: str = APP,
+		api_version: int = API_VERSION,
+		owner: str | None = None,
+		**manifest_fields,
 	):
 		self.write_asset(
 			app,
@@ -221,10 +228,11 @@ class PluginTestCase(IntegrationTestCase):
 				{"api_version": api_version, "kit_version": "0.2.0", "app": app, "entries": entries}
 				| manifest_fields
 			),
+			owner=owner,
 		)
 
-	def write_asset(self, app: str, relative_path: str, content: str):
-		path = os.path.join(self.assets_folder, app, relative_path)
+	def write_asset(self, app: str, relative_path: str, content: str, owner: str | None = None):
+		path = os.path.join(self.assets_folder, registry.get_asset_dir(app, owner or app), relative_path)
 		os.makedirs(os.path.dirname(path), exist_ok=True)
 		with open(path, "w") as asset_file:
 			asset_file.write(content)
@@ -749,3 +757,48 @@ class TestInstalledApps(PluginTestCase):
 	def get_installed_app(self, app: str) -> dict:
 		with self.set_user(SYSTEM_MANAGER):
 			return next(row for row in get_plugins() if row["app"] == app)
+
+
+class TestOfficialPlugins(PluginTestCase):
+	def write_official_plugin(self, app: str = APP):
+		self.write_manifest([sidebar_action("open", label="Open", icon=None)], app=app, owner="commera")
+		self.write_asset(
+			app,
+			"plugin.config.js",
+			f"/* commera-plugin-api: {API_VERSION} */\nexport default {{}}",
+			owner="commera",
+		)
+
+	def test_an_official_plugin_loads_under_its_installed_app(self):
+		self.write_official_plugin()
+
+		entry = self.entries_by_key()[f"{APP}:sidebar:open"]
+
+		self.assertEqual(entry["owner"], "commera")
+		self.assertEqual(
+			entry["module_url"], f"/assets/commera/official_plugins/{APP}/plugin.config.js?v=4b7e2d"
+		)
+		self.assertIn(APP, get_visible_plugins("Administrator")["apps"])
+
+	def test_an_official_plugin_waits_for_its_app_to_be_installed(self):
+		self.write_official_plugin("not_installed_app")
+
+		self.assertEqual(get_registry()["entries"], [])
+
+	def test_an_app_that_ships_its_own_plugin_replaces_the_official_one(self):
+		self.write_official_plugin()
+		self.write_manifest([page()])
+
+		self.assertEqual(list(self.entries_by_key()), [f"{APP}:pages:jobs"])
+
+	def test_an_official_plugin_wears_its_app_logo(self):
+		patch_app_declarations(self, {APP: {"add_to_apps_screen": [{"logo": "/assets/erpnext/logo.svg"}]}})
+		self.write_official_plugin()
+
+		self.assertEqual(get_registry()["apps"][APP]["icon_url"], "/assets/erpnext/logo.svg")
+
+	def test_an_official_plugin_runs_only_commera_functions(self):
+		self.write_manifest([action(method=f"{FUNCTIONS}.resend_order")], owner="commera")
+
+		self.assertEqual(get_registry()["entries"], [])
+		self.assertIn("inside commera", get_registry()["problems"][0]["message"])

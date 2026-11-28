@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import frappeui from 'frappe-ui/vite'
+import { PLUGIN_HOST_DIR } from './pluginApps.js'
 import { pluginDevServer } from './pluginDevServer.js'
 
 // The bare specifiers an app page may import, each mapped to a runtime entry whose chunk keeps its export names,
@@ -19,8 +20,6 @@ const fromHere = (path) => fileURLToPath(new URL(path, import.meta.url))
 
 const SHARED_INPUTS = Object.fromEntries(Object.values(SHARED).map(({ entry, source }) => [entry, fromHere(source)]))
 
-// Outside the emptied outDir: bench builds apps in parallel, and the plugin kit reads these while commera rebuilds.
-const PLUGIN_HOST_DIR = fromHere('../commera/public/plugin-host')
 
 function findEntryChunk(bundle, entryName) {
   const chunk = Object.values(bundle).find((output) => output.type === 'chunk' && output.isEntry && output.name === entryName)

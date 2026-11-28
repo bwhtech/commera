@@ -809,10 +809,14 @@ export default async function commeraPlugin({
 	root = process.cwd(),
 	app = basename(resolve(root)),
 	hostDir,
+	sourceDir: sourceDirOption,
+	outDir,
 } = {}) {
 	// Vite reports module ids by real path, and the strip step matches files by id.
 	const appRoot = realpathSync(resolve(root));
-	const sourceDir = join(appRoot, 'commera');
+	const sourceDir = sourceDirOption
+		? realpathSync(resolve(sourceDirOption))
+		: join(appRoot, 'commera');
 	const resolvedHostDir =
 		hostDir ?? resolve(appRoot, '../commera/commera/public/plugin-host');
 	const { default: vue } = await importFromApp(appRoot, '@vitejs/plugin-vue');
@@ -879,7 +883,7 @@ export default async function commeraPlugin({
 				publicDir: false,
 				define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 				build: {
-					outDir: join(appRoot, app, 'public', 'commera'),
+					outDir: outDir ?? join(appRoot, app, 'public', 'commera'),
 					emptyOutDir: true,
 					target: 'es2022',
 					minify: true,
