@@ -1,8 +1,5 @@
-"""The shape of a theme page's data: the keys a block can bind, by page type.
-
-A value is None (text, number or flag), a dict (an object with its own keys) or a one-item
-list (a list to repeat, with the shape of each item). A test holds this to what page_data.py returns.
-"""
+"""The keys a block can bind, by page type. A value is None (text, number or flag), a dict (a group of keys)
+or a one-item list (a list to repeat, with the shape of an item). A test holds this to page_data.py."""
 
 from commera.builder_themes.pages import HOME, PRODUCT_DETAIL, PRODUCT_LISTING
 

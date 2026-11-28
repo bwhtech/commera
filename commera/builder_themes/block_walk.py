@@ -186,9 +186,8 @@ def is_repeater(block: dict) -> bool:
 
 
 def get_bindings(block: dict) -> list[dict]:
-	"""The bindings Builder renders on the block, the one that wins first: a later entry beats an earlier one
-	of the same property. A repeater shows no text of its own, and a block that does not repeat can also
-	hold the older single `dataKey` binding, which every other binding beats."""
+	"""The bindings Builder renders on the block, the winner first: a later entry beats an earlier one of the
+	same property, and all beat the older single `dataKey`. A repeater shows no text of its own."""
 	bindings = get_dynamic_values(block)[::-1]
 	if block.get("isRepeaterBlock"):
 		return [binding for binding in bindings if binding.get("type") != "key"]

@@ -8,39 +8,34 @@ from commera.builder_themes.checks import Problem, check_page
 from commera.builder_themes.pages import get_page_role
 
 CHECK_PAGE = "commera_check_page"
+CHECK_PAGE_DESCRIPTION = (
+	"Check a Commera theme page: every binding names a real key of the page's data, and the page has the "
+	"parts a store page needs (cart link, add to cart, sizes, product cards, pagination). It lists each "
+	"problem with its block and the fix. Call it before you finish a turn that changed a theme page."
+)
+PAGE_DESCRIPTION = (
+	"The page id of another page of this theme, to check it with the edits you prepared for it. "
+	"Leave out to check this page."
+)
 
 
 def get_tools() -> list:
 	# Builder is optional, and it calls this hook only when it is installed.
 	from builder.ai.agent.registry import Tool
 
-	return [
-		Tool(
-			name=CHECK_PAGE,
-			side="server",
-			description=(
-				"Check a Commera theme page: every binding names a real key of the page's data, and the "
-				"page has the parts a store page needs (cart link, add to cart, sizes, product cards, "
-				"pagination). It lists each problem with its block and the fix. Call it before you finish "
-				"a turn that changed a theme page."
-			),
-			parameters={
-				"type": "object",
-				"properties": {
-					"page": {
-						"type": "string",
-						"description": (
-							"The page id of another page of this theme, to check it with the edits you "
-							"prepared for it. Leave out to check this page."
-						),
-					}
-				},
-			},
-			handler=run_check_page,
-			label=("Checking the page for the store", "Checked the page for the store"),
-			available=is_theme_page,
-		)
-	]
+	check_page_tool = Tool(
+		name=CHECK_PAGE,
+		side="server",
+		description=CHECK_PAGE_DESCRIPTION,
+		parameters={
+			"type": "object",
+			"properties": {"page": {"type": "string", "description": PAGE_DESCRIPTION}},
+		},
+		handler=run_check_page,
+		label=("Checking the page for the store", "Checked the page for the store"),
+		available=is_theme_page,
+	)
+	return [check_page_tool]
 
 
 def is_theme_page(ctx) -> bool:
