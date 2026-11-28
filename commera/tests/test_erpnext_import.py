@@ -273,7 +273,8 @@ class TestErpnextImport(ProductOnboardingTestCase):
 			_log, status = self.run_import([bad])
 
 		self.assertEqual(
-			status["failed"][0]["error"], "Something went wrong with this item. Run the import again to retry it."
+			status["failed"][0]["error"],
+			"Something went wrong with this item. Run the import again to retry it.",
 		)
 		log_error.assert_called_once()
 

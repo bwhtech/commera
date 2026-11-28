@@ -66,18 +66,14 @@ def read_uploaded_rows(file_url):
 	rows = read_spreadsheet(file_doc)
 	if rows is None:
 		frappe.throw(
-			_(
-				"This file is not a readable Excel or CSV file. Save it again from Excel, or export it as CSV."
-			)
+			_("This file is not a readable Excel or CSV file. Save it again from Excel, or export it as CSV.")
 		)
 	return [row for row in rows if any(cstr(cell).strip() for cell in row)]
 
 
 def read_spreadsheet(file_doc):
-	"""The file's rows, or None when it is not the kind of file its name says. File.get_content() hands
-	back text as str and anything binary as bytes, so the type tells a CSV from a workbook before a
-	parser trips over the wrong one: a text file named .xlsx raised a TypeError, and a workbook
-	renamed .csv an "Unknown file encoding"."""
+	"""The file's rows, or None when it is not what its name says. get_content() returns str for text and
+	bytes otherwise, which tells a CSV from a workbook before the wrong parser trips over it."""
 	content = file_doc.get_content()
 	if cstr(file_doc.file_name).lower().endswith(".csv"):
 		return read_csv_content(content) if isinstance(content, str) else None
@@ -111,9 +107,8 @@ def get_exact_field(text, taken, primary_only):
 
 
 def suggest_mapping(headers):
-	"""Best-guess header -> field, each field used once. An exact name is "high", another known spelling
-	"medium", and a header that only contains one ("Variant Size") is "low", which the Map step asks the
-	merchant to check."""
+	"""Best-guess header -> field, each field used once: an exact name is "high", a known spelling "medium",
+	and a header that only contains one ("Variant Size") "low", which the Map step asks about."""
 	normalized = {header: normalize_header(header) for header in headers}
 	mapping = dict.fromkeys(headers, "")
 	confidence = dict.fromkeys(headers, "none")
@@ -166,10 +161,8 @@ def get_missing_fields(mapping, default_collection):
 def parse_and_validate(
 	file_url: str, column_mapping: dict | None = None, default_collection: str | None = None
 ):
-	"""One dry-run pass over the file: every row comes back with its own issue, or none. Nothing is
-	written here; this is what the Review step and run_import()'s own safety check share. A file whose
-	required fields are not matched yet still answers, with `missing` set and no rows checked, so the
-	merchant can match them in the Map step."""
+	"""A dry run shared by the Review step and run_import(): each row with its issue, or none. Unmatched
+	required fields answer with `missing` set and no rows checked, for the Map step."""
 	rows = read_uploaded_rows(file_url)
 	if not rows:
 		frappe.throw(_("Your file has no rows. Add a header row and your products, then upload it again."))
@@ -281,9 +274,8 @@ class RowChecker:
 		return parsed
 
 	def read_amounts(self, row, parsed):
-		"""flt() swallows a bad string down to 0.0, which would silently turn "not-a-number" into an
-		unpriced row, and float() reads "inf" and "nan", so amounts are parsed strictly and a bad one
-		is the row's error."""
+		"""Strict, because flt() turns "not-a-number" into 0.0 (an unpriced row) and float() reads "inf" and
+		"nan". A bad amount is the row's error."""
 		issue = None
 		for field, label in (
 			("sale_price", _("Price")),
@@ -357,11 +349,15 @@ class RowChecker:
 		title, row = parsed["title"], first["row"]
 		if parsed["collection"] != first["collection"]:
 			return error(
-				_('Collection does not match row {0} of "{1}", which is in {2}.').format(row, title, first["collection"])
+				_('Collection does not match row {0} of "{1}", which is in {2}.').format(
+					row, title, first["collection"]
+				)
 			)
 		if bool(parsed["color"]) != bool(first["color"]):
 			return error(
-				_('Row {0} of "{1}" differs. Give every row of a product a color, or none.').format(row, title)
+				_('Row {0} of "{1}" differs. Give every row of a product a color, or none.').format(
+					row, title
+				)
 			)
 		if bool(parsed["size"]) != bool(first["size"]):
 			return error(

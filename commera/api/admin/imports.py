@@ -1,9 +1,8 @@
 # Copyright (c) 2026, company@bwhstudios.com and contributors
 # For license information, please see license.txt
 
-"""Bulk product import: a spreadsheet template, and the importer that reads one back. One row is one
-colour/size; rows sharing a Product Title become one product via catalog.create_product, priced once
-per colour."""
+"""Bulk product import from a spreadsheet: one row is one colour/size, and rows sharing a Product Title
+become one product via catalog.create_product, priced once per colour."""
 
 import math
 import os
@@ -100,7 +99,9 @@ def get_image_groups(parsed_rows):
 					"key": key,
 					"title": group["title"],
 					"color": row["color"],
-					"slug": "-".join(filter(None, [slugify(group["title"]), slugify(row["color"])])),
+					"slug": "-".join(
+						part for part in (slugify(group["title"]), slugify(row["color"])) if part
+					),
 				}
 	return list(groups.values())
 
@@ -414,7 +415,7 @@ def get_orphan_image_errors(parsed_rows, file_urls_by_key, used_image_keys):
 		if key in used_image_keys or not file_urls:
 			continue
 		row = first_row_by_key.get(key, {})
-		name = " · ".join(filter(None, [row.get("title"), row.get("color")])) or key
+		name = " · ".join(part for part in (row.get("title"), row.get("color")) if part) or key
 		message = (
 			_("No product was created for {0}, so its photo was not attached.").format(name)
 			if len(file_urls) == 1

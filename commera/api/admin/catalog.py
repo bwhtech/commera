@@ -618,9 +618,8 @@ def get_product(item_template: str):
 		"restock_level": restock_level,
 		"option_attribute": option_attribute,
 		"can_edit_options": bool(template.has_variants and configurators),
-		# Every size the product sells, once, in the Size attribute's order. A sparse colour lists only
-		# its own sizes, so the screen cannot rebuild this order from the colours alone: Red S/M and
-		# Blue S/L would merge as S, L, M.
+		# In the Size attribute's order: from sparse colours alone, Red S/M and Blue S/L would merge as
+		# S, L, M.
 		"size_order": list(dict.fromkeys(row.size for row in sizes)),
 		"variants": [
 			{
@@ -640,9 +639,8 @@ def get_product(item_template: str):
 
 
 def sort_by_first_item(variants: list, sizes_by_variant: dict) -> list:
-	"""Colours in the order the seller added them. create_product makes the size items in the order they
-	were typed but the colour rows in whatever order generate_variants groups them, so a colour's first item
-	is the truer clock; a colour with no items falls back to its own creation."""
+	"""Colours in the order the seller added them: generate_variants groups colour rows in no set order, so
+	a colour's first item is the truer clock, and a colour with no items falls back to its own creation."""
 	item_codes = [
 		size["item_code"] for sizes in sizes_by_variant.values() for size in sizes if size["item_code"]
 	]
@@ -913,9 +911,8 @@ def get_default_collection() -> str | None:
 
 
 def get_seeded_item_groups() -> list:
-	"""Products, Raw Material, Services, Sub Assemblies, Consumable: ERPNext's setup wizard files them
-	for stock-keeping, not a storefront, so a shop owner never picked them. Read from ERPNext's own
-	preset list, in English and in the site language the wizard may have used."""
+	"""The groups ERPNext's setup wizard makes for stock-keeping (Products, Raw Material…), read from its
+	preset list in English and in the site language the wizard may have used."""
 	from erpnext.setup.setup_wizard.operations.install_fixtures import get_preset_records
 
 	country = frappe.db.get_single_value("System Settings", "country") or ""
@@ -1445,9 +1442,8 @@ def create_product(
 			frappe.DuplicateEntryError,
 		)
 
-	# A book has neither a colour nor a size, so both axes fall back to a single hidden value - an owner who
-	# named no options (sizes alone included) hangs on the fallback axis, not on whichever attribute the
-	# form had selected.
+	# A product with no named option (sizes alone included) hangs on the hidden fallback axis, not on
+	# whichever attribute the form had selected.
 	option_sizes = parse_option_sizes(option_sizes)
 	names_an_option = any(
 		option.casefold() != DEFAULT_OPTION_VALUE.casefold() for option, _sizes in option_sizes

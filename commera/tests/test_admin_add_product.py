@@ -10,6 +10,7 @@ from commera.api.admin.catalog import (
 	DEFAULT_SIZE_VALUE,
 	SIZE_ATTRIBUTE,
 	create_product,
+	ensure_attribute_exists,
 	get_attribute_values,
 	get_attributes,
 	get_collections,
@@ -87,6 +88,9 @@ class TestAddProduct(ProductOnboardingTestCase):
 		return item_group.name
 
 	def test_size_and_the_placeholder_are_not_option_axes(self):
+		# Made here, not assumed: in CI's test order nothing may have created Color or Size yet.
+		ensure_attribute_exists("Color", "Red", "RED")
+		ensure_attribute_exists(SIZE_ATTRIBUTE, DEFAULT_SIZE_VALUE, "OS")
 		options = {row["name"]: row["is_option"] for row in get_attributes()}
 
 		self.assertTrue(options["Color"])

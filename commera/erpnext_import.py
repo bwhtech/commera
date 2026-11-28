@@ -252,9 +252,8 @@ class ImportAlreadyRunningError(frappe.ValidationError):
 
 
 def get_selection_key(item_codes: list | None) -> str:
-	"""Names what an import was started for, so a second start can tell the same items (a page
-	reloaded while they import) from other ones. None is every importable item. A digest, not the
-	codes, because the status rides every progress update to the browser."""
+	"""What an import was started for, so a restart can tell the same items from other ones (None is every
+	item). A digest, not the codes, because the status rides every progress update to the browser."""
 	if item_codes is None:
 		return "all"
 	return hashlib.sha256("\n".join(sorted(set(item_codes))).encode()).hexdigest()
@@ -273,9 +272,7 @@ def queue_import(item_codes: list | None) -> dict:
 		)
 
 	log = create_configurator_log()
-	set_status(
-		JOB_ID, get_new_progress("queued", log.name, total=len(item_codes or []), selection=selection)
-	)
+	set_status(JOB_ID, get_new_progress("queued", log.name, total=len(item_codes or []), selection=selection))
 	frappe.enqueue(
 		import_items,
 		queue="long",
@@ -328,9 +325,8 @@ def import_items(item_codes: list | None, log_name: str, import_id: str = JOB_ID
 
 
 def get_failure_message(error, item_code):
-	"""What the result card says about an item that failed. A refusal (ValidationError) is written for
-	the seller already. Anything else is a bug: its text ("'NoneType' object has no attribute ...") is
-	for the error log, where it goes, and the seller is told the plain consequence."""
+	"""A refusal (ValidationError) is already written for the seller. Anything else is a bug: its text goes
+	to the error log, and the seller is told the plain consequence."""
 	if isinstance(error, frappe.ValidationError) and cstr(error):
 		return cstr(error)
 	frappe.log_error(f"ERPNext import of {item_code}")
