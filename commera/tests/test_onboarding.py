@@ -224,21 +224,41 @@ class StartStoreSetupTestCase(IntegrationTestCase):
 		onboarding.set_setup_status("running")
 		polled = []
 
-		def poll(*args):
+		def poll(*args, **kwargs):
 			polled.append(onboarding_api.get_setup_status()["stage"])
 
 		with (
 			patch("commera.onboarding.is_job_enqueued", return_value=True),
 			patch("commera.onboarding.run_frappe_setup", side_effect=poll),
+			patch("commera.onboarding.get_or_create_selling_price_list"),
 			patch("commera.onboarding.seed_commera_settings", side_effect=poll),
 			patch("commera.onboarding.create_payment_modes", side_effect=poll),
 			patch("frappe.publish_realtime") as publish,
 		):
-			onboarding.run_store_setup({"company_name": "Zz Staged"})
+			onboarding.run_store_setup({"company_name": "Zz Staged", "currency": "INR"})
 
 		self.assertEqual(polled, ["company", "storefront", "payments"])
 		published = [call.args[1].get("stage") for call in publish.call_args_list]
 		self.assertEqual(published, ["company", "storefront", "payments", None])
+
+	def test_new_store_sells_from_its_own_sale_price_list(self):
+		fields = ["company", "default_price_list", "sale_price_list", "ecommerce_warehouse"]
+		saved = frappe.db.get_value(SETTINGS, SETTINGS, fields, as_dict=True)
+		self.addCleanup(frappe.db.set_single_value, SETTINGS, saved)
+		currency = frappe.db.get_value("Company", TEST_COMPANY, "default_currency")
+		with (
+			patch("commera.onboarding.run_frappe_setup"),
+			patch("commera.onboarding.create_payment_modes"),
+			patch("frappe.publish_realtime"),
+		):
+			onboarding.run_store_setup({"company_name": TEST_COMPANY, "currency": currency})
+
+		sale_price_list = frappe.db.get_single_value(SETTINGS, "sale_price_list")
+		self.assertEqual(sale_price_list, f"{TEST_COMPANY} Sale")
+		self.assertEqual(
+			frappe.db.get_value("Price List", sale_price_list, ["selling", "enabled", "currency"]),
+			(1, 1, currency),
+		)
 
 
 class SetupStatusAcrossRequestsTestCase(IntegrationTestCase):
