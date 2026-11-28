@@ -5,10 +5,16 @@ import { __ } from './translation.js'
 // longer title is refused by the server in ERPNext's words. Say it on the field first.
 export const TITLE_MAX_LENGTH = 140
 
-export function titleLengthError(title) {
-  return (title ?? '').trim().length > TITLE_MAX_LENGTH
-    ? __('Use {0} characters or fewer for the title.', [TITLE_MAX_LENGTH])
-    : ''
+export function titleLengthError(title, max = TITLE_MAX_LENGTH) {
+  return (title ?? '').trim().length > max ? __('Use {0} characters or fewer for the title.', [max]) : ''
+}
+
+// A new product also names records after its title: "<title> <option>" for its option list and
+// "<title> - <value>" for each value's page. The longest of those must fit in 140 too, so the limit
+// at creation depends on the option and its values (no option is "Title" with "Standard").
+export function newProductTitleLimit(attribute, values) {
+  const suffixes = [` ${attribute}`, ...values.map((value) => ` - ${value}`)]
+  return TITLE_MAX_LENGTH - Math.max(...suffixes.map((suffix) => suffix.length))
 }
 
 // What a shopper is actually charged for a priced row (a size, or a pricing-screen row): the

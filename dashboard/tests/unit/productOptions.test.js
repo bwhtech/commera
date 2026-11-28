@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { optionChanges, pairKey } from '../../src/data/optionSizes.js'
-import { productOptions, useProductStats } from '../../src/data/product.js'
+import { newProductTitleLimit, productOptions, titleLengthError, useProductStats } from '../../src/data/product.js'
 
 const variant = (option, sizes) => ({ option, sizes: sizes.map((size) => ({ size })) })
 
@@ -89,4 +89,12 @@ test('the price range leaves out a size with no price, so it never reads ₹0', 
   assert.equal(stats.value.priceHigh, 1299)
   const unpriced = useProductStats({ variants: [sized('Black', [null, 0])] })
   assert.equal(unpriced.value.priceLow, null)
+})
+
+test('a new product title leaves room for the names made from it', () => {
+  // "<title> - Standard" is the longest name a product with no option makes.
+  assert.equal(newProductTitleLimit('Title', ['Standard']), 129)
+  assert.equal(newProductTitleLimit('Color', ['Black', 'Navy']), 132)
+  assert.equal(titleLengthError('T'.repeat(129), 129), '')
+  assert.equal(titleLengthError('T'.repeat(130), 129), 'Use 129 characters or fewer for the title.')
 })

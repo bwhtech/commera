@@ -11,7 +11,15 @@ import { useRouter } from 'vue-router'
 import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { addProduct, closeAddProduct } from '../data/addProduct'
 import { newProductOptionSizes } from '../data/optionSizes'
-import { hasPrice, originalPriceError, priceInputRates, titleLengthError } from '../data/product'
+import {
+  PLACEHOLDER_ATTRIBUTE,
+  PLACEHOLDER_OPTION,
+  hasPrice,
+  newProductTitleLimit,
+  originalPriceError,
+  priceInputRates,
+  titleLengthError,
+} from '../data/product'
 import { productRoute } from '../ia/routes'
 import { errorMessage } from '../data/errors'
 import { __ } from '../data/translation'
@@ -225,7 +233,12 @@ async function focusTitle() {
 // The price is required. create_product only writes Item Prices for a rate above zero, so a product
 // created without one carries no Item Price row at all and reads as 0 until someone prices it by hand.
 // The first thing still missing is named next to the button, so a disabled button is never silent.
-const shownTitleError = computed(() => titleError.value || titleLengthError(title.value))
+const titleLimit = computed(() =>
+  colors.value.length
+    ? newProductTitleLimit(optionAttribute.value, colors.value)
+    : newProductTitleLimit(PLACEHOLDER_ATTRIBUTE, [PLACEHOLDER_OPTION]),
+)
+const shownTitleError = computed(() => titleError.value || titleLengthError(title.value, titleLimit.value))
 
 const missingReason = computed(() => {
   if (!title.value.trim()) return __('Add a title to continue.')

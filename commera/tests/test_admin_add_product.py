@@ -57,8 +57,30 @@ class TestAddProduct(ProductOnboardingTestCase):
 			)
 
 	def test_a_title_past_the_item_name_column_is_refused_in_plain_words(self):
-		with self.assertRaisesRegex(frappe.ValidationError, "Use 140 characters or fewer for the title."):
-			self.add_product(title="T" * 141)
+		# No option: the longest generated name is "<title> - Standard", which leaves 129.
+		with self.assertRaisesRegex(frappe.ValidationError, "Use 129 characters or fewer for the title."):
+			self.add_product(title="T" * 130)
+
+	def test_a_title_at_the_creation_limit_makes_every_record(self):
+		# Color/Black: the longest generated name is "<title> - Black", so the title may use 132.
+		title = f"Limit {frappe.generate_hash(length=6).upper()} " + "T" * 119
+		self.assertEqual(len(title), 132)
+		item_template = self.add_product(
+			title=title, option_attribute="Color", option_sizes=[{"option": "Black", "sizes": ["S", "M"]}]
+		)
+		with self.assertRaisesRegex(frappe.ValidationError, "Use 132 characters or fewer for the title."):
+			self.add_product(
+				title=title + "X",
+				option_attribute="Color",
+				option_sizes=[{"option": "Black", "sizes": ["S"]}],
+			)
+
+		variants = frappe.get_all("Item", filters={"variant_of": item_template}, fields=["name", "item_name"])
+		self.assertEqual(len(variants), 2)
+		for variant in variants:
+			self.assertLessEqual(len(variant.name), 140)
+			self.assertLessEqual(len(variant.item_name), 140)
+		self.assertTrue(frappe.db.exists("Style Attribute Variant", f"{item_template} - Black"))
 
 	def test_a_taken_title_is_a_duplicate_entry(self):
 		title = f"Add Product {frappe.generate_hash(length=6).upper()}"

@@ -1411,9 +1411,16 @@ DEFAULT_SIZE_VALUE = "One Size"
 TITLE_MAX_LENGTH = 140
 
 
-def check_title_length(title: str):
-	if len(title) > TITLE_MAX_LENGTH:
-		frappe.throw(_("Use {0} characters or fewer for the title.").format(TITLE_MAX_LENGTH))
+def check_title_length(title: str, limit: int = TITLE_MAX_LENGTH):
+	if len(title) > limit:
+		frappe.throw(_("Use {0} characters or fewer for the title.").format(limit))
+
+
+def get_new_product_title_limit(option_attribute: str, options: list) -> int:
+	"""A new product also names "<title> <option>" (its configurator) and "<title> - <value>" (each value's
+	page), so the longest of those must fit in 140 as well. Mirrors newProductTitleLimit() in product.js."""
+	suffixes = [f" {option_attribute}", *(f" - {option}" for option in options)]
+	return TITLE_MAX_LENGTH - max(len(suffix) for suffix in suffixes)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -1436,7 +1443,6 @@ def create_product(
 	title = cstr(title).strip()
 	if not title:
 		frappe.throw(_("Enter a product title"))
-	check_title_length(title)
 
 	# An Item is named after its title (autoname "field:item_code"), so a reserved "New Item" prefix and a
 	# repeat title both surface from inside insert() as messages a shop owner cannot act on.
@@ -1489,6 +1495,9 @@ def create_product(
 		if isinstance(size_abbreviations, str)
 		else size_abbreviations,
 	)
+	check_title_length(
+		title, get_new_product_title_limit(option_attribute, [option for option, _ in option_sizes])
+	)
 
 	item_template = frappe.new_doc("Item")
 	item_template.item_code = title
@@ -1506,6 +1515,7 @@ def create_product(
 		for size in sizes:
 			size_item = create_variant(item_template.name, {option_attribute: option, size_attribute: size})
 			size_item.item_name = get_variant_title(title, option, size)
+			fit_variant_names(size_item, item_template.name)
 			size_item.insert()
 
 	configurator = frappe.new_doc("Style Attribute Configurator")
@@ -1729,6 +1739,7 @@ def save_product_options(
 			continue
 		size_item = create_variant(item_template, {option_attribute: option, SIZE_ATTRIBUTE: size})
 		size_item.item_name = get_variant_title(template_title, option, size)
+		fit_variant_names(size_item, item_template)
 		size_item.insert()
 		item_code_by_key[key] = size_item.name
 		created_codes.append(size_item.name)
@@ -1781,6 +1792,20 @@ def switch_option_attribute(item_template: str, configurator: dict, option_attri
 
 	bump_catalog()
 	return switched_codes
+
+
+def fit_variant_names(size_item, item_template: str):
+	"""A variant's code is "<template>-<abbreviations>", so a title near the 140-character limit overflows
+	it. Shorten the template part, keep the suffix that tells variants apart, and never repeat a code."""
+	if len(size_item.item_code) > TITLE_MAX_LENGTH:
+		suffix = size_item.item_code[len(item_template) :]
+		stem = item_template[: TITLE_MAX_LENGTH - len(suffix)]
+		size_item.item_code = stem + suffix
+		if frappe.db.exists("Item", size_item.item_code):
+			unique = f"-{frappe.generate_hash(length=4).upper()}"
+			size_item.item_code = stem[: -len(unique)] + unique + suffix
+	if len(size_item.item_name) > TITLE_MAX_LENGTH:
+		size_item.item_name = size_item.item_name[: TITLE_MAX_LENGTH - 1] + "…"
 
 
 def get_variant_title(title: str, option: str, size: str) -> str:
