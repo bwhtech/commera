@@ -16,6 +16,7 @@ from commera.api.variant_pricing import (
 	get_selling_price_lists,
 	set_variant_prices,
 )
+from commera.data.product_taxonomy import PRODUCT_TAXONOMY
 from commera.data.store_options import SUPERSEDED_VALUES
 from commera.plugin_events import add_changed_products
 from commera.product_collections import (
@@ -1250,6 +1251,29 @@ def clear_swatch(attribute: str, value: str):
 		frappe.delete_doc("Swatch", existing)
 
 	return {"value": value, "color": None, "image": None}
+
+
+@frappe.whitelist()
+def get_product_types(category: str):
+	frappe.has_permission("Item Attribute", ptype="read", throw=True)
+
+	groups = PRODUCT_TAXONOMY.get(cstr(category).strip(), {})
+	return [{"group": group, "product_types": list(product_types)} for group, product_types in groups.items()]
+
+
+@frappe.whitelist()
+def get_option_suggestions(product_type: str):
+	frappe.has_permission("Item Attribute", ptype="read", throw=True)
+
+	product_type = cstr(product_type).strip()
+	for groups in PRODUCT_TAXONOMY.values():
+		for product_types in groups.values():
+			if product_type in product_types:
+				return [
+					{"name": attribute, "values": list(values)}
+					for attribute, values in product_types[product_type].items()
+				]
+	return []
 
 
 # A product that sells as a single item still needs both variant axes present: Color Size Item.size is
