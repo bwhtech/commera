@@ -93,3 +93,19 @@ router.beforeEach((to) => {
   const target = firstPluginRoute() ?? '/no-pages'
   return to.path === target ? true : { path: target, replace: true }
 })
+
+// A rebuild renames every lazy chunk, so a tab opened before it fails to import the next screen it has not loaded yet.
+// A full load fetches the new chunk names; the remembered target stops a chunk that is really gone from reloading forever.
+const STALE_CHUNK = /dynamically imported module|Importing a module script failed|Unable to preload CSS/
+const STALE_CHUNK_RELOAD = 'commera:stale-chunk-reload'
+
+router.onError((error, to) => {
+  if (!STALE_CHUNK.test(error?.message)) return
+  if (sessionStorage.getItem(STALE_CHUNK_RELOAD) === to.fullPath) return
+  sessionStorage.setItem(STALE_CHUNK_RELOAD, to.fullPath)
+  window.location.assign(router.resolve(to.fullPath).href)
+})
+
+router.afterEach((_to, _from, failure) => {
+  if (!failure) sessionStorage.removeItem(STALE_CHUNK_RELOAD)
+})
