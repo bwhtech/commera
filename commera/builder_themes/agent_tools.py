@@ -52,11 +52,12 @@ def run_check_page(ctx, args: dict) -> str:
 	page, why = find_page(ctx, args.get("page"))
 	if not page:
 		return f"FAILED: {why}."
+	# before the role: a page the user cannot read must not show whether it is a theme page
+	if not frappe.has_permission("Builder Page", "read", doc=page):
+		return f"FAILED: you cannot read page {page}."
 	role = get_page_role(page)
 	if not role:
 		return f"FAILED: {page} is not a page of a Commera theme."
-	if not frappe.has_permission("Builder Page", "read", doc=page):
-		return f"FAILED: you cannot read page {page}."
 	return describe(role.page_type, check_page(role.page_type, get_root(ctx, page)))
 
 

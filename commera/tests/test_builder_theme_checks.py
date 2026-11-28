@@ -10,8 +10,15 @@ import frappe
 
 from commera.builder_themes.agent_context import get_agent_context
 from commera.builder_themes.agent_tools import CHECK_PAGE
+from commera.builder_themes.cards import get_card
 from commera.builder_themes.checks import check_page
-from commera.builder_themes.page_data import get_data_for
+from commera.builder_themes.listing import Listing
+from commera.builder_themes.page_data import (
+	get_collection_link,
+	get_data_for,
+	get_menu_link,
+	get_product_shape,
+)
 from commera.builder_themes.pages import (
 	HOME,
 	PRODUCT_DETAIL,
@@ -19,7 +26,7 @@ from commera.builder_themes.pages import (
 	get_theme_pages,
 	is_builder_installed,
 )
-from commera.builder_themes.schema import ROOT_KEY, get_page_schema
+from commera.builder_themes.schema import CARD, MENU_LINK, PAGE_KEYS, ROOT_KEY, get_page_schema
 from commera.builder_themes.theme import create_builder_theme
 from commera.tests.test_product_details import ProductDetailPriceTestCase
 
@@ -102,15 +109,60 @@ class TestThemePageChecks(ProductDetailPriceTestCase):
 				data = {ROOT_KEY: get_data_for(page_type, {})}
 				self.assert_same_keys(data, get_page_schema(page_type), page_type)
 
-	def assert_same_keys(self, value, shape, path):
+	def test_every_declared_shape_is_what_its_producer_returns(self):
+		"""Full inputs, so no list is empty and no group is missing: a renamed key cannot hide."""
+		rating = {"average": 4.5, "count": 2}
+		card = {
+			"title": "Shirt",
+			"handle": "shirt",
+			"image": "/a.jpg",
+			"hover_image": "/b.jpg",
+			"vendor": "V",
+		}
+		card |= {"color": "Red", "price": 80, "compare_at_price": 100, "currency": "USD", "available": True}
+		color = {"name": "Red", "handle": "shirt-red", "selected": True, "available": True}
+		variants = [{"id": f"SKU-{size}", "title": size, "price": 80, "available": True} for size in "SM"]
+		product = card | {
+			"description_html": "<p>Soft</p>",
+			"images": ["/a.jpg"],
+			"options": [{"name": "Colour", "values": [color | {"swatch": {"color": "#f00"}}]}],
+			"variants": variants,
+			"collection": {"title": "Shirts", "handle": "shirts"},
+			"rating": rating,
+		}
+		listing = Listing({"colors": "Red", "has_discount": "1"})
+		made = {
+			"card": (get_card(card | {"rating": rating}), CARD),
+			"product": (get_product_shape(product), PAGE_KEYS[PRODUCT_DETAIL]["product"]),
+			"menu": (get_menu_link({"title": "Men", "url": "/men", "items": []}), MENU_LINK),
+			"collection": (
+				get_collection_link({"title": "Shirts", "handle": "shirts", "image": "/a.jpg"}),
+				PAGE_KEYS[HOME]["collections"][0],
+			),
+			"filters": (
+				listing.get_filters({"colors": [{"value": "Red", "count": 1}]}),
+				PAGE_KEYS[PRODUCT_LISTING]["filters"],
+			),
+			"active_filters": (listing.get_active_filters(), PAGE_KEYS[PRODUCT_LISTING]["active_filters"]),
+			"pagination": (listing.get_pagination(2), PAGE_KEYS[PRODUCT_LISTING]["pagination"]),
+			"collections": (listing.get_collection_links(), PAGE_KEYS[PRODUCT_LISTING]["collections"]),
+		}
+		for name, (value, shape) in made.items():
+			with self.subTest(name=name):
+				self.assert_same_keys(value, shape, name, is_full=True)
+
+	def assert_same_keys(self, value, shape, path, is_full=False):
 		if isinstance(shape, list):
 			self.assertIsInstance(value, list, path)
+			self.assertTrue(value or not is_full, f"{path} is empty")
 			for item in value:
-				self.assert_same_keys(item, shape[0], f"{path}[]")
-		elif isinstance(shape, dict) and value is not None:
+				self.assert_same_keys(item, shape[0], f"{path}[]", is_full)
+		elif isinstance(shape, dict) and (value is not None or is_full):
 			self.assertEqual(set(value), set(shape), path)
 			for key, item in value.items():
-				self.assert_same_keys(item, shape[key], f"{path}.{key}")
+				# a menu link holds menu links without end: one level is enough
+				if shape[key] != [shape]:
+					self.assert_same_keys(item, shape[key], f"{path}.{key}", is_full)
 		else:
 			self.assertNotIsInstance(value, (list, dict), path)
 
@@ -151,7 +203,7 @@ class TestThemePageChecks(ProductDetailPriceTestCase):
 	def test_a_repeater_reads_only_its_items_keys(self):
 		outside = block("p", bind={"innerHTML": "commera.shop.name"})
 		typo = block("p", bind={"innerHTML": "pirce"})
-		cards = block("div", card(), outside, typo, repeat="commera.related_products")
+		cards = block("div", block("div", card(), outside, typo), repeat="commera.related_products")
 		found = messages(check_page(PRODUCT_DETAIL, product_page(cards)))
 		self.assertEqual(len(found), 2, found)
 		self.assertIn("reads only its item's keys", found[0])
@@ -207,6 +259,53 @@ class TestThemePageChecks(ProductDetailPriceTestCase):
 		found = messages(problems, warnings=True)
 		self.assertEqual(len(found), 3, found)
 		self.assertTrue(any("'/products' is typed in" in message for message in found))
+
+	def test_older_binding_forms_are_read_as_builder_reads_them(self):
+		page = product_page()
+		cart = page["children"][0]
+		cart["dynamicValues"] = []
+		cart["dataKey"] = {"key": "commera.shop.cart_url", "property": "href", "type": "attribute"}
+		self.assertEqual(check_page(PRODUCT_DETAIL, page), [])
+
+		bare = block("p")
+		bare["dynamicValues"] = ["commera.shop.nmae"]
+		hidden = block("p")
+		hidden["visibilityCondition"] = "commera.product.is_availble"
+		found = messages(check_page(PRODUCT_DETAIL, product_page(bare, hidden)))
+		self.assertEqual(len(found), 2, found)
+		self.assertIn("Did you mean 'commera.shop.name'?", found[0])
+		self.assertIn("Did you mean 'commera.product.is_available'?", found[1])
+
+	def test_only_a_repeaters_first_child_counts(self):
+		title = block("p", bind={"innerHTML": "title"})
+		cards = block("div", title, card(), repeat="commera.featured_products")
+		problems = check_page(HOME, block("div", header(), cards))
+		self.assert_one_problem(problems, "'commera.featured_products' do not link")
+
+	def test_a_repeater_on_props_keeps_the_page_keys(self):
+		wrong = block("p", bind={"innerHTML": "commera.product.titel"})
+		tabs = block("div", wrong, repeat="tabs")
+		tabs["dataKey"]["comesFrom"] = "props"
+		self.assert_one_problem(check_page(PRODUCT_DETAIL, product_page(tabs)), "'commera.product.titel'")
+
+	def test_a_part_needs_a_link_not_only_its_key(self):
+		tooltip = block("div", bind={"title": "commera.shop.cart_url"})
+		home = block("div", tooltip, block("div", card(), repeat="commera.featured_products"))
+		self.assert_one_problem(check_page(HOME, home), "No link to the cart")
+
+		page = listing_page()
+		page["children"][-1] = block("p", bind={"innerHTML": "commera.pagination.page"})
+		self.assert_one_problem(check_page(PRODUCT_LISTING, page), "No pagination links")
+		number = block("a", bind={"href": "url", "innerHTML": "number"})
+		page["children"][-1] = block("div", number, repeat="commera.pagination.pages")
+		self.assertEqual(check_page(PRODUCT_LISTING, page), [])
+
+	def test_custom_attributes_count(self):
+		page = product_page()
+		for child in page["children"]:
+			if "data-commera-cart-message" in child.get("attributes", {}):
+				child["customAttributes"] = child.pop("attributes")
+		self.assertEqual(check_page(PRODUCT_DETAIL, page), [])
 
 
 @unittest.skipUnless(is_builder_installed(), "Frappe Builder is not installed on this site")
@@ -287,3 +386,51 @@ class TestBobChecksThemePages(ProductDetailPriceTestCase):
 		reply = self.check(PRODUCT_DETAIL, page)
 		self.assertTrue(reply.startswith("FAILED: 1 to fix"), reply)
 		self.assertIn(f"- block {wrong['blockId']} of component {component.name}: 'commera.shop.nmae'", reply)
+
+	def make_component(self, name, root):
+		component = {"doctype": "Builder Component", "component_name": name, "block": frappe.as_json(root)}
+		return frappe.get_doc(component).insert().name
+
+	def test_an_instance_is_checked_with_what_the_page_changes_on_it(self):
+		cart = header()
+		name = block("p", bind={"innerHTML": "commera.shop.nmae"})
+		component = self.make_component("Checked Shop Name", block("div", cart, name))
+
+		def instance(key):
+			"""The component on a page, which binds its name block to another key."""
+			changed = block("p", bind={"innerHTML": key})
+			changed["referenceBlockId"] = name["blockId"]
+			kept = block("a")
+			kept["referenceBlockId"] = cart["blockId"]
+			return block("div", kept, changed, component=component)
+
+		page = product_page()
+		page["children"][0] = instance("commera.shop.name")
+		self.assertEqual(
+			self.check(PRODUCT_DETAIL, page), "OK: the Product Detail page passes Commera's checks."
+		)
+		page["children"][0] = instance("commera.shop.nam")
+		self.assertIn("'commera.shop.nam' is not a key", self.check(PRODUCT_DETAIL, page))
+
+	def test_a_component_is_checked_in_each_place_it_is_used(self):
+		component = self.make_component("Checked Card", card())
+		home = block(
+			"div",
+			header(),
+			block("div", block("a", component=component), repeat="commera.featured_products"),
+			block("div", block("a", component=component), repeat="commera.sale_products"),
+		)
+		self.assertEqual(self.check(HOME, home), "OK: the Home page passes Commera's checks.")
+		home["children"].append(block("div", block("a", component=component), repeat="commera.footer"))
+		self.assertIn("'url' is not a key of an item of 'commera.footer'", self.check(HOME, home))
+
+	def test_a_page_the_user_cannot_read_does_not_show_its_role(self):
+		other = frappe.get_doc({"doctype": "Builder Page", "page_title": "Not a theme page"}).insert()
+		user = frappe.get_doc(
+			{"doctype": "User", "email": "no-builder@example.com", "first_name": "No Builder"}
+		).insert(ignore_permissions=True)
+		frappe.set_user(user.name)
+		self.addCleanup(frappe.set_user, "Administrator")
+		for page in (self.pages[PRODUCT_LISTING], other.name):
+			reply = self.check(HOME, block("div"), page=page)
+			self.assertEqual(reply, f"FAILED: you cannot read page {page}.")
