@@ -2544,7 +2544,6 @@ Enter a price above zero to continue.,أدخل سعرًا أكبر من صفر �
 A product with this title already exists.,يوجد منتج بهذا العنوان بالفعل.
 "Saved, but not published yet. You add photos next.",يُحفظ دون نشره بعد. تضيف الصور بعد ذلك.
 Original price,السعر الأصلي
-Shown crossed out next to the price. Must be higher than the price.,يظهر مشطوبًا بجانب السعر. يجب أن يكون أعلى من السعر.
 Add original price,إضافة السعر الأصلي
 Each color and size pair is a variant you sell and stock.,كل لون ومقاس معًا هو متغير تبيعه وتخزّنه.
 "Use another option, like Material",استخدم خيارًا آخر، مثل الخامة
@@ -2572,7 +2571,6 @@ Each {0} has its own photos. The first one is the cover. Photos save as you add 
 Enter a price above zero.,أدخل سعرًا أكبر من صفر.
 Enter a quantity to add.,أدخل كمية لإضافتها.
 Enter a title.,أدخل عنوانًا.
-Fix the highlighted fields to save,صحّح الحقول المميزة للحفظ
 "Live, except {0}: add a size to publish it.",منشور، باستثناء {0}: أضف مقاسًا لنشره.
 Live on your store,منشور في متجرك
 Live. Shoppers can find and buy this product.,منشور. يمكن للمتسوقين العثور على هذا المنتج وشراؤه.
@@ -2646,7 +2644,6 @@ Many products to go,ما زالت منتجات كثيرة
 {0} could not go live yet. Open them from your products to finish them.,تعذّر نشر {0} بعد. افتحها من منتجاتك لإكمالها.
 Customers can find them on your store now.,يمكن للعملاء العثور عليها في متجرك الآن.
 "Fix the rows below in your file, then import it again.",أصلح الصفوف أدناه في ملفك، ثم استورده مرة أخرى.
-"These products are not published yet. Publish them now, or later from each product page.",هذه المنتجات غير منشورة بعد. انشرها الآن، أو لاحقًا من صفحة كل منتج.
 Importing your products,جارٍ استيراد منتجاتك
 Adding 1 product…,جارٍ إضافة منتج واحد…
 Adding {0} products…,جارٍ إضافة {0} منتجات…
@@ -2754,7 +2751,6 @@ No products were published,لم يُنشر أي منتج
 "Price does not match row {0}. Every size of ""{1}"" has the same price.","السعر لا يطابق الصف {0}. لكل مقاسات ""{1}"" السعر نفسه."
 Customers can find it on your store now.,يمكن للعملاء العثور عليه في متجرك الآن.
 Sizes of {0},مقاسات {0}
-Fix the ticked sizes to continue.,صحّح المقاسات المحددة للمتابعة.
 Details,التفاصيل
 "Clear {0} shown","مسح {0} معروضة"
 "Select {0} shown","تحديد {0} معروضة"
@@ -2820,3 +2816,7 @@ Upload photos for {0},ارفع صورًا لـ{0}
 Items ({0} of {1}),العناصر ({0} من {1})
 Pick one to continue.,اختر واحدًا للمتابعة.
 Enter a value to continue.,أدخل قيمة للمتابعة.
+Tick a size for each {0} to continue.,اختر مقاسًا واحدًا على الأقل لكل {0} للمتابعة.
+Shown crossed out next to the price.,يظهر مشطوبًا بجانب السعر.
+"Publish them now, or later from each product page.",انشرها الآن، أو لاحقًا من صفحة كل منتج.
+Fix the highlighted fields to save.,صحّح الحقول المميزة للحفظ.

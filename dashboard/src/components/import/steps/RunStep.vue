@@ -90,7 +90,8 @@ const warningsTitle = computed(() =>
 const doneBody = computed(() => {
   if (published.value != null) return publishedBody(published.value, notPublished.value.length)
   if (!imp.created.length) return __('Fix the rows below in your file, then import it again.')
-  return __('These products are not published yet. Publish them now, or later from each product page.')
+  // The title already says "not published yet"; the body only says what to do about it.
+  return __('Publish them now, or later from each product page.')
 })
 </script>
 

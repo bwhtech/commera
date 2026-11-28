@@ -15,6 +15,9 @@ function loadFormDialog({ isMobile = false, confirmLeave = async () => true } = 
   const DialogShell = loadComponent('components/DialogShell', {
     BottomSheet: surface('bottom-sheet'), Button: shell, Dialog: surface('dialog'),
     DialogTitle: primitive('dialog-title'), useIsMobile: () => viewport,
+    // No content element in the test renderer, so the shell's attribute fixes have nothing to touch.
+    injectDialogRootContext: () => ({ descriptionId: '', contentElement: Vue.ref(null) }),
+    useDialogLayer: () => Vue.ref(false),
   })
   return loadComponent('components/FormDialog', {
     Button: shell, DialogDescription: primitive('dialog-description'), DialogShell,
@@ -88,4 +91,21 @@ test('a dirty sheet cannot be swiped or tapped away, because a swipe cannot be a
   const sheet = (dirty) => render({ title: 'Add product', dirty }, { isMobile: true }).all('bottom-sheet')[0]
   assert.equal(sheet(true).props.dismissible, false)
   assert.equal(sheet(false).props.dismissible, true)
+})
+
+test('a sheet draws its own title, with the × on its row only when asked for', () => {
+  const sheet = (closeButton) => {
+    const DialogShell = loadComponent('components/DialogShell', {
+      BottomSheet: surface('bottom-sheet'), Button: shell, Dialog: surface('dialog'),
+      DialogTitle: primitive('dialog-title'), useIsMobile: () => Vue.ref(true),
+      injectDialogRootContext: () => ({ descriptionId: '', contentElement: Vue.ref(null) }),
+      useDialogLayer: () => Vue.ref(false),
+    })
+    return mount({ render: () => Vue.h(DialogShell, { open: true, title: 'Import products', closeButton }) }).root
+  }
+  const withClose = sheet('always')
+  const title = findNode(withClose, (node) => node.type === 'dialog-title')
+  assert.equal(title.children.map((child) => child.text).join(''), 'Import products')
+  assert.ok(title.parent.children.some((node) => node.type === 'button'))
+  assert.equal(findNode(sheet('desktop'), (node) => node.type === 'button'), undefined)
 })

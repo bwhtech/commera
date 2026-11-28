@@ -47,16 +47,39 @@ function openVariant(variant, { withPriceFocused = false } = {}) {
   showVariant.value = true
 }
 
-// The page's Add price on a phone, where the price column is hidden: the first color the publish
-// check stops on opens in its dialog.
+const isUnpriced = (size) => !hasPrice(priceInputs(size).price)
+
+// The inline price editors, by the row they price: a color's name, or a size's item code on a
+// product with sizes only, where each size row has its own. A plain object, not a ref: the page
+// reads it once per Add price, and a reactive one would re-render the list on every mount.
+const priceEditors = {}
+function setPriceEditor(key, editor) {
+  if (editor) priceEditors[key] = editor
+  else delete priceEditors[key]
+}
+
+// The page's Add price. On a phone, where the price column is hidden, the first color the publish
+// check stops on opens in its dialog. From sm up its inline price editor opens in the row, with the
+// caret in the input, so the click visibly lands somewhere and the seller can type at once.
 function openFirstUnpriced() {
-  const unpriced = props.product.variants.find((variant) =>
-    variant.sizes.some((size) => !hasPrice(priceInputs(size).price)),
-  )
-  if (unpriced) openVariant(unpriced, { withPriceFocused: true })
+  const unpriced = props.product.variants.find((variant) => variant.sizes.some(isUnpriced))
+  if (!unpriced) return
+  if (isMobile.value) {
+    openVariant(unpriced, { withPriceFocused: true })
+    return
+  }
+  const key = sizesOnlyVariant.value ? groupSizes(unpriced).find(isUnpriced)?.item_code : unpriced.name
+  priceEditors[key]?.open()
 }
 
 defineExpose({ openFirstUnpriced })
+
+// "No price", not ₹0, for a row with no price yet: the words the rail, the Products list and the
+// publish check use, where a 0 reads as "free".
+function priceText(size) {
+  const { price } = priceInputs(size)
+  return hasPrice(price) ? money(price) : __('No price')
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -337,16 +360,20 @@ const sizeColumns = {
       <dl v-if="hasOptions" class="border-t border-outline-gray-1">
         <div v-if="hasColors" class="flex items-start gap-3 px-4 py-3">
           <dt class="w-20 shrink-0 pt-0.5 text-base text-ink-gray-6">{{ optionName || __('Option') }}</dt>
+          <!-- frappe-ui's Badge is nowrap, so a long value held its full width and ran past the card
+               at 390px. max-w-full caps each pill at the row (it also caps a flex item's automatic
+               minimum), and the inner span truncates; the full value stays in the DOM for a screen
+               reader, in the title on hover, and in full as the color's dialog title. -->
           <dd class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-            <Badge v-for="value in options.options" :key="value" variant="subtle">
-              <span class="flex items-center gap-1.5">
+            <Badge v-for="value in options.options" :key="value" class="max-w-full" variant="subtle" :title="value">
+              <span class="flex min-w-0 items-center gap-1.5">
                 <SwatchDot
                   v-if="swatches[value]?.color || swatches[value]?.image"
                   :color="swatches[value]?.color"
                   :image="swatches[value]?.image"
                   size="xs"
                 />
-                {{ value }}
+                <span class="truncate">{{ value }}</span>
               </span>
             </Badge>
           </dd>
@@ -354,7 +381,9 @@ const sizeColumns = {
         <div v-if="options.sizes.length" class="flex items-start gap-3 border-t border-outline-gray-1 px-4 py-3 first:border-t-0">
           <dt class="w-20 shrink-0 pt-0.5 text-base text-ink-gray-6">{{ __('Size') }}</dt>
           <dd class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-            <Badge v-for="size in options.sizes" :key="size" :label="size" variant="subtle" />
+            <Badge v-for="size in options.sizes" :key="size" class="max-w-full" variant="subtle" :title="size">
+              <span class="truncate">{{ size }}</span>
+            </Badge>
           </dd>
         </div>
       </dl>
@@ -405,7 +434,7 @@ const sizeColumns = {
                 >
                   <span class="block truncate text-base-medium text-ink-gray-8">{{ size.size }}</span>
                   <span class="block text-sm text-ink-gray-6 tabular-nums sm:hidden">
-                    {{ money(priceInputs(size).price ?? 0) }}
+                    {{ priceText(size) }}
                     <span v-if="priceInputs(size).originalPrice" class="line-through">{{ money(priceInputs(size).originalPrice) }}</span>
                     · {{ stockLabel(size.stock) }}
                   </span>
@@ -413,7 +442,9 @@ const sizeColumns = {
               </ListCell>
               <ListCell class="flex-col !items-end max-sm:hidden" data-price-cell>
                 <EditableValue
-                  :model-value="priceInputs(size).price ?? 0"
+                  :ref="(editor) => setPriceEditor(size.item_code, editor)"
+                  :model-value="priceInputs(size).price"
+                  :empty-label="__('No price')"
                   :label="__('Price')"
                   :description="priceScopeHint(sizesOnlyVariant)"
                   :trigger-label="__('Edit price of {0}', [product.title])"
@@ -477,7 +508,7 @@ const sizeColumns = {
                            are the only place a phone shows these numbers. -->
                       <DotList class="text-sm text-ink-gray-6 tabular-nums" :parts="colorFacts(item)" />
                       <span class="block text-sm text-ink-gray-6 tabular-nums sm:hidden">
-                        {{ money(priceInputs(item.sizes[0]).price ?? 0) }}
+                        {{ priceText(item.sizes[0]) }}
                         <span v-if="priceInputs(item.sizes[0]).originalPrice" class="line-through">{{ money(priceInputs(item.sizes[0]).originalPrice) }}</span>
                       </span>
                     </span>
@@ -489,7 +520,9 @@ const sizeColumns = {
                    prices keep one right edge down the column whether a row has one or not. -->
               <ListCell class="flex-col !items-end max-sm:hidden" data-price-cell>
                 <EditableValue
-                  :model-value="priceInputs(item.sizes[0]).price ?? 0"
+                  :ref="(editor) => setPriceEditor(item.name, editor)"
+                  :model-value="priceInputs(item.sizes[0]).price"
+                  :empty-label="__('No price')"
                   :label="__('Price')"
                   :description="priceScopeHint(item) || undefined"
                   :trigger-label="__('Edit price of {0}', [colorLabel(item)])"

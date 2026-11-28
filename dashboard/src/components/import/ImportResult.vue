@@ -30,7 +30,8 @@ const tone = computed(() => {
       <span :class="[tone.icon, 'size-6']" aria-hidden="true" />
     </div>
     <h2 class="mt-4 text-xl-semibold text-ink-gray-9">{{ title }}</h2>
-    <p v-if="body" class="mx-auto mt-1.5 max-w-md text-p-base text-ink-gray-6">{{ body }}</p>
+    <!-- text-pretty: centred, a one-word last line ("page.") reads as a stray. -->
+    <p v-if="body" class="mx-auto mt-1.5 max-w-md text-pretty text-p-base text-ink-gray-6">{{ body }}</p>
     <slot name="details" />
     <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
       <slot />

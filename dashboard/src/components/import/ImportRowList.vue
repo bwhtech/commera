@@ -28,7 +28,7 @@ defineProps({
     <ul v-scroll-fade class="max-h-56 divide-y divide-outline-gray-1 overflow-y-auto">
       <li v-for="entry in entries" :key="entry.key" class="px-4 py-2.5">
         <div class="break-words text-base tabular-nums text-ink-gray-8">{{ entry.name }}</div>
-        <p class="text-p-sm text-ink-gray-6">{{ entry.message }}</p>
+        <p class="text-pretty text-p-sm text-ink-gray-6">{{ entry.message }}</p>
       </li>
     </ul>
     <p v-if="footer" class="border-t border-outline-gray-1 px-4 py-2.5 text-p-sm text-ink-gray-6">{{ footer }}</p>

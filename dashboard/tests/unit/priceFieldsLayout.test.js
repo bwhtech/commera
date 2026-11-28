@@ -6,7 +6,7 @@ import { hasPrice } from '../../src/data/product.js'
 
 const field = {
   props: ['label', 'error'],
-  render() { return Vue.h('field', { label: this.label }, this.$slots.prefix?.()) },
+  render() { return Vue.h('field', { label: this.label }, [this.$slots.prefix?.(), Vue.h('input'), this.$slots.suffix?.()]) },
 }
 const PriceFields = loadComponent('components/PriceFields', {
   Button: shell, FormControl: field, hasPrice, symbolFor: () => '₹', __: (text) => text,
@@ -35,8 +35,7 @@ test('Price stands alone at full width with the add link until an original price
   assert.equal(view.original(), undefined)
   assert.equal(view.isTwoColumns(), false)
 
-  view.button('Add original price').props.onClick()
-  await Vue.nextTick()
+  await view.button('Add original price').props.onClick()
   assert.ok(view.original())
   assert.equal(view.isTwoColumns(), true)
   assert.equal(view.button('Add original price'), undefined)
@@ -51,4 +50,10 @@ test('a stored original price shows, and × clears and hides it', async () => {
   assert.equal(view.model.originalPrice, null)
   assert.equal(view.original(), undefined)
   assert.ok(view.button('Add original price'))
+})
+
+test('adding an original price moves focus into the new field, since the add button unmounts', async () => {
+  const view = render(null)
+  await view.button('Add original price').props.onClick()
+  assert.equal(view.original().children.find((node) => node.type === 'input').focused, true)
 })

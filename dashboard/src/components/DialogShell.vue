@@ -6,9 +6,10 @@
  * only asks to close through `update:open`, and the caller decides (FormDialog asks before it
  * drops typed work, ImportDialog says a run keeps going).
  */
-import { computed, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { BottomSheet, Button, Dialog } from 'frappe-ui'
-import { DialogTitle } from 'reka-ui'
+import { DialogTitle, injectDialogRootContext } from 'reka-ui'
+import { useDialogLayer } from '../utils/dialogLayers'
 import { useIsMobile } from '../utils/useIsMobile'
 
 const props = defineProps({
@@ -20,8 +21,8 @@ const props = defineProps({
   // Escape and a click outside (and, on a phone, a swipe down) ask to close.
   dismissible: { type: Boolean, default: true },
   // `desktop`: the × shows next to the title from `sm` only, because a sheet's footer always has
-  // Cancel. `always`: a phone gets one too, in the sheet's corner, for a flow whose footer has no
-  // way out. `none`: the buttons are the only way out.
+  // Cancel. `always`: a phone gets one too, on the sheet's title row, for a flow whose footer has
+  // no way out. `none`: the buttons are the only way out.
   closeButton: { type: String, default: 'desktop' },
   closeDisabled: { type: Boolean, default: false },
   // A confirm reads as one block; a form's footer is set off from the fields above it.
@@ -77,24 +78,120 @@ function scrollToTop() {
 }
 
 defineExpose({ scrollToTop })
+
+// A dialog opened over this one (a "Discard changes?", a "New collection") covers it.
+const isCovered = useDialogLayer(open)
+
+// Made inert while it still holds focus, the covered dialog would drop focus to <body> before the
+// one on top takes it, and that one would then hand focus back to <body> when it closes. So the
+// covered dialog waits for focus to leave it first.
+function whenFocusLeaves(element, callback) {
+  if (!element.contains(document.activeElement)) {
+    callback()
+    return null
+  }
+  const stop = () => document.removeEventListener('focusin', onFocusIn)
+  function onFocusIn() {
+    if (element.contains(document.activeElement)) return
+    stop()
+    callback()
+  }
+  document.addEventListener('focusin', onFocusIn)
+  return stop
+}
+
+/*
+ * Corrects the dialog's content element where neither frappe-ui's Dialog nor its BottomSheet lets a
+ * caller set an attribute. It renders inside them, because reka's dialog context (which knows the
+ * content element and the description id) can only be read below DialogRoot, and this shell sits
+ * above it. Recheck each rule when frappe-ui changes these components.
+ * - aria-describedby: BottomSheet hard-codes it to undefined (its way of telling reka a sheet has no
+ *   description), which also drops the one every shell here draws, so a sheet lost "Color of Cotton
+ *   tee" or "What you entered here is not saved." Linked only when the description is in the DOM.
+ * - aria-modal: reka does not set it, so the tree reported the dialog as non-modal.
+ * - aria-label: BottomSheet labels a sheet without its `title` prop "Bottom sheet". This shell draws
+ *   its own DialogTitle, which names the sheet through aria-labelledby, so the stale label goes.
+ * - inert while covered: reka hides everything outside the top dialog, except that aria-hidden keeps
+ *   every aria-live region and its ancestors exposed, and FormDialog's footer reason line is one. So
+ *   the form under a confirm stayed in the accessibility tree. Inert takes it out until the top one
+ *   closes; it is removed as soon as the top one starts closing, so its focus return lands.
+ */
+const ContentAttributes = defineComponent({
+  props: { covered: { type: Boolean, default: false } },
+  setup(attributeProps) {
+    const context = injectDialogRootContext()
+    const content = ref(null)
+    let stopWaiting = null
+
+    function cover(covered) {
+      stopWaiting?.()
+      stopWaiting = null
+      const element = content.value
+      if (!element) return
+      if (covered) stopWaiting = whenFocusLeaves(element, () => (element.inert = true))
+      else element.inert = false
+    }
+
+    onMounted(async () => {
+      // reka hands its content element to the context in its own onMounted, which runs after this
+      // child's.
+      await nextTick()
+      const element = context.contentElement?.value
+      // Until reka has a content element it holds a placeholder comment (nodeType 8), or nothing.
+      if (element?.nodeType !== 1) return
+      content.value = element
+      element.setAttribute('aria-modal', 'true')
+      if (element.hasAttribute('aria-labelledby')) element.removeAttribute('aria-label')
+      if (!element.hasAttribute('aria-describedby') && document.getElementById(context.descriptionId)) {
+        element.setAttribute('aria-describedby', context.descriptionId)
+      }
+      cover(attributeProps.covered)
+    })
+    watch(() => attributeProps.covered, cover)
+    onBeforeUnmount(() => cover(false))
+
+    return () => null
+  },
+})
 </script>
 
 <template>
+  <!-- No `title` prop: the sheet draws its own, in the sticky header below, so the × can sit on
+       the title's row and the description can sit close under it. BottomSheet's title lives in
+       its grab-handle block, out of reach of both. -->
   <BottomSheet
     v-if="rendered && isMobile"
     v-model:open="open"
-    :title="props.title"
     :dismissible="props.dismissible"
     @after-leave="onAfterLeave"
   >
+    <ContentAttributes :covered="isCovered" />
     <!-- The sheet's own scroll region holds all of this, so the header and the footer are pinned
          with sticky rather than taken out of the flow: a short sheet still hugs its content.
          z-20 keeps them over body content that is itself positioned, such as OptionSizeGrid's
-         z-10 sticky column. -->
-    <div v-if="$slots.header" class="sticky top-0 z-20 bg-surface-base px-4 pb-3 text-center">
+         z-10 sticky column. The header's description (mt-1 in the slot) sits 4px under the title
+         and 16px (pb-4) above the body, so it reads as the title's, not the body's. -->
+    <div class="sticky top-0 z-20 bg-surface-base px-4 pb-4 text-center">
+      <!-- pt-2 and the type are BottomSheet's own title, so a sheet reads the same with or
+           without the ×. The × is in the row, top-aligned with the first line of the title
+           (28px beside a 27px line), and 16px in from the edge, clear of the 36px corner. A
+           same-size spacer on the start side keeps the title centred on the sheet. -->
+      <div class="flex items-start gap-2 pt-2">
+        <span v-if="showSheetClose" class="size-7 shrink-0" aria-hidden="true" />
+        <DialogTitle class="min-w-0 flex-1 text-3xl-semibold text-ink-gray-9">{{ props.title }}</DialogTitle>
+        <Button
+          v-if="showSheetClose"
+          class="shrink-0"
+          variant="ghost"
+          icon="lucide-x"
+          :aria-label="__('Close')"
+          :disabled="props.closeDisabled"
+          @click="requestClose"
+        />
+      </div>
       <slot name="header" />
     </div>
-    <div ref="sheetBody" class="px-4 pb-5" :class="{ 'pt-1': !$slots.header }">
+    <div ref="sheetBody" class="px-4 pb-5">
       <slot />
     </div>
     <!-- pb: the home-indicator inset on a notched phone, or 1rem where it is smaller (the same
@@ -107,18 +204,6 @@ defineExpose({ scrollToTop })
       <!-- A thumb needs a taller target than a pointer: frappe-ui's lg is 40px. -->
       <slot name="footer" button-size="lg" />
     </div>
-    <!-- The sheet's DialogContent is `fixed`, so it is this button's containing block and the
-         scroll region (not positioned) does not clip it: the × stays in the corner while the body
-         scrolls. -->
-    <Button
-      v-if="showSheetClose"
-      class="absolute end-3 top-3"
-      variant="ghost"
-      icon="lucide-x"
-      :aria-label="__('Close')"
-      :disabled="props.closeDisabled"
-      @click="requestClose"
-    />
   </BottomSheet>
 
   <Dialog
@@ -131,6 +216,7 @@ defineExpose({ scrollToTop })
     :dismissible="props.dismissible"
     @after-leave="onAfterLeave"
   >
+    <ContentAttributes :covered="isCovered" />
     <div class="flex flex-col" :class="PANEL_HEIGHTS[props.position]">
       <div class="px-6 pb-4 pt-5">
         <div class="flex items-start gap-3">

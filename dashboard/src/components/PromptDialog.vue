@@ -7,10 +7,11 @@
 import { computed } from 'vue'
 import { FormControl } from 'frappe-ui'
 import FormDialog from './FormDialog.vue'
-import { promptState, submitPrompt } from '../utils/confirmDialog'
+import { isPromptDirty, promptState, submitPrompt } from '../utils/confirmDialog'
 import { __ } from '../data/translation'
 
 const isEmpty = computed(() => String(promptState.value ?? '').trim() === '')
+const isDirty = computed(isPromptDirty)
 </script>
 
 <template>
@@ -23,6 +24,7 @@ const isEmpty = computed(() => String(promptState.value ?? '').trim() === '')
     :primary-disabled="isEmpty"
     :reason="isEmpty ? (promptState.type === 'select' ? __('Pick one to continue.') : __('Enter a value to continue.')) : ''"
     :loading="promptState.loading"
+    :dirty="isDirty"
     @submit="submitPrompt"
   >
     <FormControl

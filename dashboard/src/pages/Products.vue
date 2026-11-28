@@ -300,7 +300,9 @@ function collectionSummary(product) {
       :row-height="isMobile ? undefined : Math.max(ia.density, 44)"
       :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['1fr', '7rem', '11rem', '8rem', '7rem'] }"
     >
-      <ListHeader>
+      <!-- gray-6: frappe-ui's gray-5 header is 4.18:1, under AA for 13px text. style.css carries it to
+           the sort buttons, which paint their own ink. -->
+      <ListHeader class="text-ink-gray-6">
         <ListHeaderCellSort :direction="directionFor('title')" @click="toggleSort('title')">
           {{ __('Product') }}
         </ListHeaderCellSort>

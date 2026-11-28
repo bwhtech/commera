@@ -66,7 +66,7 @@ const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'er
       </p>
     </div>
 
-    <DotList class="text-base text-ink-gray-8" :parts="summary" />
+    <DotList class="text-base tabular-nums text-ink-gray-8" :parts="summary" />
 
     <TabButtons v-if="filterOptions.length > 2" v-model="activeFilter" :options="filterOptions" />
 
@@ -98,9 +98,11 @@ const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'er
           <ListHeader class="text-ink-gray-6">
             <ListHeaderCell>{{ __('Product') }}</ListHeaderCell>
             <ListHeaderCell>{{ __('Collection') }}</ListHeaderCell>
-            <ListHeaderCell>{{ __('Price') }}</ListHeaderCell>
-            <ListHeaderCell>{{ __('Stock') }}</ListHeaderCell>
-            <ListHeaderCell>{{ __('Status') }}</ListHeaderCell>
+            <!-- Price and Stock end-align, header included, like every number column in the product
+                 flows (the product page, the variant dialog, the Products list). -->
+            <ListHeaderCell class="justify-end">{{ __('Price') }}</ListHeaderCell>
+            <ListHeaderCell class="justify-end">{{ __('Stock') }}</ListHeaderCell>
+            <ListHeaderCell class="ps-4">{{ __('Status') }}</ListHeaderCell>
           </ListHeader>
           <ListRows :items="filtered" row-key="row" v-slot="{ item }">
             <ListRow :value="String(item.row)">
@@ -116,17 +118,18 @@ const statusLabel = (row) => (!row.issue ? __('Ready') : row.issue.level === 'er
                 </div>
               </ListCell>
               <ListCell><span class="truncate text-sm text-ink-gray-7">{{ item.collection || '—' }}</span></ListCell>
-              <ListCell>
+              <ListCell class="justify-end">
                 <span class="text-sm tabular-nums text-ink-gray-7">{{ priceOf(item) }}</span>
                 <s v-if="originalPriceOf(item)" class="ms-1.5 text-sm tabular-nums text-ink-gray-6">{{ originalPriceOf(item) }}</s>
               </ListCell>
-              <ListCell>
+              <ListCell class="justify-end">
                 <span class="text-sm tabular-nums" :class="item.stock ? 'text-ink-gray-7' : 'text-ink-gray-6'">{{ item.stock || 0 }}</span>
               </ListCell>
-              <ListCell>
+              <!-- ps-4: an end-aligned Stock figure would otherwise sit one 8px column gap from the badge. -->
+              <ListCell class="ps-4">
                 <div class="min-w-0 py-2">
                   <ToneBadge :label="statusLabel(item)" :tone="statusTone(item)" />
-                  <p v-if="item.issue" class="mt-1 text-p-sm text-ink-gray-6">{{ item.issue.text }}</p>
+                  <p v-if="item.issue" class="mt-1 text-pretty text-p-sm text-ink-gray-6">{{ item.issue.text }}</p>
                 </div>
               </ListCell>
             </ListRow>

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { optionChanges, pairKey } from '../../src/data/optionSizes.js'
-import { productOptions } from '../../src/data/product.js'
+import { productOptions, useProductStats } from '../../src/data/product.js'
 
 const variant = (option, sizes) => ({ option, sizes: sizes.map((size) => ({ size })) })
 
@@ -80,4 +80,13 @@ test('the store size order wins over what sparse colors imply', () => {
 test('the store size order drops the placeholder size', () => {
   const product = { size_order: ['One Size'], variants: [variant('Indigo', ['One Size'])] }
   assert.deepEqual(productOptions(product).sizes, [])
+})
+
+test('the price range leaves out a size with no price, so it never reads ₹0', () => {
+  const sized = (option, rates) => ({ option, sizes: rates.map((sale_rate, index) => ({ size: `S${index}`, sale_rate })) })
+  const stats = useProductStats({ variants: [sized('Black', [null, 0]), sized('White', [999, 1299])] })
+  assert.equal(stats.value.priceLow, 999)
+  assert.equal(stats.value.priceHigh, 1299)
+  const unpriced = useProductStats({ variants: [sized('Black', [null, 0])] })
+  assert.equal(unpriced.value.priceLow, null)
 })

@@ -50,13 +50,21 @@ function toggleItem(itemCode, isSelected) {
 
 const kindLabel = (item) => KIND_LABELS[item.kind] ?? item.kind
 
+// A plain item has no options to name: "No options" on every row of a plain catalog is noise. The
+// kind shows only on an item that has some, and the Options column only while one is on the page.
+const hasOptions = (item) => item.kind !== 'plain'
+const showsOptions = computed(() => imp.erpnext.items.some(hasOptions))
+const pickColumns = computed(() =>
+  showsOptions.value ? ['minmax(0,1fr)', '9rem', '7rem', '5rem'] : ['minmax(0,1fr)', '7rem', '5rem'],
+)
+
 const factsOf = (item) => [
-  kindLabel(item),
+  hasOptions(item) && kindLabel(item),
   item.price
     ? { label: money(item.price), class: 'tabular-nums text-ink-gray-7' }
     : { label: __('No price yet'), class: 'text-ink-amber-8' },
   { label: __('{0} in stock', [item.stock || 0]), class: 'tabular-nums' },
-]
+].filter(Boolean)
 
 // Items made in Desk are named after their code by default, and "Bowl / Bowl · Products" says the
 // name twice. The code shows only when it tells the seller something the name does not.
@@ -172,16 +180,17 @@ const tabs = computed(() => [
           v-model:selection="pageSelection"
           class="list-row-px-2"
           selectable
-          :columns="['minmax(0,1fr)', '9rem', '7rem', '5rem']"
+          :columns="pickColumns"
           :row-height="52"
         >
+          <!-- Price and Stock end-align, header included, like every number column in the product flows. -->
           <ListHeader class="text-ink-gray-6">
             <ListHeaderCell>{{ __('Item') }}</ListHeaderCell>
-            <ListHeaderCell>{{ __('Options') }}</ListHeaderCell>
-            <ListHeaderCell>{{ __('Price') }}</ListHeaderCell>
-            <ListHeaderCell>{{ __('Stock') }}</ListHeaderCell>
+            <ListHeaderCell v-if="showsOptions">{{ __('Options') }}</ListHeaderCell>
+            <ListHeaderCell class="justify-end">{{ __('Price') }}</ListHeaderCell>
+            <ListHeaderCell class="justify-end">{{ __('Stock') }}</ListHeaderCell>
           </ListHeader>
-          <ListSkeleton v-if="previewRequest.loading && !imp.erpnext.items.length" :columns="4" />
+          <ListSkeleton v-if="previewRequest.loading && !imp.erpnext.items.length" :columns="pickColumns.length" />
           <ListRows v-else :items="imp.erpnext.items" row-key="item_code" v-slot="{ item }">
             <ListRow :value="item.item_code">
               <ListCell>
@@ -193,14 +202,14 @@ const tabs = computed(() => [
                   </div>
                 </div>
               </ListCell>
-              <ListCell>
-                <Badge :label="kindLabel(item)" theme="gray" variant="subtle" />
+              <ListCell v-if="showsOptions">
+                <Badge v-if="hasOptions(item)" :label="kindLabel(item)" theme="gray" variant="subtle" />
               </ListCell>
-              <ListCell>
+              <ListCell class="justify-end">
                 <span v-if="item.price" class="text-sm text-ink-gray-7 tabular-nums">{{ money(item.price) }}</span>
                 <span v-else class="text-sm text-ink-amber-8">{{ __('No price yet') }}</span>
               </ListCell>
-              <ListCell>
+              <ListCell class="justify-end">
                 <span class="text-sm tabular-nums" :class="item.stock ? 'text-ink-gray-7' : 'text-ink-gray-6'">
                   {{ item.stock || 0 }}
                 </span>

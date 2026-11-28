@@ -36,7 +36,8 @@ const failureEntries = computed(() =>
 const doneBody = computed(() => {
   if (published.value != null) return publishedBody(published.value, notPublished.value.length)
   if (!created.value) return __('Fix the items below in ERPNext, then import them again.')
-  return __('These products are not published yet. Publish them now, or later from each product page.')
+  // The title already says "not published yet"; the body only says what to do about it.
+  return __('Publish them now, or later from each product page.')
 })
 
 const router = useRouter()
@@ -92,7 +93,7 @@ function finish(path) {
     <template v-else>
       <ImportResult :published="published" :title="doneTitle(created, published)" :body="doneBody">
         <template v-if="skipped" #details>
-          <p class="mx-auto mt-1 max-w-md text-p-sm text-ink-gray-6">
+          <p class="mx-auto mt-1 max-w-md text-p-sm tabular-nums text-ink-gray-6">
             {{
               skipped === 1
                 ? __('1 item is already a product, so it was left alone.')

@@ -38,13 +38,23 @@ export const promptState = reactive({
   type: 'text',
   options: [],
   value: '',
+  // What the field opened with: the dialog is dirty, and asks before closing, once `value` differs.
+  initialValue: '',
   confirmLabel: '',
   submit: null,
   loading: false,
 })
 
 export function askValue({ title, message = '', label, type = 'text', options = [], value = '', confirmLabel, submit }) {
-  Object.assign(promptState, { open: true, title, message, label, type, options, value, confirmLabel, submit, loading: false })
+  Object.assign(promptState, {
+    open: true, title, message, label, type, options, value, initialValue: value, confirmLabel, submit, loading: false,
+  })
+}
+
+// Compared as text: a number field hands back a string as soon as it is edited, so 5 and "5" are
+// the same value, and typing a digit and deleting it leaves the dialog clean again.
+export function isPromptDirty() {
+  return String(promptState.value ?? '') !== String(promptState.initialValue ?? '')
 }
 
 export async function submitPrompt() {

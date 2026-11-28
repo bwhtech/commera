@@ -21,3 +21,13 @@ test('a new question answers the open one "no", so no caller waits forever', asy
   settleConfirm(true)
   assert.equal(await second, true)
 })
+
+test('a prompt is dirty only while its value differs from the one it opened with', async () => {
+  const { askValue, isPromptDirty, promptState } = await import('../../src/utils/confirmDialog.js')
+  askValue({ title: 'Low-stock level', label: 'Level', type: 'number', value: 5, confirmLabel: 'Save', submit: async () => true })
+  assert.equal(isPromptDirty(), false)
+  promptState.value = '99'
+  assert.equal(isPromptDirty(), true)
+  promptState.value = '5'
+  assert.equal(isPromptDirty(), false)
+})

@@ -209,19 +209,19 @@ const isMissingPrice = computed(() => {
 
 const variantEditor = ref(null)
 
-// A product sold as one item has its Price on the page; otherwise each color's price is in Variants,
-// where the first input is a row checkbox, so focus goes to the first price trigger instead. A phone
-// hides the price column (the price rides the name's second line), so there the color that needs a
-// price opens in its own dialog with Price focused.
+// A product sold as one item has its Price on the page, so Price takes focus. Otherwise each color
+// has its own price, and VariantEditor opens the first one the publish check stops on: in its
+// dialog on a phone, which hides the price column, and in its row's inline editor from sm up.
+// Focusing a closed price trigger instead left a pointer click with no ring and nothing open.
 function goToPrice() {
-  if (!singleItem.value && isMobile.value) {
+  if (!singleItem.value) {
+    if (!isMobile.value) document.getElementById('product-variants')?.scrollIntoView({ block: 'start' })
     variantEditor.value?.openFirstUnpriced()
     return
   }
-  const section = document.getElementById(singleItem.value ? 'product-pricing' : 'product-variants')
+  const section = document.getElementById('product-pricing')
   section?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  const target = singleItem.value ? 'input' : '[data-price-cell] button'
-  section?.querySelector(target)?.focus({ preventScroll: true })
+  section?.querySelector('input')?.focus({ preventScroll: true })
 }
 
 // Gray subtle, not the Alert's default amber label: amber ink on the Alert's gray-1 surface measures
@@ -326,8 +326,10 @@ const loadFailure = computed(() =>
           <Button icon="lucide-ellipsis" :label="__('More actions')" />
         </Dropdown>
         <template v-if="isDirty">
-          <span class="hidden text-p-sm text-ink-gray-6 md:inline">
-            {{ hasErrors ? __('Fix the highlighted fields to save') : __('Unsaved changes') }}
+          <!-- The error in the red of the field errors below it, as on a phone; plain unsaved work
+               stays a gray status. -->
+          <span class="hidden text-p-sm md:inline" :class="hasErrors ? 'text-ink-red-7' : 'text-ink-gray-6'">
+            {{ hasErrors ? __('Fix the highlighted fields to save.') : __('Unsaved changes') }}
           </span>
           <Button :label="__('Discard')" variant="subtle" theme="gray" :disabled="saving" @click="discard" />
           <Button
@@ -374,8 +376,10 @@ const loadFailure = computed(() =>
         <PageBody width="narrow">
           <div v-if="publishBlocker || showsGlance || (!hasRail && isDirty && hasErrors)" class="mb-4 space-y-1">
             <Alert v-if="publishBlocker" theme="amber" :title="publishBlocker" :primary-action="addPriceAction" />
-            <p v-if="isDirty && hasErrors" class="text-p-sm text-ink-red-6 md:hidden">
-              {{ __('Fix the highlighted fields to save') }}
+            <!-- red-7, the field errors' red (style.css), so this line and "Enter a title." under it
+                 read as one red: red-6 measured 4.84:1 on the dark page. -->
+            <p v-if="isDirty && hasErrors" class="text-p-sm text-ink-red-7 md:hidden">
+              {{ __('Fix the highlighted fields to save.') }}
             </p>
             <p v-if="showsGlance" class="text-p-sm text-ink-gray-6 tabular-nums">{{ glance }}</p>
           </div>

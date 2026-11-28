@@ -71,7 +71,7 @@ function onOpenChange(value) {
   >
     <template v-if="props.description" #header>
       <!-- reka's DialogDescription carries the id the dialog's aria-describedby points at. -->
-      <DialogDescription class="mt-1 text-p-sm text-ink-gray-6">{{ props.description }}</DialogDescription>
+      <DialogDescription class="mt-1 text-pretty text-p-sm text-ink-gray-6">{{ props.description }}</DialogDescription>
     </template>
 
     <slot />

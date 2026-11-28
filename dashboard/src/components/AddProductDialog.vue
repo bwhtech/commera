@@ -232,8 +232,9 @@ const missingReason = computed(() => {
   if (!hasPrice(price.value)) return __('Enter a price above zero to continue.')
   if (priceError.value) return __('Fix the original price to continue.')
   if (!collection.value) return __('Pick a collection to continue.')
-  // The full sentence already sits under the grid; the footer only says what blocks the button.
-  if (gridError.value) return __('Fix the ticked sizes to continue.')
+  // The full sentence already sits under the grid; the footer only says what blocks the button. A
+  // grid error is always a row with no size ticked, so it says that, not "fix" something.
+  if (gridError.value) return __('Tick a size for each {0} to continue.', [optionAttribute.value.toLowerCase()])
   return ''
 })
 

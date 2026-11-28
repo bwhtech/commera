@@ -127,7 +127,11 @@ function addStock(rows) {
               <td class="py-2 pe-3 text-base text-ink-gray-8">
                 {{ size.size }}
               </td>
-              <td class="py-2 text-end text-base tabular-nums text-ink-gray-8">{{ size.stock ?? 0 }}</td>
+              <!-- Zero steps down to gray-6, as on the page's variant rows, so an empty size reads
+                   the same in both places. -->
+              <td class="py-2 text-end text-base tabular-nums" :class="size.stock ? 'text-ink-gray-8' : 'text-ink-gray-6'">
+                {{ size.stock ?? 0 }}
+              </td>
             </tr>
           </tbody>
         </table>

@@ -121,9 +121,9 @@ export function useProductStats(source) {
     const committed = sizes.reduce((sum, size) => sum + (size.committed ?? 0), 0)
     // The range a shopper sees, so it reads the charged rate too — a size priced on the sale
     // list alone has no default_rate at all and would otherwise drop out of the range entirely.
-    const rates = sizes
-      .filter((size) => size.sale_rate != null || size.default_rate != null)
-      .map((size) => shownPrice(size))
+    // A rate of 0 is a price never set, like a missing one (hasPrice): counted, it would turn the
+    // range into "₹0 – ₹999" where the rows say "No price".
+    const rates = sizes.map((size) => shownPrice(size)).filter(hasPrice)
 
     const sales = product.recent_sales ?? { units_sold: 0, order_count: 0, revenue: 0 }
 

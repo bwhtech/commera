@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { Button, Spinner, toast } from 'frappe-ui'
 import { DialogDescription } from 'reka-ui'
 import { canChangeStep, closeImport, imp, isMappingChecked, steps } from '../../data/importFlow'
@@ -17,6 +17,7 @@ import RunStep from './steps/RunStep.vue'
 import ErpnextPickStep from './steps/ErpnextPickStep.vue'
 import ErpnextRunStep from './steps/ErpnextRunStep.vue'
 import { __ } from '../../data/translation'
+import { useIsMobile } from '../../utils/useIsMobile'
 
 const stepComponents = {
   csv: { source: SourceStep, upload: UploadStep, map: MapStep, images: ImagesStep, review: ReviewStep, run: RunStep },
@@ -37,12 +38,46 @@ watch(
 
 const isReady = computed(() => imp.hasSourceChoice !== null)
 
-// One scroll box serves every step, so a new step would otherwise open where the last one was left.
+const isMobile = useIsMobile()
 const shell = ref(null)
+const stepBody = ref(null)
+
+const FOCUSABLE = 'button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), a[href]'
+
+// A step change swaps the body under the button that made it: Continue turns disabled, changes its
+// label or (on the last step) unmounts, and focus falls to <body>, where the next Tab leaves the
+// modal for the page behind it. The new step's heading takes focus instead (every step opens with
+// one), which also reads the step out to a screen reader. One scroll box serves every step, so it
+// goes back to the top first.
 watch(
   () => imp.step,
-  () => shell.value?.scrollToTop(),
+  async () => {
+    shell.value?.scrollToTop()
+    await nextTick()
+    const heading = stepBody.value?.querySelector('h2')
+    if (!heading) return
+    heading.tabIndex = -1
+    heading.focus({ preventScroll: true })
+  },
 )
+
+// On open, focus goes to the first control of the first step rather than ×, the way FormDialog opens
+// on its first field. It waits for the step itself: on a first open the body is a spinner until
+// ERPNext answers. The frame lets reka finish its own open focus first, so this one is the last word.
+// Not on a phone, where the sheet focuses itself and a focused field would pop the keyboard.
+watch(
+  () => imp.open && isReady.value,
+  async (isShown) => {
+    if (!isShown || isMobile.value) return
+    await nextTick()
+    requestAnimationFrame(() => {
+      const control = [...(stepBody.value?.querySelectorAll(FOCUSABLE) ?? [])].find((element) => element.checkVisibility())
+      control?.focus()
+    })
+  },
+  { immediate: true },
+)
+
 const stepKey = computed(() => steps.value[imp.step]?.key)
 
 // "Step 2 of 5 · Match columns". The source step has no total and no step bar: picking ERPNext or a
@@ -131,13 +166,13 @@ function close() {
   >
     <!-- The step line and the step bar stay put above the body, like FormDialog's description. -->
     <template #header>
-      <DialogDescription class="mt-1 text-p-sm text-ink-gray-6">{{ stepLine }}</DialogDescription>
+      <DialogDescription class="mt-1 text-p-sm tabular-nums text-ink-gray-6">{{ stepLine }}</DialogDescription>
       <div v-if="isReady && !isSourceStep" class="mt-4">
         <ImportStepNav />
       </div>
     </template>
 
-    <div class="sm:pt-2">
+    <div ref="stepBody" class="sm:pt-2">
       <component :is="current" v-if="isReady" @next="next" />
       <div v-else class="flex justify-center py-14"><Spinner class="size-5" /></div>
     </div>
@@ -165,8 +200,9 @@ function close() {
             :disabled="!canChangeStep"
             @click="back"
           />
+          <!-- tabular-nums: the import label carries counts ("Import 2 products (3 variants)"). -->
           <Button
-            class="max-sm:min-w-0 max-sm:flex-1"
+            class="tabular-nums max-sm:min-w-0 max-sm:flex-1"
             :size="buttonSize"
             variant="solid"
             theme="gray"

@@ -10,10 +10,11 @@ defineProps({
 
 <template>
   <PageHeader>
+    <!-- data-page-title: the hook style.css lifts the ancestor breadcrumbs to AA through. -->
     <!-- PageHeader's own row is `flex items-center justify-between` with nothing
          allowed to shrink, so without min-w-0 the title reports its full width and
          the page overflows sideways instead of the title ellipsising. -->
-    <div class="flex min-w-0 items-center gap-1">
+    <div class="flex min-w-0 items-center gap-1" data-page-title>
       <!-- Desktop keeps its sidebar and its breadcrumbs; the phone has neither
            once the rail is gone, so `backTo` only becomes a control down there.
            It goes back through history and falls back to `backTo` on a cold load. -->

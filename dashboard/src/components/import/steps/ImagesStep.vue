@@ -268,13 +268,15 @@ onMounted(() => {
 
     <!-- B: one product colour at a time -->
     <template v-else>
+      <!-- Below sm the bar takes a row of its own: beside a long mixed-batch count it shrank to a
+           44px stub. -->
       <div class="flex flex-wrap items-center gap-3 rounded-4 border border-outline-gray-1 bg-surface-gray-1 px-3 py-2.5">
         <span class="text-base tabular-nums text-ink-gray-7">{{ photoGroupsHavePhoto(groupsWithPhoto, groups.length, groupKind) }}</span>
         <Progress
           v-if="groups.length"
           :value="Math.round((groupsWithPhoto / groups.length) * 100)"
           size="sm"
-          class="max-w-56 flex-1"
+          class="flex-1 max-sm:basis-full sm:max-w-56"
         />
       </div>
 

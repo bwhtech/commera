@@ -9,7 +9,9 @@ import { Button, FormControl, Popover } from 'frappe-ui'
 import { money, symbolFor } from '../data/format'
 
 const props = defineProps({
-  modelValue: { type: Number, required: true },
+  // null for a value never set, such as a color with no price yet: emptyLabel then shows in its
+  // place, where a 0 would read as "free".
+  modelValue: { type: Number, default: null },
   label: { type: String, required: true },
   format: { type: String, default: 'number' },
   description: { type: String, default: undefined },
@@ -35,6 +37,7 @@ const draft = ref(props.modelValue)
 const error = ref('')
 const saving = ref(false)
 const field = ref(null)
+const popover = ref(null)
 watch(() => props.modelValue, (value) => (draft.value = value))
 
 // Every opening starts from the stored value: a refused value left behind by an outside click is
@@ -72,6 +75,14 @@ function cancel(close) {
   reset()
   close()
 }
+
+// For a caller that sends the seller here from elsewhere on the page (the product's Add price): the
+// popover opens as if its trigger were clicked, and reka's focus scope puts the caret in the input.
+function open() {
+  popover.value?.open()
+}
+
+defineExpose({ open })
 </script>
 
 <template>
@@ -81,7 +92,7 @@ function cancel(close) {
 
   <!-- The panel opens from the trigger's aligned edge: in an end-aligned column it grows back into
        the row instead of past the card's edge. -->
-  <Popover v-else :align="align" :offset="4" @open="reset">
+  <Popover v-else ref="popover" :align="align" :offset="4" @open="reset">
     <template #trigger="{ open }">
       <button
         class="group flex items-center gap-1 rounded-4 px-1.5 py-0.5 tabular-nums"
@@ -103,7 +114,10 @@ function cancel(close) {
     </template>
 
     <template #default="{ close }">
-      <div ref="field" class="w-56 space-y-3 p-1">
+      <!-- p-3 sets the label and the buttons 12px in from the panel's rounded edge, near the 14px a
+           frappe-ui menu's p-1.5 + px-2 gives its item text. w-60 keeps the field 216px wide, as at
+           the old p-1, so the hint under it wraps no sooner. -->
+      <div ref="field" class="w-60 space-y-3 p-3">
         <FormControl
           v-model="draft"
           type="number"
