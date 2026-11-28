@@ -11,7 +11,12 @@ from frappe.utils.data import cstr, flt
 from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file
 from openpyxl.utils.exceptions import InvalidFileException
 
-from commera.api.admin.catalog import get_collection
+from commera.api.admin.catalog import (
+	DEFAULT_OPTION_ATTRIBUTE,
+	DEFAULT_OPTION_VALUE,
+	get_collection,
+	get_new_product_title_limit,
+)
 
 TEMPLATE_HEADERS = [
 	"Product Title",
@@ -308,6 +313,13 @@ class RowChecker:
 		title = parsed["title"]
 		if title.startswith("New Item"):
 			return error(_('A product title cannot start with "New Item". Rename it in your file.'))
+		# Color is the import's option axis (imports.OPTION_ATTRIBUTE); a row with none hangs on the hidden one.
+		limit = get_new_product_title_limit(
+			"Color" if parsed["color"] else DEFAULT_OPTION_ATTRIBUTE,
+			[parsed["color"] or DEFAULT_OPTION_VALUE],
+		)
+		if len(title) > limit:
+			return error(_("Use {0} characters or fewer for the title.").format(limit))
 		if self.is_title_taken(title):
 			return error(
 				_(

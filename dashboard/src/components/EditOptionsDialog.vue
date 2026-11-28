@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { Alert, Select, toast } from 'frappe-ui'
 import { useAdminAction, useAdminRead, trySubmit } from '../data/api'
 import { optionChanges, pairKey } from '../data/optionSizes'
-import { PLACEHOLDER_ATTRIBUTE, productOptions } from '../data/product'
+import { PLACEHOLDER_ATTRIBUTE, TITLE_MAX_LENGTH, productOptions } from '../data/product'
 import { __ } from '../data/translation'
 import AttributeMultiSelect from './AttributeMultiSelect.vue'
 import FormDialog from './FormDialog.vue'
@@ -92,8 +92,21 @@ const summary = computed(() => {
 
 const emptyError = computed(() => (changes.value.ticked.length ? '' : __('Keep at least one variant ticked.')))
 const hasChanges = computed(() => Boolean(addedCount.value || removedCount.value))
-const canSave = computed(() => hasChanges.value && !emptyError.value)
-const blockedReason = computed(() => (hasChanges.value ? emptyError.value : __('Nothing has changed yet.')))
+// Each value gets a page named "<product> - <value>" and an option switch a list named "<product>
+// <option>", in 140-character columns: a product named near the limit leaves little room. Said here,
+// as save_product_options refuses it, instead of as a failed save.
+const nameError = computed(() => {
+  const room = TITLE_MAX_LENGTH - props.product.id.length
+  if (switchesOption.value && ` ${chosenAttribute.value}`.length > room) {
+    return __("This product's name is too long to switch to {0}.", [chosenAttribute.value])
+  }
+  const tooLong = options.value.find((option) => ` - ${option}`.length > room)
+  return tooLong ? __('“{0}” is too long for this product. Use {1} characters or fewer.', [tooLong, room - 3]) : ''
+})
+const canSave = computed(() => hasChanges.value && !emptyError.value && !nameError.value)
+const blockedReason = computed(() =>
+  hasChanges.value ? emptyError.value || nameError.value : __('Nothing has changed yet.'),
+)
 
 // What saving does, in one quiet paragraph under the summary rather than a stack of alerts.
 const consequenceHint = computed(() =>

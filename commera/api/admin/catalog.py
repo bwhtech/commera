@@ -1416,6 +1416,19 @@ def check_title_length(title: str, limit: int = TITLE_MAX_LENGTH):
 		frappe.throw(_("Use {0} characters or fewer for the title.").format(limit))
 
 
+def check_option_names_fit(item_template: str, option_attribute: str | None, options) -> None:
+	"""Edit options names a new "<template> <option>" and "<template> - <value>" too, so a value the product's
+	name leaves no room for is refused in plain words, not as a database error."""
+	room = TITLE_MAX_LENGTH - len(item_template)
+	if option_attribute and len(f" {option_attribute}") > room:
+		frappe.throw(_("This product's name is too long to switch to {0}.").format(option_attribute))
+	for option in options:
+		if len(f" - {option}") > room:
+			frappe.throw(
+				_("“{0}” is too long for this product. Use {1} characters or fewer.").format(option, room - 3)
+			)
+
+
 def get_new_product_title_limit(option_attribute: str, options: list) -> int:
 	"""A new product also names "<title> <option>" (its configurator) and "<title> - <value>" (each value's
 	page), so the longest of those must fit in 140 as well. Mirrors newProductTitleLimit() in product.js."""
@@ -1515,7 +1528,7 @@ def create_product(
 		for size in sizes:
 			size_item = create_variant(item_template.name, {option_attribute: option, size_attribute: size})
 			size_item.item_name = get_variant_title(title, option, size)
-			fit_variant_names(size_item, item_template.name)
+			fit_variant_names(size_item, item_template.name, title)
 			size_item.insert()
 
 	configurator = frappe.new_doc("Style Attribute Configurator")
@@ -1670,8 +1683,14 @@ def save_product_options(
 		frappe.throw(_("Product {0} has no options to edit").format(item_template))
 
 	option_attribute = cstr(option_attribute).strip()
+	switching = option_attribute and option_attribute != configurator.item_attribute
+	check_option_names_fit(
+		item_template,
+		option_attribute if switching else None,
+		{option for option, _size in parse_option_size_pairs(add)},
+	)
 	switched_codes = []
-	if option_attribute and option_attribute != configurator.item_attribute:
+	if switching:
 		switched_codes = switch_option_attribute(item_template, configurator, option_attribute)
 
 	template_attributes = frappe.get_all(
@@ -1739,7 +1758,7 @@ def save_product_options(
 			continue
 		size_item = create_variant(item_template, {option_attribute: option, SIZE_ATTRIBUTE: size})
 		size_item.item_name = get_variant_title(template_title, option, size)
-		fit_variant_names(size_item, item_template)
+		fit_variant_names(size_item, item_template, template_title)
 		size_item.insert()
 		item_code_by_key[key] = size_item.name
 		created_codes.append(size_item.name)
@@ -1794,9 +1813,9 @@ def switch_option_attribute(item_template: str, configurator: dict, option_attri
 	return switched_codes
 
 
-def fit_variant_names(size_item, item_template: str):
-	"""A variant's code is "<template>-<abbreviations>", so a title near the 140-character limit overflows
-	it. Shorten the template part, keep the suffix that tells variants apart, and never repeat a code."""
+def fit_variant_names(size_item, item_template: str, title: str):
+	"""Near the 140-character limit, "<template>-<abbreviations>" and "<title> - <color> - <size>" overflow.
+	Shorten the title part, never the suffix that tells variants apart, and never repeat a code."""
 	if len(size_item.item_code) > TITLE_MAX_LENGTH:
 		suffix = size_item.item_code[len(item_template) :]
 		stem = item_template[: TITLE_MAX_LENGTH - len(suffix)]
@@ -1804,8 +1823,9 @@ def fit_variant_names(size_item, item_template: str):
 		if frappe.db.exists("Item", size_item.item_code):
 			unique = f"-{frappe.generate_hash(length=4).upper()}"
 			size_item.item_code = stem[: -len(unique)] + unique + suffix
-	if len(size_item.item_name) > TITLE_MAX_LENGTH:
-		size_item.item_name = size_item.item_name[: TITLE_MAX_LENGTH - 1] + "…"
+	if len(size_item.item_name) > TITLE_MAX_LENGTH and size_item.item_name.startswith(title):
+		shown = size_item.item_name[len(title) :]
+		size_item.item_name = title[: TITLE_MAX_LENGTH - len(shown) - 1] + "…" + shown
 
 
 def get_variant_title(title: str, option: str, size: str) -> str:

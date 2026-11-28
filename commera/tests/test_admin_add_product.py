@@ -87,6 +87,27 @@ class TestAddProduct(ProductOnboardingTestCase):
 			self.assertLessEqual(len(variant.item_name), 140)
 		self.assertTrue(frappe.db.exists("Style Attribute Variant", f"{item_template} - Black"))
 
+	def test_variant_names_at_the_limit_keep_their_color_and_size(self):
+		title = f"Names {frappe.generate_hash(length=6).upper()} " + "T" * 119
+		item_template = self.add_product(
+			title=title, option_attribute="Color", option_sizes=[{"option": "Black", "sizes": ["M"]}]
+		)
+		self.assertEqual(len(title), 132)
+		names = frappe.get_all("Item", filters={"variant_of": item_template}, pluck="item_name")
+		self.assertEqual(len(names), 1)
+		self.assertLessEqual(len(names[0]), 140)
+		self.assertTrue(names[0].endswith("… - Black - M"))
+
+	def test_edit_options_refuses_a_value_the_product_name_has_no_room_for(self):
+		from commera.api.admin.catalog import save_product_options
+
+		title = f"Room {frappe.generate_hash(length=6).upper()} " + "T" * 120
+		item_template = self.add_product(
+			title=title, option_attribute="Color", option_sizes=[{"option": "Black", "sizes": ["M"]}]
+		)
+		with self.assertRaisesRegex(frappe.ValidationError, "is too long for this product. Use 5 characters"):
+			save_product_options(item_template, add=[{"option": "Burgundy", "size": "M"}])
+
 	def test_a_taken_title_is_a_duplicate_entry(self):
 		title = f"Add Product {frappe.generate_hash(length=6).upper()}"
 		self.add_product(title=title)

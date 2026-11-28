@@ -551,6 +551,19 @@ class TestImportExistingTitles(RunImportTestCase):
 		self.assertEqual(issue["level"], "error")
 		self.assertIn("New Item", issue["text"])
 
+	def test_a_title_too_long_for_its_names_is_skipped_at_review(self):
+		# A Color row makes "<title> - Black", so the title may use 132, not 140.
+		title = f"Long {self.suffix} " + "T" * 121
+		file_url = self.make_import_file(
+			["Product Title,Collection,Color,Price", f"{title},{self.collection},Black,99"]
+		)
+
+		issue = parse_and_validate(file_url)["rows"][0]["issue"]
+
+		self.assertEqual(len(title), 133)
+		self.assertEqual(issue["level"], "error")
+		self.assertEqual(issue["text"], "Use 132 characters or fewer for the title.")
+
 
 class TestPublishImportedProducts(RunImportTestCase):
 	def test_publish_all_puts_every_imported_draft_live(self):
