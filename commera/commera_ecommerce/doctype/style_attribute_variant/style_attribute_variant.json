@@ -22,6 +22,7 @@
 		"images",
 		"section_break_hjed",
 		"sizes",
+		"option_values",
 		"reviews_section",
 		"average_rating",
 		"column_break_reviews",
@@ -57,6 +58,12 @@
 			"fieldtype": "Table",
 			"label": "Sizes",
 			"options": "Color Size Item"
+		},
+		{
+			"fieldname": "option_values",
+			"fieldtype": "Table",
+			"label": "Option Values",
+			"options": "Variant Option Value"
 		},
 		{
 			"fieldname": "attribute_value",
@@ -197,7 +204,7 @@
 	"index_web_pages_for_search": 1,
 	"is_published_field": "is_published",
 	"links": [],
-	"modified": "2026-11-12 12:00:00.000000",
+	"modified": "2026-11-28 12:00:00.000000",
 	"modified_by": "Administrator",
 	"module": "Commera Ecommerce",
 	"name": "Style Attribute Variant",

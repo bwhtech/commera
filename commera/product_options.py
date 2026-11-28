@@ -1,0 +1,3 @@
+MAX_PRODUCT_OPTIONS = 3
+OPTION_VALUES_FIELD = "option_values"
+VARIANT_OPTION_VALUE = "Variant Option Value"
