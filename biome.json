@@ -12,6 +12,8 @@
 			"public/js/vendor/**/*",
 			"dashboard/**/*",
 			"commera/public/commera/**/*",
+			"commera/public/official_plugins/**/*",
+			"official_plugins/node_modules/**/*",
 			"commera/**/*.json"
 		]
 	},

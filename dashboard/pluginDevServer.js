@@ -6,14 +6,14 @@ import { searchForWorkspaceRoot } from 'vite'
 import * as compiler from 'vue/compiler-sfc'
 import { discoverPlugins, findPluginConfig, pageEntryCode } from '../packages/plugin-kit/vite.js'
 import places from '../packages/plugin-kit/places.json' with { type: 'json' }
-import { BENCH, readPluginApps, sourceDirOf } from './pluginApps.js'
+import { BENCH, buildCommandOf, isOfficialPlugin, outDirOf, readPluginApps, sourceDirOf } from './pluginApps.js'
 
 const PREFIX = '/@commera-plugin/'
 const VIRTUAL = '\0commera-plugin:'
 const CONFIG_TIMESTAMP = /\.timestamp-\d+-\w+\.mjs$/
 // Without the hashes, which change on every edit, so only a new placement or changed plugin field reloads the page.
 function placementsOf(app) {
-  const path = join(BENCH, 'apps', app, app, 'public', 'commera', 'manifest.json')
+  const path = join(outDirOf(app), 'manifest.json')
   if (!existsSync(path)) return null
   const manifest = JSON.parse(readFileSync(path, 'utf8'))
   manifest.entries = manifest.entries.map(({ hash, ...entry }) => entry)
@@ -56,7 +56,8 @@ function buildRunner(server) {
     const before = placementsOf(app)
     const job = new Promise((resolve) => {
       let output = ''
-      const child = spawn('yarn', ['build'], { cwd: join(BENCH, 'apps', app), env: process.env })
+      const { command, args, cwd } = buildCommandOf(app)
+      const child = spawn(command, args, { cwd, env: process.env })
       child.stdout.on('data', (chunk) => (output += chunk))
       child.stderr.on('data', (chunk) => (output += chunk))
       child.on('error', (error) => resolve({ ok: false, output: error.message }))
@@ -176,7 +177,7 @@ export function pluginDevServer() {
       })
       apps.reduce((previous, app) => previous.then(() => build(app)), Promise.resolve())
       restartOnNewApps(server, apps)
-      rebuildAfterInstall(server, apps, schedule)
+      rebuildAfterInstall(server, apps.filter((app) => !isOfficialPlugin(app)), schedule)
     },
     resolveId(source) {
       if (source.startsWith(PREFIX)) return VIRTUAL + source.slice(PREFIX.length)

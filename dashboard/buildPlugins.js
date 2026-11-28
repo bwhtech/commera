@@ -1,17 +1,17 @@
-import { execSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { BENCH, readPluginApps } from './pluginApps.js'
+import { buildCommandOf, readPluginApps } from './pluginApps.js'
 
 // Runs after the dashboard build, because each plugin checks its classes and imports against what that build wrote.
 const failed = []
 for (const app of readPluginApps()) {
-  const appRoot = join(BENCH, 'apps', app)
-  if (!existsSync(join(appRoot, 'package.json'))) continue
+  const { command, args, cwd } = buildCommandOf(app)
+  if (!existsSync(join(cwd, 'package.json'))) continue
   console.log(`\nBuilding Commera plugin ${app}`)
   try {
-    if (!existsSync(join(appRoot, 'node_modules'))) execSync('yarn install --frozen-lockfile', { cwd: appRoot, stdio: 'inherit' })
-    execSync('yarn build', { cwd: appRoot, stdio: 'inherit' })
+    if (!existsSync(join(cwd, 'node_modules'))) execSync('yarn install --frozen-lockfile', { cwd, stdio: 'inherit' })
+    execFileSync(command, args, { cwd, stdio: 'inherit' })
   } catch {
     failed.push(app)
   }

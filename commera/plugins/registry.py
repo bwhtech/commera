@@ -11,6 +11,7 @@ from commera.plugins.places import ICONS, NAME_PATTERN, PLACES, RECORD_DOCTYPES,
 from commera.sdk import API_VERSION
 
 CACHE_KEY = "commera:plugins"
+OFFICIAL_ASSET_DIR = "commera/official_plugins"
 BANNER_PATTERN = re.compile(r"commera-plugin-api:\s*(\d+)")
 ENTRY_FIELDS = tuple(dict.fromkeys(field for spec in PLACES.values() for field in spec["fields"]))
 CLIENT_FIELDS = (
@@ -93,14 +94,30 @@ def passes_condition(entry: dict, *arguments) -> bool:
 
 def get_plugin_entries() -> dict:
 	registry = {"apps": {}, "entries": [], "problems": []}
-	for app in frappe.get_installed_apps():
+	installed_apps = frappe.get_installed_apps()
+	for app in installed_apps:
 		if app != "commera" and is_supported_app(app):
 			add_plugin_entries(registry, app)
+	for app in get_official_plugin_apps():
+		# An app that ships its own plugin replaces the one Commera ships for it.
+		if app in installed_apps and app not in registry["apps"]:
+			add_plugin_entries(registry, app, owner="commera")
 	return registry
 
 
-def add_plugin_entries(registry: dict, app: str):
-	path = get_asset_path(app, "manifest.json")
+def get_official_plugin_apps() -> list[str]:
+	path = get_asset_path(OFFICIAL_ASSET_DIR, "")
+	return sorted(os.listdir(path)) if os.path.isdir(path) else []
+
+
+def get_asset_dir(app: str, owner: str) -> str:
+	return f"{app}/commera" if owner == app else f"{OFFICIAL_ASSET_DIR}/{app}"
+
+
+def add_plugin_entries(registry: dict, app: str, owner: str | None = None):
+	owner = owner or app
+	asset_dir = get_asset_dir(app, owner)
+	path = get_asset_path(asset_dir, "manifest.json")
 	if not os.path.isfile(path):
 		return
 
@@ -115,12 +132,15 @@ def add_plugin_entries(registry: dict, app: str):
 		return
 
 	registry["apps"][app] = {"title": get_app_title(app)}
-	if icon_url := get_icon_url(app, manifest.get("icon")):
+	icon_url = get_icon_url(asset_dir, manifest.get("icon"))
+	if not icon_url and owner != app:
+		icon_url = get_apps_screen_logo(app)
+	if icon_url:
 		registry["apps"][app]["icon_url"] = icon_url
 	version_error = get_version_error(manifest)
 	taken = set()
 	for manifest_entry in manifest["entries"]:
-		entry = get_entry(app, manifest_entry if isinstance(manifest_entry, dict) else {})
+		entry = get_entry(app, manifest_entry if isinstance(manifest_entry, dict) else {}) | {"owner": owner}
 		if reason := get_invalid_reason(entry, taken):
 			add_problem(registry, app, f"{entry['place']}/{entry['name']}", reason)
 			continue
@@ -209,20 +229,24 @@ def is_contained_asset(relative_path: str, extension: str) -> bool:
 	)
 
 
-def get_icon_url(app: str, icon: str | None) -> str | None:
+def get_icon_url(asset_dir: str, icon: str | None) -> str | None:
 	if not icon or not is_contained_asset(icon, ".svg"):
 		return None
-	path = get_asset_path(app, icon)
+	path = get_asset_path(asset_dir, icon)
 	if not os.path.isfile(path):
 		return None
 	# nosemgrep: frappe-security-file-traversal  # path is inside the app's built assets
 	with open(path, "rb") as icon_file:
 		digest = hashlib.sha256(icon_file.read()).hexdigest()[:8]
-	return f"/assets/{app}/commera/{icon}?v={digest}"
+	return f"/assets/{asset_dir}/{icon}?v={digest}"
+
+
+def get_apps_screen_logo(app: str) -> str | None:
+	return next((screen.get("logo") for screen in frappe.get_hooks("add_to_apps_screen", app_name=app)), None)
 
 
 def get_function_reason(entry: dict) -> str | None:
-	app = entry["app"]
+	app = entry["owner"]
 	if entry["condition"] and not get_app_function(app, entry["condition"]):
 		return f"condition {entry['condition']} must name a function inside {app}."
 	if entry["method"] and not get_whitelisted_method(app, entry["method"]):
@@ -251,7 +275,8 @@ def add_module_url(entry: dict, version_error: str | None) -> dict:
 		return entry
 
 	app, module = entry["app"], entry["module"]
-	path = get_asset_path(app, module)
+	asset_dir = get_asset_dir(app, entry["owner"])
+	path = get_asset_path(asset_dir, module)
 	if not os.path.isfile(path):
 		return entry | {"error": f"{module} isn't built. Run bench build --app {app}."}
 
@@ -263,9 +288,9 @@ def add_module_url(entry: dict, version_error: str | None) -> dict:
 	if int(banner.group(1)) != API_VERSION:
 		return entry | {"error": f"{module} is built for Commera API {banner.group(1)}, not {API_VERSION}."}
 
-	return entry | {"module_url": f"/assets/{app}/commera/{module}?v={cstr(entry['hash'])}"}
+	return entry | {"module_url": f"/assets/{asset_dir}/{module}?v={cstr(entry['hash'])}"}
 
 
-def get_asset_path(app: str, relative_path: str) -> str:
+def get_asset_path(asset_dir: str, relative_path: str) -> str:
 	# The served copy, so a module built but never linked into sites/assets reads as not built.
-	return os.path.join(frappe.local.sites_path, "assets", app, "commera", relative_path)
+	return os.path.join(frappe.local.sites_path, "assets", asset_dir, relative_path)
