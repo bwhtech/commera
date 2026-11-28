@@ -126,6 +126,7 @@ OVERVIEW_WINDOW_DAYS = 30
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_orders(
 	status: str | None = None, search: str | None = None, start: int = 0, page_length: int = PAGE_LENGTH
 ):
@@ -613,6 +614,7 @@ def get_order_charges(order):
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_order(sales_order: str):
 	"""Everything one order's screen needs, in one call."""
 	frappe.has_permission("Sales Order", doc=sales_order, ptype="read", throw=True)
@@ -887,6 +889,7 @@ def fulfil_order(sales_order: str):
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_overview(order_status: str | None = None):
 	"""The whole Home screen in one call. `order_status` narrows only the recent-orders panel; the
 	figures always describe the whole store."""

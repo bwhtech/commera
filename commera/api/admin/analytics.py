@@ -234,6 +234,7 @@ def read_window_totals(from_date, to_date):
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_revenue_report(months: int = REPORT_MONTHS_DEFAULT):
 	"""Monthly revenue/orders/discounts/refunds for the trailing N months, plus a vs-previous comparison.
 	Reuses orders.is_webshop_order, so drafts count as real sales here as on the Home screen and Orders list."""
@@ -477,6 +478,7 @@ def read_default_rates_map(item_codes: list[str]) -> dict[str, float]:
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_inventory_report(months: int = REPORT_MONTHS_DEFAULT):
 	"""Stock value and sell-through for the shop's own ecommerce warehouse. "Value" prices on-hand stock at
 	today's selling price - "what my shelves are worth to sell", not ERPNext's landed-cost valuation."""
@@ -707,6 +709,7 @@ def read_storefront_metrics_single_pass(start, today, from_date, to_date, previo
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_storefront_report(months: int = REPORT_MONTHS_DEFAULT):
 	"""Sessions/funnel/traffic for the trailing N months - a thin wrapper over analytics_dashboard.py's
 	already SQL-aggregated storefront queries, so it cannot disagree with the Desk analytics dashboard."""

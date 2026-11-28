@@ -15,6 +15,7 @@ LOW_STOCK_THRESHOLD = 5
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_inventory(
 	availability: str | None = None,
 	search: str | None = None,
@@ -213,6 +214,7 @@ VOUCHER_TYPE_REASON_LABELS = {
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_stock_movements(start: int = 0, page_length: int = PAGE_LENGTH):
 	"""Every stock movement against the shop's own warehouse, newest first. Read-only."""
 	# Gated the same way get_inventory() is, on Item read - Stock Ledger Entry's own permission

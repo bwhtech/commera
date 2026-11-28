@@ -53,6 +53,7 @@ CLEARED_ON_ITEM_TRASH = ("Bin", "Item Price")
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_products(
 	search: str | None = None,
 	collection: str | None = None,
@@ -417,6 +418,7 @@ def save_variant_collections(item_templates: list) -> None:
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_pricing_rows(
 	search: str | None = None,
 	collection: str | None = None,
@@ -506,6 +508,7 @@ def get_pricing_rows(
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_product(item_template: str):
 	"""Everything one product's edit screen needs, in one call."""
 	frappe.has_permission("Item", doc=item_template, ptype="read", throw=True)
@@ -654,6 +657,7 @@ TOP_PRODUCTS_LIMIT = 4
 
 
 @frappe.whitelist()
+@frappe.read_only()
 def get_top_products(limit: int = TOP_PRODUCTS_LIMIT):
 	"""Home screen bestsellers, one row per product template. A Sales Order Item's item_code is a single
 	size, so this walks size -> variant -> configurator and sums in SQL; drafts count, as is_webshop_order does."""
