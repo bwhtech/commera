@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Button } from 'frappe-ui'
 import { draft } from '../../../ia/onboarding'
-import { SETUP_STAGES, STEP_INDEX, setupBuildLevel } from '../../../ia/onboardingSteps'
+import { FINAL_BUILD, STEP_INDEX, buildDwell, setupBuildLevel } from '../../../ia/onboardingSteps'
 import { __ } from '../../../data/translation'
 import { burstConfetti } from '../../../utils/confetti'
 import { prefersReducedMotion } from '../../../utils/reveal'
@@ -18,16 +18,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['finish', 'build'])
 
-const CAPTIONS = [
-  __('Laying the foundations…'),
-  __('Hanging your sign…'),
-  __('Chiselling the storefront…'),
-  __('Polishing the shelves…'),
-]
-const FINAL_BUILD = SETUP_STAGES.length + 1
-const LOCAL_BUILD = 2
-const BUILD_DWELL_MS = 900
-const WELCOME_DWELL_MS = 1800
+const CAPTIONS = [__('Creating your store'), __('Setting up your storefront'), __('Turning on payments'), __('Almost ready')]
 
 const shownBuild = ref(0)
 const isWelcome = ref(false)
@@ -36,14 +27,18 @@ const confettiCanvas = ref(null)
 let beatTimer = null
 let lastBeatAt = Date.now()
 
-const reachedBuild = computed(() => Math.max(LOCAL_BUILD, setupBuildLevel(props.setupStatus, props.setupStage)))
+const reachedBuild = computed(() => setupBuildLevel(props.setupStatus, props.setupStage))
 const isFailed = computed(() => props.setupStatus === 'failed')
 const caption = computed(() => CAPTIONS[Math.min(shownBuild.value, CAPTIONS.length - 1)])
 const storeName = computed(() => draft.storeName.trim())
 
-function scheduleBeat(delay) {
-  if (beatTimer) return
-  beatTimer = setTimeout(beat, Math.max(0, delay - (Date.now() - lastBeatAt)))
+// Re-armed whenever the setup moves, so a stage that lands during a paced hold plays at the shorter dwell.
+function scheduleBeat() {
+  clearTimeout(beatTimer)
+  beatTimer = null
+  const dwell = buildDwell(shownBuild.value, reachedBuild.value, isWelcome.value)
+  if (dwell === null || isFailed.value) return
+  beatTimer = setTimeout(beat, Math.max(0, dwell - (Date.now() - lastBeatAt)))
 }
 
 function beat() {
@@ -56,12 +51,11 @@ function beat() {
     return
   }
   if (shownBuild.value === FINAL_BUILD) isWelcome.value = true
-  else if (shownBuild.value < reachedBuild.value) shownBuild.value += 1
-  else return
-  scheduleBeat(isWelcome.value ? WELCOME_DWELL_MS : BUILD_DWELL_MS)
+  else shownBuild.value += 1
+  scheduleBeat()
 }
 
-watch([reachedBuild, isFailed], () => scheduleBeat(BUILD_DWELL_MS), { immediate: true })
+watch([reachedBuild, isFailed], scheduleBeat, { immediate: true })
 watch(shownBuild, (level) => emit('build', level), { immediate: true })
 watch(
   confettiCanvas,
