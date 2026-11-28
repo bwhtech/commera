@@ -26,3 +26,8 @@ test('steps are found by key per source', () => {
 test('an unknown source falls back to the spreadsheet', () => {
   assert.deepEqual(keys('shopify'), keys('csv'))
 })
+
+test('with the spreadsheet as the only source, the flow opens on Upload', () => {
+  assert.deepEqual(stepsFor('csv', false).map((step) => step.key), ['upload', 'map', 'images', 'review', 'run'])
+  assert.equal(stepIndex('csv', 'review', false), 3)
+})

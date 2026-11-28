@@ -105,8 +105,11 @@ export function priceRange(low, high) {
   return `${money(low)} – ${money(high)}`
 }
 
+// The -7/-8 steps, not the -6/-7 ones: a stock count is 13-14px text, and only these pass AA on
+// both a white and a dark surface (red-7 6.70:1 / 6.88:1, amber-8 7.14:1 / 10.87:1; amber-7 is
+// 3.90:1 on white).
 export function stockTone(qty) {
-  if (qty <= 0) return 'text-ink-red-6'
-  if (qty <= 5) return 'text-ink-amber-7'
+  if (qty <= 0) return 'text-ink-red-7'
+  if (qty <= 5) return 'text-ink-amber-8'
   return 'text-ink-gray-7'
 }

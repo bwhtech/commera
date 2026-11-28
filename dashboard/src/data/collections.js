@@ -1,7 +1,8 @@
 // The collection picker is offered from two places — one product's ⋯ menu and the Products bulk
 // bar — so the list, the wording and the count it reports live here rather than in each screen.
 import { computed } from 'vue'
-import { dialog, toast } from 'frappe-ui'
+import { toast } from 'frappe-ui'
+import { askValue } from '../utils/confirmDialog'
 import { useAdminAction, useAdminRead, trySubmit } from './api'
 import { __ } from './translation'
 
@@ -15,11 +16,21 @@ const collectionOptions = computed(() =>
   (collectionsRequest.data ?? []).map((name) => ({ label: name, value: name })),
 )
 
+// Callers that ask while a load is in flight share it: a second fetch would abort the first
+// mid-read, and frappe-ui logs that abort as a console error.
+let loading = null
+export function loadCollections() {
+  loading ??= collectionsRequest.fetch().finally(() => {
+    loading = null
+  })
+  return loading
+}
+
 export function useCollections() {
   return {
     collectionOptions,
     loading: computed(() => addAction.loading || removeAction.loading),
-    load: () => collectionsRequest.fetch(),
+    load: loadCollections,
   }
 }
 
@@ -51,7 +62,7 @@ const MODES = {
 export async function pickCollectionFor(itemTemplates, { label, mode = 'add', onDone } = {}) {
   if (!itemTemplates.length) return
 
-  await collectionsRequest.fetch()
+  await loadCollections()
   if (collectionsRequest.error) return
   if (!collectionOptions.value.length) {
     toast.info(__('There are no collections yet. Create one first.'))
@@ -59,31 +70,23 @@ export async function pickCollectionFor(itemTemplates, { label, mode = 'add', on
   }
 
   const { action, title, message, confirmLabel, done } = MODES[mode]
-  dialog.prompt({
+  askValue({
     title: title(label),
     message: message(),
-    fields: [
-      {
-        name: 'collection',
-        label: __('Collection'),
-        type: 'select',
-        required: true,
-        options: collectionOptions.value,
-      },
-    ],
+    label: __('Collection'),
+    type: 'select',
+    options: collectionOptions.value,
     confirmLabel: confirmLabel(),
-    onConfirm: async ({ values }) => {
-      const changed = await trySubmit(action, {
-        item_templates: itemTemplates,
-        collection: values.collection,
-      })
-      if (!changed) return
+    submit: async (collection) => {
+      const changed = await trySubmit(action, { item_templates: itemTemplates, collection })
+      if (!changed) return false
       const response = action.data
 
       // The server reports which products it actually changed (one already in the collection is
       // skipped), and under which collection it resolved the name to — the toast says that.
       toast.success(done(response.updated.length, response.collection))
       onDone?.()
+      return true
     },
   })
 }

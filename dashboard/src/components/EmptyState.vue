@@ -42,7 +42,7 @@ const shownDescription = computed(() =>
     <p :class="compact ? 'text-base text-ink-gray-6' : 'text-base text-ink-gray-7'">
       {{ shownTitle }}
     </p>
-    <p v-if="shownDescription" class="text-sm text-ink-gray-5">{{ shownDescription }}</p>
+    <p v-if="shownDescription" class="text-sm text-ink-gray-6">{{ shownDescription }}</p>
     <slot />
   </div>
 </template>

@@ -1,15 +1,20 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Badge, Button, Progress, Select, Spinner, TabButtons, toast, useFileUpload } from 'frappe-ui'
-import { beginPhase, canChangeStep, endPhase, imp, isCurrentImport } from '../../../data/importFlow'
+import { beginPhase, canChangeStep, endPhase, imp, importParams, isCurrentImport } from '../../../data/importFlow'
+import { manyPhotoGroupsTip, photoCount, photoGroupKind, photoGroupsHavePhoto, photoGroupsNeedPhoto } from '../../../data/importCounts'
 import { useAdminAction, trySubmit } from '../../../data/api'
 import CoachTip from '../CoachTip.vue'
+import ToneBadge from '../ToneBadge.vue'
+import EmptyState from '../../EmptyState.vue'
 import { __ } from '../../../data/translation'
-
-const emit = defineEmits(['next'])
+import { useIsMobile } from '../../../utils/useIsMobile'
 
 const { upload } = useFileUpload()
 const matchAction = useAdminAction('imports.match_import_images')
+
+// A phone has no drag: its drop zone names the button a thumb taps instead.
+const isMobile = useIsMobile()
 
 const uploading = computed(() => imp.phase === 'uploading')
 const chosenCount = ref(0)
@@ -21,8 +26,11 @@ const activeGroupKey = ref('')
 
 const groups = computed(() => imp.imageMatch?.groups ?? [])
 
-// Split around the placeholder so the example file name keeps its own colour inside one translated sentence.
+// Split around the placeholder so the example file name keeps its own color inside one translated sentence.
 const matchExample = __('We match each file to a product by its name, so {0} lands on Oversized Tee in Black.').split('{0}')
+
+// A product with no colors is one group, named by its title alone.
+const groupName = (group) => [group.title, group.color].filter(Boolean).join(' · ')
 
 function assignedPhotos(key) {
   return imp.imageAssignments[key] ?? []
@@ -31,10 +39,15 @@ function assignedPhotos(key) {
 const assignedFileUrls = computed(() => new Set(Object.values(imp.imageAssignments).flat()))
 const unplacedFiles = computed(() => imp.imageFiles.filter((file) => !assignedFileUrls.value.has(file.file_url)))
 const groupsWithPhoto = computed(() => groups.value.filter((group) => assignedPhotos(group.key).length).length)
+const groupKind = computed(() => photoGroupKind(groups.value))
+
+// Every row skipped: no product will be made, so there is nothing a photo could land on, and the
+// step says so instead of a "0 of 0" count and a drop zone whose photos could never match.
+const hasNothingToPhotograph = computed(() => !imp.counts.ready)
 
 const groupOptions = computed(() => [
   { label: __('Leave unmatched'), value: '' },
-  ...groups.value.map((group) => ({ label: `${group.title} · ${group.color}`, value: group.key })),
+  ...groups.value.map((group) => ({ label: groupName(group), value: group.key })),
 ])
 
 // A merchant's manual pick beats the file-name match, so re-running the match after another
@@ -62,11 +75,7 @@ function rebuildAssignments() {
 async function matchUploadedFiles(uploadTicket = null) {
   const ticket = uploadTicket ?? beginPhase('matching')
   if (ticket === null) return
-  const matched = await trySubmit(matchAction, {
-    file_url: imp.fileUrl,
-    column_mapping: { ...imp.mapping },
-    image_files: imp.imageFiles,
-  })
+  const matched = await trySubmit(matchAction, { ...importParams(), image_files: imp.imageFiles })
   if (matched && isCurrentImport(ticket)) {
     imp.imageMatch = matchAction.data
     rebuildAssignments()
@@ -130,29 +139,31 @@ function onGroupFilesPicked(event) {
 }
 
 onMounted(() => {
-  if (!imp.imageMatch) matchUploadedFiles()
+  if (!imp.imageMatch && !hasNothingToPhotograph.value) matchUploadedFiles()
 })
 </script>
 
 <template>
   <div class="space-y-6">
-    <input ref="bulkInput" type="file" accept="image/*" multiple class="hidden" @change="onBulkFilesPicked" />
-    <input ref="groupInput" type="file" accept="image/*" multiple class="hidden" @change="onGroupFilesPicked" />
+    <input ref="bulkInput" type="file" accept="image/*" multiple hidden @change="onBulkFilesPicked" />
+    <input ref="groupInput" type="file" accept="image/*" multiple hidden @change="onGroupFilesPicked" />
 
     <div class="flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
       <div class="min-w-0 flex-1">
-        <h2 class="text-xl text-ink-gray-9">{{ __('Add product photos') }}</h2>
-        <p class="mt-1 text-p-base text-ink-gray-6">
-          {{ __('Products sell far better with a photo. You can also skip this and add them later.') }}
+        <h2 class="text-lg-semibold text-ink-gray-9">{{ __('Add product photos') }}</h2>
+        <!-- Advice about photos is beside the point when nothing can take one; the empty state says why. -->
+        <p v-if="!hasNothingToPhotograph" class="mt-1 text-p-base text-ink-gray-6">
+          {{ __('Products sell far better with a photo. You can also skip this and add them from each product page later.') }}
         </p>
       </div>
       <!-- The tabs are unbreakable content, wider than the dialog body on a phone.
            Scroll the strip in place rather than letting it push the body. -->
       <TabButtons
+        v-if="!hasNothingToPhotograph"
         v-model="imp.imagesMode"
         class="max-w-full overflow-x-auto sm:shrink-0 sm:overflow-visible"
         :options="[
-          { label: __('Drop a folder'), value: 'bulk' },
+          { label: __('Several at once'), value: 'bulk' },
           { label: __('One by one'), value: 'each' },
         ]"
       />
@@ -163,8 +174,17 @@ onMounted(() => {
       {{ __('Reading your products…') }}
     </div>
 
+    <div v-if="hasNothingToPhotograph" class="rounded-5 border border-outline-gray-1">
+      <EmptyState
+        compact
+        icon="lucide-image-off"
+        :title="__('No products to add photos to')"
+        :description="__('Every row in your file is skipped. Review shows what to fix in each one.')"
+      />
+    </div>
+
     <!-- A: a folder of files, matched on the product and colour in each name -->
-    <template v-if="imp.imagesMode === 'bulk'">
+    <template v-else-if="imp.imagesMode === 'bulk'">
       <div
         v-if="uploading"
         class="rounded-5 border border-outline-gray-1 p-4"
@@ -174,7 +194,7 @@ onMounted(() => {
           <span class="text-base text-ink-gray-8">
             {{ matchAction.loading ? __('Matching photos to your products…') : __('Uploading photos') }}
           </span>
-          <span class="ms-auto text-sm tabular-nums text-ink-gray-5">{{ __('{0} of {1} uploaded', [doneCount, chosenCount]) }}</span>
+          <span class="ms-auto text-sm tabular-nums text-ink-gray-6">{{ __('{0} of {1} uploaded', [doneCount, chosenCount]) }}</span>
         </div>
         <Progress :value="Math.round((doneCount / chosenCount) * 100)" size="sm" class="mt-3" />
       </div>
@@ -188,9 +208,9 @@ onMounted(() => {
         <div class="flex size-11 items-center justify-center rounded-full bg-surface-base text-ink-gray-6 shadow-sm">
           <span class="lucide-images size-5" aria-hidden="true" />
         </div>
-        <p class="mt-3 text-base text-ink-gray-7">{{ __('Drop your photos here') }}</p>
-        <p class="mt-1 max-w-[440px] text-p-sm text-ink-gray-5">
-          {{ matchExample[0] }}<span class="text-ink-gray-7">oversized-tee-black-1.jpg</span>{{ matchExample[1] }}
+        <p class="mt-3 text-base text-ink-gray-7">{{ isMobile ? __('Choose your photos') : __('Drop your photos here') }}</p>
+        <p class="mt-1 max-w-md text-p-sm text-ink-gray-6">
+          {{ matchExample[0] }}<span class="whitespace-nowrap text-ink-gray-7">oversized-tee-black-1.jpg</span>{{ matchExample[1] }}
         </p>
         <Button
           class="mt-3"
@@ -203,40 +223,38 @@ onMounted(() => {
       </div>
 
       <template v-else>
-        <div class="grid gap-4 sm:grid-cols-3">
-          <div class="rounded-5 border border-outline-gray-1 p-4">
-            <div class="text-2xl tabular-nums text-ink-green-6">{{ assignedFileUrls.size }}</div>
-            <div class="mt-0.5 text-sm text-ink-gray-5">
-              {{ __('of {0} photos matched to a product', [imp.imageFiles.length]) }}
-            </div>
-          </div>
-          <div class="rounded-5 border border-outline-gray-1 p-4">
-            <div class="text-2xl tabular-nums text-ink-amber-7">{{ unplacedFiles.length }}</div>
-            <div class="mt-0.5 text-sm text-ink-gray-5">{{ __('could not be matched') }}</div>
-          </div>
-          <div class="rounded-5 border border-outline-gray-1 p-4">
-            <div class="text-2xl tabular-nums text-ink-gray-7">{{ groups.length - groupsWithPhoto }}</div>
-            <div class="mt-0.5 text-sm text-ink-gray-5">{{ __('of {0} products still have no photo', [groups.length]) }}</div>
-          </div>
-        </div>
+        <p class="text-p-base tabular-nums text-ink-gray-7">
+          {{ __('{0} of {1} photos matched.', [assignedFileUrls.size, imp.imageFiles.length]) }}
+          <span v-if="groups.length - groupsWithPhoto" class="text-ink-gray-6">
+            {{ photoGroupsNeedPhoto(groups.length - groupsWithPhoto, groups.length, groupKind) }}
+          </span>
+        </p>
 
         <div v-if="unplacedFiles.length" class="rounded-5 border border-outline-gray-1">
           <div class="flex items-center gap-2 border-b border-outline-gray-1 px-4 py-3">
             <span class="text-base-semibold text-ink-gray-8">{{ __('Files we could not place') }}</span>
-            <Badge :label="String(unplacedFiles.length)" theme="amber" variant="subtle" />
+            <!-- Gray: amber-7 on amber-2 is 3.55:1 in light mode, and the heading already says these need a pick. -->
+            <Badge class="tabular-nums" :label="String(unplacedFiles.length)" theme="gray" variant="subtle" />
           </div>
           <div v-scroll-fade class="max-h-72 divide-y divide-outline-gray-1 overflow-y-auto">
-            <div v-for="file in unplacedFiles" :key="file.file_url" class="flex items-center gap-3 px-4 py-3">
-              <img
-                :src="file.file_url"
-                alt=""
-                class="size-10 shrink-0 rounded-4 border border-outline-gray-1 object-cover"
-              />
-              <div class="min-w-0 flex-1 truncate text-base text-ink-gray-7">{{ file.file_name }}</div>
+            <!-- Stacked below sm so the file name keeps its width next to the picker. -->
+            <div
+              v-for="file in unplacedFiles"
+              :key="file.file_url"
+              class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
+            >
+              <div class="flex min-w-0 flex-1 items-center gap-3">
+                <img
+                  :src="file.file_url"
+                  alt=""
+                  class="size-10 shrink-0 rounded-4 border border-outline-gray-1 object-cover"
+                />
+                <div class="min-w-0 flex-1 truncate text-base text-ink-gray-7">{{ file.file_name }}</div>
+              </div>
               <Select
                 :model-value="imp.imageChoices[file.file_url] ?? ''"
                 :options="groupOptions"
-                class="w-64 shrink-0"
+                class="w-full sm:w-64 sm:shrink-0"
                 @update:model-value="(key) => setAssignment(file.file_url, key)"
               />
             </div>
@@ -248,32 +266,33 @@ onMounted(() => {
 
       <CoachTip
         :title="__('File names do the matching')"
-        :text="__('Name each photo after the product and its colour, like oversized-tee-black.jpg, and add -1, -2, -3 for extra shots. The first photo for a colour becomes its main image.')"
+        :text="__('Name each photo after the product and its color, like oversized-tee-black.jpg, and add -1, -2, -3 for extra shots. The first photo for a color becomes its main photo.')"
       />
     </template>
 
     <!-- B: one product colour at a time -->
     <template v-else>
+      <!-- Below sm the bar takes a row of its own: beside a long mixed-batch count it shrank to a
+           44px stub. -->
       <div class="flex flex-wrap items-center gap-3 rounded-4 border border-outline-gray-1 bg-surface-gray-1 px-3 py-2.5">
-        <span class="text-base text-ink-gray-7">{{ __('{0} of {1} have a photo', [groupsWithPhoto, groups.length]) }}</span>
+        <span class="text-base tabular-nums text-ink-gray-7">{{ photoGroupsHavePhoto(groupsWithPhoto, groups.length, groupKind) }}</span>
         <Progress
           v-if="groups.length"
           :value="Math.round((groupsWithPhoto / groups.length) * 100)"
           size="sm"
-          class="max-w-56 flex-1"
-        />
-        <Button
-          class="ms-auto"
-          variant="ghost"
-          :label="__('Skip the rest for now')"
-          :disabled="!canChangeStep"
-          @click="emit('next')"
+          class="flex-1 max-sm:basis-full sm:max-w-56"
         />
       </div>
 
       <div v-if="groups.length" class="overflow-hidden rounded-5 border border-outline-gray-1">
         <div class="divide-y divide-outline-gray-1">
-          <div v-for="group in groups" :key="group.key" class="flex items-center gap-3 px-4 py-3">
+          <!-- Below sm the badge and the action go under the product: beside it they left the title
+               50px, and two tees in different colors could not be told apart. From sm one row again. -->
+          <div
+            v-for="group in groups"
+            :key="group.key"
+            class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center"
+          >
             <div class="flex min-w-0 flex-1 items-center gap-3">
               <div class="flex shrink-0 gap-1">
                 <img
@@ -290,35 +309,43 @@ onMounted(() => {
                   <span class="lucide-image-off size-4" aria-hidden="true" />
                 </div>
               </div>
+              <!-- min-w-0 lets the name wrap (below sm) or truncate (from sm) inside the row, instead of
+                   holding the row at the name's full width. -->
               <div class="min-w-0">
-                <div class="truncate text-base text-ink-gray-8">{{ group.title }}</div>
-                <div class="truncate text-sm text-ink-gray-5">{{ group.color }}</div>
+                <div class="break-words text-base text-ink-gray-8 sm:truncate">{{ group.title }}</div>
+                <div v-if="group.color" class="break-words text-sm text-ink-gray-6 sm:truncate">{{ group.color }}</div>
               </div>
             </div>
-            <Badge
-              v-if="assignedPhotos(group.key).length"
-              class="shrink-0"
-              :label="assignedPhotos(group.key).length === 1 ? __('1 photo') : __('{0} photos', [assignedPhotos(group.key).length])"
-              theme="green"
-              variant="subtle"
-            />
-            <Button
-              class="shrink-0"
-              :variant="assignedPhotos(group.key).length ? 'subtle' : 'solid'"
-              theme="gray"
-              :disabled="!canChangeStep"
-              icon-left="lucide-upload"
-              :label="assignedPhotos(group.key).length ? __('Add more') : __('Upload')"
-              @click="chooseGroupFiles(group.key)"
-            />
+            <div class="flex shrink-0 items-center gap-3 max-sm:justify-between">
+              <ToneBadge
+                v-if="assignedPhotos(group.key).length"
+                class="tabular-nums"
+                tone="ready"
+                :label="photoCount(assignedPhotos(group.key).length)"
+              />
+              <!-- The words go in the slot, not in `label`: Button makes `label` its aria-label, and
+                   five buttons all named "Upload" do not say which product each one is for. -->
+              <Button
+                class="ms-auto"
+                :variant="assignedPhotos(group.key).length ? 'subtle' : 'solid'"
+                theme="gray"
+                :disabled="!canChangeStep"
+                icon-left="lucide-upload"
+                :aria-label="assignedPhotos(group.key).length ? __('Add more photos to {0}', [groupName(group)]) : __('Upload photos for {0}', [groupName(group)])"
+                @click="chooseGroupFiles(group.key)"
+              >
+                {{ assignedPhotos(group.key).length ? __('Add more') : __('Upload') }}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
       <CoachTip
+        v-if="groups.length >= 10"
         icon="lucide-clock"
-        :title="__('Slow going for a long catalogue')"
-        :text="__('For {0} product colours, dropping a folder of named photos is far quicker.', [groups.length])"
+        :title="__('Many products to go')"
+        :text="manyPhotoGroupsTip(groups.length, groupKind)"
       />
     </template>
   </div>

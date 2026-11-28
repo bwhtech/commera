@@ -16,6 +16,8 @@ import SearchInput from '../components/SearchInput.vue'
 import { useAdminRead, useAdminAction } from '../data/api'
 import { pickCollectionFor, useCollections } from '../data/collections'
 import { priceRange, stockTone } from '../data/format'
+import { listedVariantCount } from '../data/product'
+import { useIsMobile } from '../utils/useIsMobile'
 import { ia } from '../ia/store'
 import { productRoute } from '../ia/routes'
 import { importsLanded, openImport } from '../data/importFlow'
@@ -32,8 +34,8 @@ import { __ } from '../data/translation'
 
 const STATUS_TABS = [
   { label: __('All'), value: 'all' },
-  { label: __('Published'), value: 'published' },
-  { label: __('Unpublished'), value: 'unpublished' },
+  { label: __('Live'), value: 'published' },
+  { label: __('Not published'), value: 'unpublished' },
 ]
 
 const status = ref('all')
@@ -182,6 +184,36 @@ function changeCollection(mode) {
   })
 }
 
+const isMobile = useIsMobile()
+
+// Below `sm` the List drops to two tracks and the middle cells hide, so the skeleton matches.
+const skeletonColumns = computed(() => (isMobile.value ? 2 : 5))
+
+function productStatus(product) {
+  if (product.disabled) return { status: 'archived' }
+  return product.published_count ? { status: 'published', label: __('Live') } : { status: 'draft', label: __('Not published') }
+}
+
+// The item code is shown only when it says something the title does not. A dashboard product is
+// named after its title, and an ERPNext item's code is often its name with hyphens for spaces
+// ("Linen-Tee" under "Linen Tee"), so codes are compared by their letters and digits alone.
+const codeKey = (text) => (text ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '')
+
+function productSubtitle(product) {
+  const variants = listedVariantCount(product)
+  return [
+    codeKey(product.name) !== codeKey(product.title) ? product.name : '',
+    variants ? (variants === 1 ? __('1 variant') : __('{0} variants', [variants])) : '',
+  ].filter(Boolean).join(' · ')
+}
+
+// One wording for every count, zero included, so the list and the product page agree. Only the
+// tone tells a draft still being set up (quiet gray) from a live product that sold out (red).
+function stockLabel(product) {
+  const tone = product.stock <= 0 && !product.published_count ? 'text-ink-gray-6' : stockTone(product.stock)
+  return { text: __('{0} in stock', [product.stock]), tone }
+}
+
 function collectionSummary(product) {
   const others = (product.collections?.length ?? 1) - 1
   return others > 0 ? `${product.collection} +${others}` : (product.collection ?? '—')
@@ -253,20 +285,35 @@ function collectionSummary(product) {
     </div>
 
     <div class="mt-3 overflow-x-auto">
+      <!-- 57rem is the width the five columns need; a phone gets two of them, because a scroll the
+           reader cannot see reads as a rendering fault. Price is the one kept, and status and stock
+           move under the title. Do not lower the `min-w`: below the columns' own sum the 1fr track
+           collapses to zero and the product cell disappears. -->
+      <!-- list-row-px-3 gives the header the same inset as the rows: by default only an
+           interactive row gets frappe-ui's 0.75rem, so every header label sat 12px off its column.
+           A phone row takes its height from its three lines plus py-3 instead of the density, which
+           left them 1px from the dividers. -->
       <List
       v-model:selection="selection"
-      class="min-w-[54rem]"
+      class="list-row-px-3 sm:min-w-[57rem]"
       :selectable="selecting"
-      :row-height="ia.density"
-      :columns="['1fr', '7rem', '8rem', '8rem', '7rem']"
+      :row-height="isMobile ? undefined : Math.max(ia.density, 44)"
+      :columns="{ base: ['minmax(0,1fr)', 'auto'], sm: ['1fr', '7rem', '11rem', '8rem', '7rem'] }"
     >
-      <ListHeader>
+      <!-- gray-6: frappe-ui's gray-5 header is 4.18:1, under AA for 13px text. style.css carries it to
+           the sort buttons, which paint their own ink. -->
+      <ListHeader class="text-ink-gray-6">
         <ListHeaderCellSort :direction="directionFor('title')" @click="toggleSort('title')">
           {{ __('Product') }}
         </ListHeaderCellSort>
-        <ListHeaderCell>{{ __('Status') }}</ListHeaderCell>
-        <ListHeaderCell>{{ __('Collection') }}</ListHeaderCell>
-        <ListHeaderCellSort align="end" :direction="directionFor('stock')" @click="toggleSort('stock')">
+        <ListHeaderCell class="max-sm:hidden">{{ __('Status') }}</ListHeaderCell>
+        <ListHeaderCell class="max-sm:hidden">{{ __('Collection') }}</ListHeaderCell>
+        <ListHeaderCellSort
+          class="max-sm:hidden"
+          align="end"
+          :direction="directionFor('stock')"
+          @click="toggleSort('stock')"
+        >
           {{ __('Inventory') }}
         </ListHeaderCellSort>
         <ListHeaderCellSort align="end" :direction="directionFor('price')" @click="toggleSort('price')">
@@ -277,30 +324,32 @@ function collectionSummary(product) {
       <!-- `loading` flips on every param change and the request keeps the previous
            `data`, so guarding on it alone would blank a loaded table on each sort
            toggle, keystroke and page change. The skeleton means first load only. -->
-      <ListSkeleton v-if="productsRequest.loading && !rows.length" :columns="5" />
+      <ListSkeleton v-if="productsRequest.loading && !rows.length" :columns="skeletonColumns" />
 
       <ListRows v-else :items="rows" row-key="name" v-slot="{ item }">
-        <ListRow :route="productRoute(item.name)" :value="item.name">
+        <ListRow class="max-sm:py-3" :route="productRoute(item.name)" :value="item.name">
           <ListCell>
             <div class="flex min-w-0 items-center gap-2.5">
               <Thumb :image="item.image" />
               <div class="min-w-0">
                 <p class="truncate text-base text-ink-gray-8">{{ item.title }}</p>
-                <p class="truncate text-sm text-ink-gray-5">
-                  {{ item.name }}<span v-if="item.variant_count"> · {{ item.variant_count === 1 ? __('1 variant') : __('{0} variants', [item.variant_count]) }}</span>
+                <p v-if="productSubtitle(item)" class="truncate text-sm text-ink-gray-6 tabular-nums">{{ productSubtitle(item) }}</p>
+                <p class="mt-1 flex items-center gap-2 text-sm sm:hidden">
+                  <StatusBadge v-bind="productStatus(item)" />
+                  <span class="tabular-nums" :class="stockLabel(item).tone">{{ stockLabel(item).text }}</span>
                 </p>
               </div>
             </div>
           </ListCell>
-          <ListCell><StatusBadge :status="item.disabled ? 'archived' : item.published_count ? 'published' : 'unpublished'" /></ListCell>
-          <ListCell>
+          <ListCell class="max-sm:hidden"><StatusBadge v-bind="productStatus(item)" /></ListCell>
+          <ListCell class="max-sm:hidden">
             <span class="truncate text-base text-ink-gray-7" :title="item.collections?.join(', ')">
               {{ collectionSummary(item) }}
             </span>
           </ListCell>
-          <ListCell>
-            <span class="w-full text-end text-base tabular-nums" :class="stockTone(item.stock)">
-              {{ __('{0} in stock', [item.stock]) }}
+          <ListCell class="max-sm:hidden">
+            <span class="w-full text-end text-base tabular-nums" :class="stockLabel(item).tone">
+              {{ stockLabel(item).text }}
             </span>
           </ListCell>
           <ListCell>
@@ -324,20 +373,20 @@ function collectionSummary(product) {
       v-if="!productsRequest.loading && !rows.length"
       icon="lucide-package"
       :title="__('No products yet')"
-      :description="__('Add your first product, or import a catalogue to get started.')"
+      :description="__('Add your first product, or import the ones you already sell.')"
       :filtered="isFiltered"
       :filtered-title="__('No products match')"
-      :filtered-description="__('Change the filters, or import a catalogue to get started.')"
+      :filtered-description="__('Change the filters or the search.')"
     >
-      <div class="mt-2 flex flex-wrap justify-center gap-2">
-        <Button :label="__('Import CSV')" icon-left="lucide-upload" variant="solid" theme="gray" @click="openImport" />
+      <div v-if="!isFiltered" class="mt-2 flex flex-wrap justify-center gap-2">
+        <Button :label="__('Import')" icon-left="lucide-upload" @click="openImport" />
         <Button
-          v-if="!isFiltered"
           :label="__('Generate Demo Products')"
           icon-left="lucide-package-plus"
           :loading="loadSampleProductsAction.loading"
           @click="loadSampleProducts"
         />
+        <Button :label="__('Add product')" icon-left="lucide-plus" variant="solid" theme="gray" @click="openAddProduct" />
       </div>
     </EmptyState>
   </PageBody>

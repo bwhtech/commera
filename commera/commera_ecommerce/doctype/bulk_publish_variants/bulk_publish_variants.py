@@ -6,6 +6,7 @@ from frappe.model.document import Document
 from frappe.query_builder import DocType
 from frappe.utils import cint, create_batch
 
+from commera.api.admin.catalog import get_publish_blockers
 from commera.commera_ecommerce.doctype.commera_settings.editor_input import parse_list
 from commera.plugin_events import add_changed_products, get_handlers
 from commera.product_collections import variant_in_collections
@@ -23,27 +24,26 @@ def chunked(values):
 
 
 def get_variants_to_publish(publish, names=None, item_groups=None, require_complete=True):
-	"""Variants whose `is_published` this call would flip. Completeness is demanded only on the way in -
-	an already-live variant must always be unpublishable."""
+	"""Variants whose `is_published` this call would flip. Readiness (catalog.get_publish_blockers) is
+	demanded only on the way in - an already-live variant must always be unpublishable."""
 	variant = frappe.qb.DocType(PRODUCT_DOCTYPE)
-	color_size_item = frappe.qb.DocType("Color Size Item")
 
 	found = []
 	for name_chunk in chunked(names):
 		for item_group_chunk in chunked(item_groups):
-			query = frappe.qb.from_(variant)
-			if publish and require_complete:
-				query = query.inner_join(color_size_item).on(
-					(color_size_item.parent == variant.name) & (color_size_item.parenttype == PRODUCT_DOCTYPE)
-				)
-			query = query.select(variant.name).distinct().where(variant.is_published == (0 if publish else 1))
+			query = frappe.qb.from_(variant).select(variant.name).distinct()
+			query = query.where(variant.is_published == (0 if publish else 1))
 			if name_chunk is not None:
 				query = query.where(variant.name.isin(name_chunk))
 			if item_group_chunk is not None:
 				query = query.where(variant_in_collections(variant, item_group_chunk))
 			found.extend(row.name for row in query.run(as_dict=True))
 
-	return list(dict.fromkeys(found))
+	found = list(dict.fromkeys(found))
+	if publish and require_complete:
+		blockers = get_publish_blockers(found)
+		found = [name for name in found if not blockers[name]]
+	return found
 
 
 def save_publish_state(publish, changed_names):

@@ -1,4 +1,21 @@
 import { computed, unref } from 'vue'
+import { __ } from './translation.js'
+
+// An Item's code and name are 140-character columns, and a product is named after its title, so a
+// longer title is refused by the server in ERPNext's words. Say it on the field first.
+export const TITLE_MAX_LENGTH = 140
+
+export function titleLengthError(title, max = TITLE_MAX_LENGTH) {
+  return (title ?? '').trim().length > max ? __('Use {0} characters or fewer for the title.', [max]) : ''
+}
+
+// A new product also names records after its title: "<title> <option>" for its option list and
+// "<title> - <value>" for each value's page. The longest of those must fit in 140 too, so the limit
+// at creation depends on the option and its values (no option is "Title" with "Standard").
+export function newProductTitleLimit(attribute, values) {
+  const suffixes = [` ${attribute}`, ...values.map((value) => ` - ${value}`)]
+  return TITLE_MAX_LENGTH - Math.max(...suffixes.map((suffix) => suffix.length))
+}
 
 // What a shopper is actually charged for a priced row (a size, or a pricing-screen row): the
 // storefront reads the sale price list and only falls back to the default one when there is no
@@ -17,36 +34,93 @@ export function compareAtPrice(rated) {
   return compareAt != null && compareAt > shownPrice(rated) ? compareAt : null
 }
 
-export function priceFields(rated) {
-  return { price: compareAtPrice(rated), discountedPrice: rated?.sale_rate ?? rated?.default_rate ?? null }
+// The two price inputs a seller edits: Price, what the customer pays (sale_rate), and the optional
+// Original price shown crossed out next to it (default_rate). Every price form reads and writes
+// through these three, so the label-to-rate mapping lives here only.
+export function priceInputs(rated) {
+  return { price: rated?.sale_rate ?? rated?.default_rate ?? null, originalPrice: compareAtPrice(rated) }
 }
 
 export function hasPrice(rate) {
   return rate != null && rate !== '' && Number(rate) > 0
 }
 
-export function isPriceValid({ price, discountedPrice }) {
-  return !hasPrice(price) || Number(price) > Number(discountedPrice)
+export function isOriginalPriceValid({ price, originalPrice }) {
+  return !hasPrice(originalPrice) || Number(originalPrice) > Number(price)
 }
 
-// An empty Price writes the discounted price to both lists: Item Prices cannot be deleted through
+// Said under the "Original price" label, so the label is not repeated: the full sentence wrapped to
+// two uneven lines in the half-width column.
+export function originalPriceError(inputs) {
+  return isOriginalPriceValid(inputs) ? '' : __('Must be higher than the price.')
+}
+
+// An empty Original price writes the price to both lists: Item Prices cannot be deleted through
 // the API, and equal rates show nothing crossed out.
+export function priceInputRates({ price, originalPrice }) {
+  const charged = Number(price)
+  return { default_rate: hasPrice(originalPrice) ? Number(originalPrice) : charged, sale_rate: charged }
+}
+
+// ponytail: the pre-rename shape ({ price: crossed-out, discountedPrice: charged }) for the screens
+// not yet moved to priceInputs; delete these three once nothing imports them.
+export function priceFields(rated) {
+  const inputs = priceInputs(rated)
+  return { price: inputs.originalPrice, discountedPrice: inputs.price }
+}
+
+export function isPriceValid({ price, discountedPrice }) {
+  return isOriginalPriceValid({ price: discountedPrice, originalPrice: price })
+}
+
 export function priceRates({ price, discountedPrice }) {
-  const charged = Number(discountedPrice)
-  return { default_rate: hasPrice(price) ? Number(price) : charged, sale_rate: charged }
+  return priceInputRates({ price: discountedPrice, originalPrice: price })
+}
+
+// One wording for a stock count on every product screen, zero included: "0 in stock" is honest and
+// countable where "No stock yet" and a bare "0" each said it differently.
+export function stockLabel(count) {
+  return __('{0} in stock', [count ?? 0])
 }
 
 export const PLACEHOLDER_ATTRIBUTE = 'Title'
 export const PLACEHOLDER_OPTION = 'Standard'
 export const PLACEHOLDER_SIZE = 'One Size'
 
+// Sizes come from catalog.get_product's `size_order`, the store's Size attribute order, whenever the
+// product carries it: two sparse colors (Red S/M, Blue S/L) do not hold enough to place M against L.
 export function productOptions(product) {
   const options = [...new Set(product.variants.map((variant) => variant.option))]
-  const sizes = [...new Set(product.variants.flatMap((variant) => variant.sizes.map((size) => size.size)))]
+  const sizes = product.size_order ?? mergeOrderedSizes(product.variants.map((variant) => variant.sizes.map((size) => size.size)))
   return {
     options: options.filter((option) => option !== PLACEHOLDER_OPTION),
     sizes: sizes.filter((size) => size !== PLACEHOLDER_SIZE),
   }
+}
+
+// The fallback for a product shape without `size_order`. Each color lists its sizes in the Size
+// attribute's order, but a sparse color skips some. A plain union would put White's S after Black's
+// M and L; slotting each unseen size in just after the size it follows in its own list keeps the
+// attribute order wherever the colors overlap.
+export function mergeOrderedSizes(lists) {
+  const merged = []
+  for (const list of lists) {
+    let cursor = 0
+    for (const size of list) {
+      const index = merged.indexOf(size)
+      if (index === -1) merged.splice(cursor++, 0, size)
+      else cursor = index + 1
+    }
+  }
+  return merged
+}
+
+// A catalog.get_products row's variants: every colour × size a shopper can buy. A product with no
+// options is the one hidden Standard row with its one hidden size, and has none.
+export function listedVariantCount(product) {
+  const rows = product.variants ?? []
+  const isSingleItem = rows.length === 1 && rows[0].option === PLACEHOLDER_OPTION && rows[0].size_count <= 1
+  return isSingleItem ? 0 : rows.reduce((total, row) => total + row.size_count, 0)
 }
 
 // Everything the product screen needs to summarise a product at a glance,
@@ -65,9 +139,9 @@ export function useProductStats(source) {
     const committed = sizes.reduce((sum, size) => sum + (size.committed ?? 0), 0)
     // The range a shopper sees, so it reads the charged rate too — a size priced on the sale
     // list alone has no default_rate at all and would otherwise drop out of the range entirely.
-    const rates = sizes
-      .filter((size) => size.sale_rate != null || size.default_rate != null)
-      .map((size) => shownPrice(size))
+    // A rate of 0 is a price never set, like a missing one (hasPrice): counted, it would turn the
+    // range into "₹0 – ₹999" where the rows say "No price".
+    const rates = sizes.map((size) => shownPrice(size)).filter(hasPrice)
 
     const sales = product.recent_sales ?? { units_sold: 0, order_count: 0, revenue: 0 }
 

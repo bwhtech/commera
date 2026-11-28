@@ -18,6 +18,13 @@ export function buildOptionSizes(options, sizes, excluded) {
   }))
 }
 
+// What catalog.create_product is sent. Sizes with no colour hang on the hidden option, the same row a
+// product page keeps for them (optionChanges below), so each size still becomes its own variant.
+export function newProductOptionSizes(options, sizes, excluded) {
+  const rowOptions = options.length || !sizes.length ? options : [PLACEHOLDER_OPTION]
+  return buildOptionSizes(rowOptions, sizes, excluded)
+}
+
 export function optionChanges({ live, options, sizes, excluded, keepsHiddenOption }) {
   const rowOptions = options.length || !keepsHiddenOption ? options : [PLACEHOLDER_OPTION]
   const rowSizes = sizes.length ? sizes : [PLACEHOLDER_SIZE]

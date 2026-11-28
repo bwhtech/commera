@@ -136,3 +136,132 @@ a {
       --scroll-fade-right 150ms ease-out;
   }
 }
+
+/* frappe-ui's InputError and its required "*" draw in ink-red-5, which measures 4.46:1 on a
+   light dialog and 3.07:1 on a dark one: under AA for 13px text, and a field error is the one
+   line a merchant must read. red-7 is 6.70:1 and 6.32:1 there, and is what frappe-ui's own
+   ErrorMessage already uses, so a field error and a form error now read in the same red. The
+   attribute pair outranks the single utility class whatever order the two stylesheets load in.
+   Recheck when frappe-ui moves its field errors off red-5. */
+[data-slot='error'][role='alert'],
+[data-slot='label'] > [aria-hidden='true'].text-ink-red-5 {
+  @apply text-ink-red-7;
+}
+
+/* A field error under a half-width field can wrap with one word on its second line. `pretty` lets
+   the browser even the lines out. */
+[data-slot='error'][role='alert'] {
+  text-wrap: pretty;
+}
+
+/* A price or a quantity is typed, never nudged by one: the native spin buttons only show on hover
+   and focus, look different in every browser, and sit on top of the field's end padding. The
+   keyboard's arrow keys still step the value. Tabular figures, because a number field sits next
+   to other numbers (Price beside Original price) and a class on frappe-ui's FormControl lands on
+   its wrapper, which preflight's `font: inherit` does not carry into the input. */
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* frappe-ui's TabButtons draw an unselected tab's label in ink-gray-5: 3.76:1 on its gray track in
+   light mode and 3.4:1 in dark, under AA for a label a merchant reads to pick a filter (Products'
+   Live / Not published, Import's sources). gray-6 passes on both tracks; the selected tab keeps
+   gray-8 on its raised pill, so the two still differ. `:not(:hover)` leaves frappe-ui's own hover
+   ink in charge. Recheck when frappe-ui changes the inactive pill ink. */
+[data-slot='tab-buttons'] [data-state='inactive'] .text-ink-gray-5:not(:hover) {
+  @apply text-ink-gray-6;
+}
+
+/* frappe-ui's solid red Button (every Discard, Delete and Archive confirm) draws ink-red-9 on
+   surface-red-7 in dark mode: 4.28:1, under AA for its 14px (16px on a sheet) label. Dark mode only:
+   light mode's white on red-7 is 5.23:1. ink-gray-9 on red-7 is 5.06:1, and frappe-ui's dark hover
+   and press (red-8, red-9) get lighter, which would drop it to 3.49 and 2.45, so here they get
+   darker instead: red-6 is 5.97:1 and red-5 7.65:1. The pressed `data-state` look (red-9 with
+   ink-base, 6.87:1) carries no red-7 class and is left alone, as is disabled. Measured from
+   frappe-ui's oklch tokens; recheck when frappe-ui changes its solid red. */
+[data-theme='dark'] button.bg-surface-red-7 {
+  @apply text-ink-gray-9;
+}
+
+[data-theme='dark'] button.bg-surface-red-7:hover {
+  @apply bg-surface-red-6;
+}
+
+[data-theme='dark'] button.bg-surface-red-7:active {
+  @apply bg-surface-red-5;
+}
+
+/* frappe-ui's menu group headings ("Store", "Stock", "Manage" in More actions) are ink-gray-4: 2.85:1
+   light and 3.63:1 dark on the menu surface. They name the group a merchant scans for, so they are
+   read, not decoration. gray-6 is 7.80:1 and 5.45:1 there; the items stay gray-8, so the heading
+   still reads as the quieter line. Recheck when frappe-ui changes menuClasses.groupLabel. */
+[data-slot='group-label'].text-ink-gray-4 {
+  @apply text-ink-gray-6;
+}
+
+/* frappe-ui's Breadcrumbs draw every crumb but the last in ink-gray-5, 4.18:1 in both themes, under
+   AA for the 16px "Products" a merchant clicks to go back. gray-6 is 7.80:1 light and 6.29:1 dark;
+   the current page stays gray-9 and the hover gray-7, so the three states still differ.
+   `data-page-title` is AppPageHeader's title row, which holds every page's breadcrumbs, including
+   the ones a page puts in its `title` slot. Recheck when frappe-ui changes the crumb ink. */
+[data-page-title] :is(a, button).text-ink-gray-5:not(:hover) {
+  @apply text-ink-gray-6;
+}
+
+/* A list header set to gray-6 (frappe-ui draws it gray-5, 4.18:1, under AA for 13px text) carries the
+   colour to its cells, except a sortable one: ListHeaderCellSort paints its own button gray-5, which
+   no class on the header or the cell reaches. This hands that button the header's choice, so a
+   header that opted into gray-6 is gray-6 in every column, and one that did not is left alone. The
+   header's class is matched as an attribute: Tailwind refuses to @apply a utility inside a selector
+   that names the same utility class. */
+[data-slot='list-header'][class~='text-ink-gray-6'] [data-slot='list-header-cell'] button.text-ink-gray-5 {
+  @apply text-ink-gray-6;
+}
+
+/* A step heading takes focus only from code (ImportDialog moves focus there on a step change, so it
+   never falls to <body>), as a place for a screen reader to land. It is not a control, so it draws
+   no ring. */
+h2[tabindex='-1']:focus {
+  outline: none;
+}
+
+/* frappe-ui's keyboard focus outline (--focus-outline-default, applied on :focus-visible) is a pale
+   gray: 1.57:1 on a white field and 1.55-1.64:1 on dark surfaces, under the 3:1 a focus indicator
+   needs. outline-gray-5 is the Espresso step that clears 3:1 on the surfaces it sits on in both
+   themes; the widths stay frappe-ui's own (2px light, 3px dark). Recheck when frappe-ui retunes the
+   focus token upstream. */
+:root {
+  --focus-outline-default: 2px solid var(--outline-gray-5);
+}
+
+[data-theme='dark'] {
+  --focus-outline-default: 3px solid var(--outline-gray-5);
+}
+
+/* frappe-ui's MultiSelect list takes at least its trigger's width and grows with its longest value,
+   with no ceiling: a 70-character color opened it 503px wide on a 390px phone, past the screen edge.
+   Capped to the room reka measures (with a 1rem margin each side as the floor), a long value wraps
+   inside its row instead, so the whole name stays readable. */
+[role='listbox'][data-slot='content'] {
+  max-width: min(var(--reka-combobox-content-available-width, 100vw), calc(100vw - 2rem));
+}
+
+/* On a phone the field already spans the form, so the list matches it and lines up under it. */
+@media (max-width: 639px) {
+  [role='listbox'][data-slot='content'] {
+    max-width: var(--reka-combobox-trigger-width);
+  }
+}
+
+[role='listbox'][data-slot='content'] [data-slot='item'] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

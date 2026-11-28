@@ -1,6 +1,8 @@
 """Turn existing ERPNext Items into draft Commera products. The Items, their prices and their stock stay
 as they are: only a Style Attribute Configurator, its options and their size rows are added around them."""
 
+import hashlib
+
 import frappe
 from frappe import _
 from frappe.utils import create_batch, now
@@ -17,7 +19,7 @@ from commera.api.admin.catalog import (
 	get_ecommerce_stock,
 	get_selling_rates,
 )
-from commera.commera_ecommerce.doctype.bulk_publish_variants.bulk_publish_variants import publish_variants
+from commera.api.admin.imports import publish_drafts
 from commera.commera_ecommerce.doctype.commera_settings.commera_settings import create_configurator_log
 from commera.product_collections import COLLECTIONS_FIELD, PRODUCT_COLLECTION
 from commera.swatches import COLOUR_ATTRIBUTE, DUPLICATE_COLOUR_ATTRIBUTE
@@ -245,13 +247,32 @@ def get_preview(search: str | None, start: int, page_length: int) -> dict:
 	return {"items": items, "skipped": skipped, "total": len(importable)}
 
 
+class ImportAlreadyRunningError(frappe.ValidationError):
+	pass
+
+
+def get_selection_key(item_codes: list | None) -> str:
+	"""What an import was started for, so a restart can tell the same items from other ones (None is every
+	item). A digest, not the codes, because the status rides every progress update to the browser."""
+	if item_codes is None:
+		return "all"
+	return hashlib.sha256("\n".join(sorted(set(item_codes))).encode()).hexdigest()
+
+
 def queue_import(item_codes: list | None) -> dict:
-	"""One import at a time: a second start while one runs answers with the running one."""
+	"""One import at a time. A second start for the same items picks up the running import. One for
+	other items is refused: answering with the running import showed its result as theirs."""
+	selection = get_selection_key(item_codes)
 	if is_job_enqueued(JOB_ID) and (running := frappe.cache.get_value(status_key(JOB_ID))):
-		return {"job_id": JOB_ID, "log": running["log"]}
+		if running.get("selection") == selection:
+			return {"job_id": JOB_ID, "log": running["log"]}
+		frappe.throw(
+			_("An import is already running. Wait for it to finish, then import these items."),
+			ImportAlreadyRunningError,
+		)
 
 	log = create_configurator_log()
-	set_status(JOB_ID, get_new_progress("queued", log.name, total=len(item_codes or [])))
+	set_status(JOB_ID, get_new_progress("queued", log.name, total=len(item_codes or []), selection=selection))
 	frappe.enqueue(
 		import_items,
 		queue="long",
@@ -275,7 +296,9 @@ def import_items(item_codes: list | None, log_name: str, import_id: str = JOB_ID
 	importable_codes = [item_code for item_code in importable_codes if item_code in requested_codes]
 	skipped_count = len(requested) - len(importable_codes)
 
-	progress = get_new_progress("running", log_name, total=len(requested))
+	progress = get_new_progress(
+		"running", log_name, total=len(requested), selection=get_selection_key(item_codes)
+	)
 	progress.update(done=skipped_count, skipped=skipped_count)
 	set_status(import_id, progress)
 
@@ -301,6 +324,15 @@ def import_items(item_codes: list | None, log_name: str, import_id: str = JOB_ID
 	set_status(import_id, progress)
 
 
+def get_failure_message(error, item_code):
+	"""A refusal (ValidationError) is already written for the seller. Anything else is a bug: its text goes
+	to the error log, and the seller is told the plain consequence."""
+	if isinstance(error, frappe.ValidationError) and cstr(error):
+		return cstr(error)
+	frappe.log_error(f"ERPNext import of {item_code}")
+	return _("Something went wrong with this item. Run the import again to retry it.")
+
+
 def import_batch(plans: list, log, failed: list) -> list:
 	created = []
 	for plan in plans:
@@ -309,9 +341,13 @@ def import_batch(plans: list, log, failed: list) -> list:
 			configurator = add_product(plan)
 		except Exception as error:
 			frappe.db.rollback(save_point="erpnext_import")
-			failed.append({"item_code": plan["item_code"], "error": cstr(error) or type(error).__name__})
-			if not isinstance(error, frappe.ValidationError):
-				frappe.log_error(f"ERPNext import of {plan['item_code']}")
+			failed.append(
+				{
+					"item_code": plan["item_code"],
+					"item_name": plan["item_name"],
+					"error": get_failure_message(error, plan["item_code"]),
+				}
+			)
 			continue
 		frappe.db.release_savepoint("erpnext_import")
 		created.append((plan, configurator))
@@ -429,6 +465,7 @@ def add_first_child_rows(
 
 
 def publish_imported_products(log: str) -> dict:
+	"""Publish all for one ERPNext import, by the same rules as the spreadsheet import's."""
 	if not frappe.db.exists(LOG_DOCTYPE, log):
 		frappe.throw(_("No such import."), frappe.DoesNotExistError)
 	configurators = frappe.get_all(
@@ -442,29 +479,17 @@ def publish_imported_products(log: str) -> dict:
 			PRODUCT_DOCTYPE,
 			"configurator",
 			configurators,
-			["name", "item_style"],
+			["name", "item_style", "attribute_value"],
 			filters={"is_published": 0},
 		).values()
 		for variant in variants
 	]
-	published = set(publish_variants(1, names=[variant.name for variant in drafts])) if drafts else set()
+	return publish_drafts(drafts)
 
-	published_products = {variant.item_style for variant in drafts if variant.name in published}
-	unpublished_products = list(
-		dict.fromkeys(variant.item_style for variant in drafts if variant.name not in published)
-	)
-	item_names = get_rows("Item", "name", unpublished_products, ["item_name"])
+
+def get_new_progress(status: str, log_name: str, total: int = 0, selection: str | None = None) -> dict:
 	return {
-		"published": len(published_products),
-		"needs_size": [
-			{"item_code": item_code, "item_name": item_names[item_code][0].item_name}
-			for item_code in unpublished_products
-		],
-	}
-
-
-def get_new_progress(status: str, log_name: str, total: int = 0) -> dict:
-	return {
+		"selection": selection,
 		"status": status,
 		"done": 0,
 		"total": total,

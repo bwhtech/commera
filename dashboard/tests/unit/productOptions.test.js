@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { optionChanges, pairKey } from '../../src/data/optionSizes.js'
-import { productOptions } from '../../src/data/product.js'
+import { newProductTitleLimit, productOptions, titleLengthError, useProductStats } from '../../src/data/product.js'
 
 const variant = (option, sizes) => ({ option, sizes: sizes.map((size) => ({ size })) })
 
@@ -62,4 +62,39 @@ test('an unticked pair is neither added nor kept', () => {
     keepsHiddenOption: false,
   })
   assert.deepEqual([changes.added, changes.removed], [[], pairs([['Red', 'M']])])
+})
+
+test('a color that skips sizes does not reorder them', () => {
+  const product = { variants: [variant('Black', ['M', 'L']), variant('White', ['S', 'M', 'L'])] }
+  assert.deepEqual(productOptions(product).sizes, ['S', 'M', 'L'])
+})
+
+test('the store size order wins over what sparse colors imply', () => {
+  const product = {
+    size_order: ['S', 'M', 'L'],
+    variants: [variant('Red', ['S', 'M']), variant('Blue', ['S', 'L'])],
+  }
+  assert.deepEqual(productOptions(product).sizes, ['S', 'M', 'L'])
+})
+
+test('the store size order drops the placeholder size', () => {
+  const product = { size_order: ['One Size'], variants: [variant('Indigo', ['One Size'])] }
+  assert.deepEqual(productOptions(product).sizes, [])
+})
+
+test('the price range leaves out a size with no price, so it never reads ₹0', () => {
+  const sized = (option, rates) => ({ option, sizes: rates.map((sale_rate, index) => ({ size: `S${index}`, sale_rate })) })
+  const stats = useProductStats({ variants: [sized('Black', [null, 0]), sized('White', [999, 1299])] })
+  assert.equal(stats.value.priceLow, 999)
+  assert.equal(stats.value.priceHigh, 1299)
+  const unpriced = useProductStats({ variants: [sized('Black', [null, 0])] })
+  assert.equal(unpriced.value.priceLow, null)
+})
+
+test('a new product title leaves room for the names made from it', () => {
+  // "<title> - Standard" is the longest name a product with no option makes.
+  assert.equal(newProductTitleLimit('Title', ['Standard']), 129)
+  assert.equal(newProductTitleLimit('Color', ['Black', 'Navy']), 132)
+  assert.equal(titleLengthError('T'.repeat(129), 129), '')
+  assert.equal(titleLengthError('T'.repeat(130), 129), 'Use 129 characters or fewer for the title.')
 })

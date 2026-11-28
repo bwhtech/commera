@@ -16,6 +16,7 @@ from commera.api.variant_pricing import (
 	get_selling_price_lists,
 	set_variant_prices,
 )
+from commera.base_prices import get_public_rates
 from commera.data.store_options import SUPERSEDED_VALUES
 from commera.plugin_events import add_changed_products
 from commera.product_collections import (
@@ -24,7 +25,12 @@ from commera.product_collections import (
 	get_product_collections,
 	set_collections,
 )
-from commera.swatches import COLOUR_ATTRIBUTE, ensure_default_swatch, get_swatch_map
+from commera.swatches import (
+	COLOUR_ATTRIBUTE,
+	DUPLICATE_COLOUR_ATTRIBUTE,
+	ensure_default_swatch,
+	get_swatch_map,
+)
 from commera.utils import (
 	IN_CLAUSE_CHUNK_SIZE,
 	get_first_option_photos,
@@ -529,7 +535,8 @@ def get_product(item_template: str):
 		frappe.get_all(
 			"Style Attribute Variant",
 			filters={"configurator": ["in", [row.name for row in configurators]]},
-			fields=["name", "attribute_value", "display_name", "is_published", "route"],
+			fields=["name", "attribute_value", "display_name", "is_published", "route", "creation"],
+			order_by="creation asc, name asc",
 		)
 		if configurators
 		else []
@@ -537,11 +544,14 @@ def get_product(item_template: str):
 	variant_names = [row.name for row in variants]
 
 	sizes = (
-		frappe.get_all(
-			"Color Size Item",
-			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
-			fields=["parent", "size", "item_code"],
-			order_by="idx asc",
+		sort_by_size_order(
+			frappe.get_all(
+				"Color Size Item",
+				filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
+				fields=["parent", "size", "item_code"],
+				order_by="idx asc",
+			),
+			lambda row: row.size,
 		)
 		if variant_names
 		else []
@@ -551,6 +561,7 @@ def get_product(item_template: str):
 			"Website Slideshow Item",
 			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
 			fields=["parent", "image"],
+			order_by="idx asc",
 		)
 		if variant_names
 		else []
@@ -592,6 +603,8 @@ def get_product(item_template: str):
 			and not sizes_by_variant.get(row.name)
 		)
 	]
+	variants = sort_by_first_item(variants, sizes_by_variant)
+	blockers = get_publish_blockers([row.name for row in variants])
 
 	return {
 		"name": template.name,
@@ -605,6 +618,9 @@ def get_product(item_template: str):
 		"restock_level": restock_level,
 		"option_attribute": option_attribute,
 		"can_edit_options": bool(template.has_variants and configurators),
+		# In the Size attribute's order: from sparse colours alone, Red S/M and Blue S/L would merge as
+		# S, L, M.
+		"size_order": list(dict.fromkeys(row.size for row in sizes)),
 		"variants": [
 			{
 				"name": row.name,
@@ -614,12 +630,35 @@ def get_product(item_template: str):
 				"storefront_url": get_url(f"/products/{row.route}") if row.route else None,
 				"sizes": sizes_by_variant.get(row.name, []),
 				"images": images_by_variant.get(row.name, []),
-				"blockers": get_publish_blockers(sizes_by_variant.get(row.name, [])),
+				"blockers": blockers[row.name],
 			}
 			for row in variants
 		],
 		"recent_sales": get_recent_product_sales(item_codes),
 	}
+
+
+def sort_by_first_item(variants: list, sizes_by_variant: dict) -> list:
+	"""Colours in the order the seller added them: generate_variants groups colour rows in no set order, so
+	a colour's first item is the truer clock, and a colour with no items falls back to its own creation."""
+	item_codes = [
+		size["item_code"] for sizes in sizes_by_variant.values() for size in sizes if size["item_code"]
+	]
+	created = dict(
+		frappe.get_all(
+			"Item", filters={"name": ["in", item_codes]}, fields=["name", "creation"], as_list=True
+		)
+	)
+
+	def first_created(variant):
+		times = [
+			created[size["item_code"]]
+			for size in sizes_by_variant.get(variant.name, [])
+			if size["item_code"] in created
+		]
+		return (min(times) if times else variant.creation, variant.name)
+
+	return sorted(variants, key=first_created) if item_codes else variants
 
 
 def get_recent_product_sales(item_codes, window_days: int = 30):
@@ -776,14 +815,48 @@ def get_item_templates_by_item_code(item_codes):
 	return {row[0]: row[1] for row in rows}
 
 
-def get_publish_blockers(sizes):
-	return [] if sizes else [_("Add at least one size")]
+def get_publish_blockers(variant_names: list) -> dict[str, list[str]]:
+	"""What keeps each color off the store, by Style Attribute Variant name: no sizes, or a size a shopper
+	cannot pay for. Every publish path asks here, so the rules live in one place."""
+	if not variant_names:
+		return {}
+
+	item_codes_by_variant = {name: [] for name in variant_names}
+	for chunk in create_batch(list(item_codes_by_variant), IN_CLAUSE_CHUNK_SIZE):
+		for row in frappe.get_all(
+			"Color Size Item",
+			filters={"parent": ["in", chunk], "parenttype": "Style Attribute Variant"},
+			fields=["parent", "item_code"],
+		):
+			item_codes_by_variant[row.parent].append(cstr(row.item_code))
+
+	rates = get_buyable_rates([code for codes in item_codes_by_variant.values() for code in codes])
+	blockers = {}
+	for name, item_codes in item_codes_by_variant.items():
+		if not item_codes:
+			blockers[name] = [_("Add at least one size")]
+		elif any(rates.get(item_code, 0) <= 0 for item_code in item_codes):
+			blockers[name] = [_("Add a price before publishing")]
+		else:
+			blockers[name] = []
+	return blockers
+
+
+def get_buyable_rates(item_codes: list) -> dict[str, float]:
+	"""The rate a shopper pays today per item, as the storefront reads it (template rows included): the
+	sale list where it has a row, else the default list. An item with neither is missing."""
+	settings = frappe.get_cached_doc("Commera Settings")
+	sale_rates, default_rates = {}, {}
+	for row in get_public_rates(item_codes, [settings.default_price_list, settings.sale_price_list]):
+		rates = sale_rates if row.price_list == settings.sale_price_list else default_rates
+		rates[cstr(row.item_code)] = flt(row.rate)
+	return {**default_rates, **sale_rates}
 
 
 @frappe.whitelist()
 def get_collections(search_text: str | None = None):
 	"""The collections a product can be filed under, for the pickers. Leaf Item Groups only, the same
-	rule get_collection enforces on save."""
+	rule get_collection enforces on save, minus the ones ERPNext's setup wizard seeds."""
 	frappe.has_permission("Item Group", ptype="read", throw=True)
 
 	item_group = frappe.qb.DocType("Item Group")
@@ -793,12 +866,64 @@ def get_collections(search_text: str | None = None):
 		frappe.qb.from_(item_group)
 		.select(item_group.name)
 		.where(item_group.rgt == item_group.lft + 1)
+		.where(item_group.name.notin(get_seeded_item_groups()))
 		.orderby(item_group.name)
 		.limit(100)
 	)
 	if search_text:
 		query = query.where(item_group.name.like(f"%{cstr(search_text)}%"))
 	return query.run(pluck=True)
+
+
+@frappe.whitelist()
+def get_default_collection() -> str | None:
+	"""Where a new product most likely goes: the collection the last product was filed under, else the
+	collection the store made last."""
+	frappe.has_permission("Item Group", ptype="read", throw=True)
+
+	item_group = frappe.qb.DocType("Item Group")
+	item = frappe.qb.DocType("Item")
+	sac = frappe.qb.DocType("Style Attribute Configurator")
+	offered = (item_group.rgt == item_group.lft + 1) & item_group.name.notin(get_seeded_item_groups())
+
+	last_used = (
+		frappe.qb.from_(item)
+		.join(sac)
+		.on(sac.item_template == item.name)
+		.join(item_group)
+		.on(item_group.name == item.item_group)
+		.select(item.item_group)
+		.where(offered)
+		.orderby(item.creation, order=Order.desc)
+		.limit(1)
+	).run(pluck=True)
+	if last_used:
+		return last_used[0]
+
+	newest = (
+		frappe.qb.from_(item_group)
+		.select(item_group.name)
+		.where(offered)
+		.orderby(item_group.creation, order=Order.desc)
+		.limit(1)
+	).run(pluck=True)
+	return newest[0] if newest else None
+
+
+def get_seeded_item_groups() -> list:
+	"""The groups ERPNext's setup wizard makes for stock-keeping (Products, Raw Material…), read from its
+	preset list in English and in the site language the wizard may have used."""
+	from erpnext.setup.setup_wizard.operations.install_fixtures import get_preset_records
+
+	country = frappe.db.get_single_value("System Settings", "country") or ""
+	names = [
+		record["item_group_name"]
+		for record in get_preset_records(country)
+		if record["doctype"] == "Item Group"
+	]
+	if not names:
+		frappe.throw(_("ERPNext's preset collections could not be read."))
+	return list({*names, *(_(name) for name in names)})
 
 
 @frappe.whitelist()
@@ -860,7 +985,8 @@ def create_collection(title: str):
 	if not title:
 		frappe.throw(_("Enter a collection name"))
 	if frappe.db.exists("Item Group", title):
-		frappe.throw(_("Collection {0} already exists.").format(title))
+		# Typed, so Add product can say it on the Name field instead of in a toast.
+		frappe.throw(_("A collection with this name already exists."), frappe.DuplicateEntryError)
 
 	item_group = frappe.qb.DocType("Item Group")
 	parent = (
@@ -951,6 +1077,7 @@ def get_attribute_values(attribute: str):
 		order_by="idx asc",
 		pluck="attribute_value",
 	)
+	values = [value for value in values if not is_placeholder_value(attribute, value)]
 	swatches = get_swatch_map(attribute)
 	usage = get_value_usage_counts([attribute])
 
@@ -1007,7 +1134,8 @@ def get_attributes():
 	)
 	values_by_attribute = {}
 	for row in value_rows:
-		values_by_attribute.setdefault(row.parent, []).append(row.attribute_value)
+		if not is_placeholder_value(row.parent, row.attribute_value):
+			values_by_attribute.setdefault(row.parent, []).append(row.attribute_value)
 
 	usage_by_attribute = get_attribute_usage_counts(attribute_names)
 	usage_by_value = get_value_usage_counts(attribute_names)
@@ -1026,9 +1154,27 @@ def get_attributes():
 			],
 			"used_by": usage_by_attribute.get(name, 0),
 			"is_colour": name == COLOUR_ATTRIBUTE,
+			"is_option": is_option_attribute(name, attribute_names),
 		}
 		for name in attribute_names
 	]
+
+
+def is_placeholder_value(attribute: str, value: str) -> bool:
+	"""The hidden value a product with no sizes (One Size) or no options (Standard) sells on. Never offered
+	as a pick: chosen next to real sizes it makes a variant the product page then hides."""
+	return (attribute, value) in (
+		(SIZE_ATTRIBUTE, DEFAULT_SIZE_VALUE),
+		(DEFAULT_OPTION_ATTRIBUTE, DEFAULT_OPTION_VALUE),
+	)
+
+
+def is_option_attribute(name: str, attribute_names: list) -> bool:
+	"""Whether a product can vary by this attribute. Size is the fixed second axis, the placeholder only
+	holds products with no options, and ERPNext's British "Colour" is a second spelling of Color."""
+	if name in (SIZE_ATTRIBUTE, DEFAULT_OPTION_ATTRIBUTE):
+		return False
+	return not (name == DUPLICATE_COLOUR_ATTRIBUTE and COLOUR_ATTRIBUTE in attribute_names)
 
 
 def get_swatches_for_attributes(attribute_names):
@@ -1260,6 +1406,36 @@ DEFAULT_OPTION_VALUE = "Standard"
 DEFAULT_SIZE_VALUE = "One Size"
 
 
+# Item code and name are 140-character columns: past that, ERPNext refuses in its own words ("Item Code
+# ... will get truncated"), naming a field the seller never saw.
+TITLE_MAX_LENGTH = 140
+
+
+def check_title_length(title: str, limit: int = TITLE_MAX_LENGTH):
+	if len(title) > limit:
+		frappe.throw(_("Use {0} characters or fewer for the title.").format(limit))
+
+
+def check_option_names_fit(item_template: str, option_attribute: str | None, options) -> None:
+	"""Edit options names a new "<template> <option>" and "<template> - <value>" too, so a value the product's
+	name leaves no room for is refused in plain words, not as a database error."""
+	room = TITLE_MAX_LENGTH - len(item_template)
+	if option_attribute and len(f" {option_attribute}") > room:
+		frappe.throw(_("This product's name is too long to switch to {0}.").format(option_attribute))
+	for option in options:
+		if len(f" - {option}") > room:
+			frappe.throw(
+				_("“{0}” is too long for this product. Use {1} characters or fewer.").format(option, room - 3)
+			)
+
+
+def get_new_product_title_limit(option_attribute: str, options: list) -> int:
+	"""A new product also names "<title> <option>" (its configurator) and "<title> - <value>" (each value's
+	page), so the longest of those must fit in 140 as well. Mirrors newProductTitleLimit() in product.js."""
+	suffixes = [f" {option_attribute}", *(f" - {option}" for option in options)]
+	return TITLE_MAX_LENGTH - max(len(suffix) for suffix in suffixes)
+
+
 @frappe.whitelist(methods=["POST"])
 def create_product(
 	title: str,
@@ -1291,12 +1467,18 @@ def create_product(
 		)
 
 	if frappe.db.exists("Item", title):
-		frappe.throw(_("A product called {0} already exists. Give this one a different title.").format(title))
+		frappe.throw(
+			_("A product called {0} already exists. Give this one a different title.").format(title),
+			frappe.DuplicateEntryError,
+		)
 
-	# A book has neither a colour nor a size, so both axes fall back to a single hidden value - an owner who
-	# named no options hangs on the fallback axis, not on whichever attribute the form had selected.
-	option_rows = frappe.parse_json(option_sizes) if isinstance(option_sizes, str) else (option_sizes or [])
-	option_attribute = (cstr(option_attribute).strip() if option_rows else "") or ensure_attribute_exists(
+	# A product with no named option (sizes alone included) hangs on the hidden fallback axis, not on
+	# whichever attribute the form had selected.
+	option_sizes = parse_option_sizes(option_sizes)
+	names_an_option = any(
+		option.casefold() != DEFAULT_OPTION_VALUE.casefold() for option, _sizes in option_sizes
+	)
+	option_attribute = (cstr(option_attribute).strip() if names_an_option else "") or ensure_attribute_exists(
 		DEFAULT_OPTION_ATTRIBUTE, DEFAULT_OPTION_VALUE, "STD"
 	)
 	size_attribute = cstr(size_attribute).strip() or SIZE_ATTRIBUTE
@@ -1313,8 +1495,6 @@ def create_product(
 			)
 		)
 
-	option_sizes = parse_option_sizes(option_sizes)
-
 	collections = parse_collections(collections if collections is not None else [collection])
 
 	option_sizes = resolve_option_sizes(
@@ -1327,6 +1507,9 @@ def create_product(
 		size_abbreviations=frappe.parse_json(size_abbreviations)
 		if isinstance(size_abbreviations, str)
 		else size_abbreviations,
+	)
+	check_title_length(
+		title, get_new_product_title_limit(option_attribute, [option for option, _ in option_sizes])
 	)
 
 	item_template = frappe.new_doc("Item")
@@ -1345,6 +1528,7 @@ def create_product(
 		for size in sizes:
 			size_item = create_variant(item_template.name, {option_attribute: option, size_attribute: size})
 			size_item.item_name = get_variant_title(title, option, size)
+			fit_variant_names(size_item, item_template.name, title)
 			size_item.insert()
 
 	configurator = frappe.new_doc("Style Attribute Configurator")
@@ -1368,9 +1552,17 @@ def parse_option_sizes(option_sizes: list | str):
 	if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
 		frappe.throw(_("Colours and sizes could not be read"))
 
+	# Sizes with no colour are one size each on the hidden option, never dropped; beside named colours
+	# a blank row is a colour the owner forgot to name.
+	named = [row for row in rows if cstr(row.get("option")).strip()]
+	if named and any(row.get("sizes") for row in rows if row not in named):
+		frappe.throw(_("Name every color that has sizes."))
+
 	merged = {}
 	for row in rows:
-		option = cstr(row.get("option")).strip()
+		option = cstr(row.get("option")).strip() or (
+			DEFAULT_OPTION_VALUE if not named and row.get("sizes") else ""
+		)
 		if not option:
 			continue
 
@@ -1491,8 +1683,14 @@ def save_product_options(
 		frappe.throw(_("Product {0} has no options to edit").format(item_template))
 
 	option_attribute = cstr(option_attribute).strip()
+	switching = option_attribute and option_attribute != configurator.item_attribute
+	check_option_names_fit(
+		item_template,
+		option_attribute if switching else None,
+		{option for option, _size in parse_option_size_pairs(add)},
+	)
 	switched_codes = []
-	if option_attribute and option_attribute != configurator.item_attribute:
+	if switching:
 		switched_codes = switch_option_attribute(item_template, configurator, option_attribute)
 
 	template_attributes = frappe.get_all(
@@ -1560,6 +1758,7 @@ def save_product_options(
 			continue
 		size_item = create_variant(item_template, {option_attribute: option, SIZE_ATTRIBUTE: size})
 		size_item.item_name = get_variant_title(template_title, option, size)
+		fit_variant_names(size_item, item_template, template_title)
 		size_item.insert()
 		item_code_by_key[key] = size_item.name
 		created_codes.append(size_item.name)
@@ -1612,6 +1811,21 @@ def switch_option_attribute(item_template: str, configurator: dict, option_attri
 
 	bump_catalog()
 	return switched_codes
+
+
+def fit_variant_names(size_item, item_template: str, title: str):
+	"""Near the 140-character limit, "<template>-<abbreviations>" and "<title> - <color> - <size>" overflow.
+	Shorten the title part, never the suffix that tells variants apart, and never repeat a code."""
+	if len(size_item.item_code) > TITLE_MAX_LENGTH:
+		suffix = size_item.item_code[len(item_template) :]
+		stem = item_template[: TITLE_MAX_LENGTH - len(suffix)]
+		size_item.item_code = stem + suffix
+		if frappe.db.exists("Item", size_item.item_code):
+			unique = f"-{frappe.generate_hash(length=4).upper()}"
+			size_item.item_code = stem[: -len(unique)] + unique + suffix
+	if len(size_item.item_name) > TITLE_MAX_LENGTH and size_item.item_name.startswith(title):
+		shown = size_item.item_name[len(title) :]
+		size_item.item_name = title[: TITLE_MAX_LENGTH - len(shown) - 1] + "…" + shown
 
 
 def get_variant_title(title: str, option: str, size: str) -> str:
@@ -1717,18 +1931,6 @@ def sync_variant_sizes(
 	for row in current_rows:
 		current_by_variant.setdefault(row.parent, []).append((row.size, row.item_code))
 
-	size_rank = {
-		cstr(value).casefold(): rank
-		for rank, value in enumerate(
-			frappe.get_all(
-				"Item Attribute Value",
-				filters={"parent": SIZE_ATTRIBUTE},
-				order_by="idx asc",
-				pluck="attribute_value",
-			)
-		)
-	}
-
 	variants_with_new_sizes = []
 	for variant in variants:
 		option = cstr(variant.attribute_value).casefold()
@@ -1742,7 +1944,7 @@ def sync_variant_sizes(
 			for key, (_option, size) in add_pairs.items()
 			if key[0] == option and key[1] not in listed
 		]
-		wanted.sort(key=lambda row: size_rank.get(cstr(row[0]).casefold(), len(size_rank)))
+		wanted = sort_by_size_order(wanted, lambda row: row[0])
 
 		if any(code in created_codes for _size, code in wanted):
 			variants_with_new_sizes.append(variant.name)
@@ -1756,6 +1958,23 @@ def sync_variant_sizes(
 		variant_doc.save()
 
 	return variants_with_new_sizes
+
+
+def sort_by_size_order(rows: list, get_size) -> list:
+	"""Sizes in the Size attribute's own order (S, M, L), not the order their items were made in. A
+	size the attribute does not list keeps its place after the listed ones."""
+	size_rank = {
+		cstr(value).casefold(): rank
+		for rank, value in enumerate(
+			frappe.get_all(
+				"Item Attribute Value",
+				filters={"parent": SIZE_ATTRIBUTE},
+				order_by="idx asc",
+				pluck="attribute_value",
+			)
+		)
+	}
+	return sorted(rows, key=lambda row: size_rank.get(cstr(get_size(row)).casefold(), len(size_rank)))
 
 
 def price_new_sizes(item_template: str, variant_names: list, existing_item_codes: list) -> None:
@@ -1839,6 +2058,7 @@ def update_product(
 		title = cstr(title).strip()
 		if not title:
 			frappe.throw(_("Title is required."))
+		check_title_length(title)
 		item.item_name = title
 	collections_changed = collections is not None or collection is not None
 	if collections is None and collection is not None:
@@ -1960,7 +2180,7 @@ def set_variant_published(style_attribute_variant: str, publish: int | str):
 
 	publish = cint(publish)
 	if publish:
-		blockers = get_publish_blockers(variant.sizes)
+		blockers = get_publish_blockers([variant.name])[variant.name]
 		if blockers:
 			frappe.throw(_("Cannot publish yet: {0}").format(", ".join(blockers)))
 
@@ -1980,7 +2200,7 @@ def add_product_images(style_attribute_variant: str, file_urls: list | str):
 	return {
 		"name": variant.name,
 		"images": [row.image for row in variant.images],
-		"blockers": get_publish_blockers(variant.sizes),
+		"blockers": get_publish_blockers([variant.name])[variant.name],
 	}
 
 
@@ -1993,8 +2213,27 @@ def remove_product_image(style_attribute_variant: str, file_url: str):
 	return {
 		"name": variant.name,
 		"images": [row.image for row in variant.images],
-		"blockers": get_publish_blockers(variant.sizes),
+		"blockers": get_publish_blockers([variant.name])[variant.name],
 	}
+
+
+@frappe.whitelist(methods=["POST"])
+def move_product_image(style_attribute_variant: str, file_url: str, position: int | str = 0):
+	"""Put one photo at a position, 0 being the cover. Undoing a removal puts the photo back where it was."""
+	variant = frappe.get_doc("Style Attribute Variant", style_attribute_variant)
+	variant.check_permission("write")
+	moved = next((row for row in variant.images if row.image == file_url), None)
+	if not moved:
+		frappe.throw(_("Image not found on this variant: {0}").format(file_url))
+
+	rows = [row for row in variant.images if row is not moved]
+	rows.insert(max(0, min(cint(position), len(rows))), moved)
+	for index, row in enumerate(rows, start=1):
+		row.idx = index
+	variant.images = rows
+	variant.save()
+
+	return {"name": variant.name, "images": [row.image for row in variant.images]}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -2061,15 +2300,14 @@ def set_product_published(item_template: str, publish: int | str):
 	)
 	variant_names = [row.name for row in variants]
 
-	# Two queries for the whole set; loading each variant to count images and sizes is a read per row.
-	ready = get_ready_variant_names(variant_names) if publish else set(variant_names)
+	blockers = get_publish_blockers(variant_names) if publish else {}
 
 	updated = []
 	skipped = []
 	for row in variants:
 		label = row.attribute_value or row.display_name
-		if row.name not in ready:
-			skipped.append(label)
+		if blockers.get(row.name):
+			skipped.append({"option": label, "blockers": blockers[row.name]})
 			continue
 
 		# ponytail: one save per option so validation and route generation still run,
@@ -2080,20 +2318,6 @@ def set_product_published(item_template: str, publish: int | str):
 		updated.append(label)
 
 	return {"updated": updated, "skipped": skipped}
-
-
-def get_ready_variant_names(variant_names):
-	if not variant_names:
-		return set()
-
-	return {
-		row.parent
-		for row in frappe.get_all(
-			"Color Size Item",
-			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
-			fields=["parent"],
-		)
-	}
 
 
 def get_unpublishable_options(limit: int = 5):
@@ -2108,15 +2332,7 @@ def get_unpublishable_options(limit: int = 5):
 	if not variants:
 		return []
 
-	variant_names = [row.name for row in variants]
-	sized_variants = {
-		row.parent
-		for row in frappe.get_all(
-			"Color Size Item",
-			filters={"parent": ["in", variant_names], "parenttype": "Style Attribute Variant"},
-			fields=["parent"],
-		)
-	}
+	blockers_by_variant = get_publish_blockers([row.name for row in variants])
 
 	templates_by_configurator = {
 		row.name: row.item_template
@@ -2137,7 +2353,7 @@ def get_unpublishable_options(limit: int = 5):
 
 	blocked = []
 	for row in variants:
-		blockers = get_publish_blockers(row.name in sized_variants)
+		blockers = blockers_by_variant[row.name]
 		if not blockers:
 			continue
 

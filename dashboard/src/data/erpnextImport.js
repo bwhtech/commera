@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { trySubmit, useAdminAction, useAdminRead } from './api'
 import { errorMessage } from './errors'
+import { __ } from './translation'
 import { beginPhase, endPhase, imp, isCurrentImport } from './importFlow'
 import { isRunSettled, itemCodesToImport, preselectedCodes } from './erpnextImportState'
 import { setupPollDelay } from '../ia/onboardingSteps'
@@ -24,7 +25,7 @@ const statusRequest = useAdminRead('erpnext_import.get_erpnext_import_status', {
   params: () => ({ job_id: imp.erpnext.jobId }),
 })
 
-export const startAction = useAdminAction('erpnext_import.start_erpnext_import')
+export const startAction = useAdminAction('erpnext_import.start_erpnext_import', { quiet: true })
 export const publishAction = useAdminAction('erpnext_import.publish_imported_products')
 
 const ITEM_CODES_PAGE = 500
@@ -34,7 +35,10 @@ export async function loadErpnextPreview() {
   previewParams.value = { search: search || undefined, start: (page - 1) * pageSize, page_length: pageSize }
   const data = await previewRequest.fetch()
   if (!data) return
+  // A slower, older search can answer last; keep only the answer for what the box holds now.
+  if ((search || '') !== (imp.erpnext.search || '')) return
   imp.erpnext.items = data.items
+  imp.erpnext.itemsSearch = search || ''
   imp.erpnext.skipped = data.skipped
   imp.erpnext.total = data.total
   if (!search) imp.erpnext.importableCount = data.total
@@ -92,13 +96,17 @@ export async function startErpnextImport() {
   if (ticket === null) return
   imp.erpnext.status = null
   imp.erpnext.error = ''
+  imp.erpnext.otherImportRunning = false
+  imp.erpnext.startFailed = false
   imp.erpnext.published = null
 
   const itemCodes = itemCodesToImport(imp.erpnext.selected, imp.erpnext.importableCount)
   const started = await trySubmit(startAction, itemCodes ? { item_codes: itemCodes } : {})
   if (!isCurrentImport(ticket)) return
   if (!started) {
-    imp.erpnext.error = errorMessage(startAction.error)
+    imp.erpnext.error = errorMessage(startAction.error, __('Nothing was imported. Try again in a moment.'))
+    imp.erpnext.otherImportRunning = startAction.error?.type === 'ImportAlreadyRunningError'
+    imp.erpnext.startFailed = true
     endPhase(ticket, 'failed')
     return
   }

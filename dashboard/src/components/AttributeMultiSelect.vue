@@ -1,7 +1,7 @@
 <script setup>
 /**
- * Pick attribute values (colours, sizes) from the ones this store already uses, or type
- * one it does not have yet and add it from the search row — catalog.create_product
+ * Pick attribute values (colors, sizes) from the ones this store already uses, or type
+ * one it does not have yet and add it from the list's footer — catalog.create_product
  * appends anything new to the Item Attribute on the way in.
  */
 import { computed, ref, watch } from 'vue'
@@ -22,6 +22,21 @@ const selected = defineModel({ type: Array, required: true })
 // Surfaced so the host dialog can stand down from outside-dismissal while this popover owns the click.
 const open = defineModel('open', { type: Boolean, default: false })
 
+// frappe-ui's MultiSelect prevents its popover's unmount autofocus and returns focus nowhere, so
+// Escape left focus on <body> and the next Tab went nowhere inside the dialog. Once the list has
+// closed, focus that is on nothing goes back to the trigger through MultiSelect's own focus(). Focus
+// the merchant moved by clicking another control is somewhere, so it is left there. A frame later,
+// because the list (and the search input that held focus) is removed on the render after the close.
+// ponytail: drop this once frappe-ui's MultiSelect returns focus on Escape (council v10 upstream diff).
+const picker = ref(null)
+watch(open, (isOpen) => {
+  if (isOpen) return
+  requestAnimationFrame(() => {
+    const active = document.activeElement
+    if (!active || active === document.body) picker.value?.focus({ preventScroll: true })
+  })
+})
+
 const emit = defineEmits(['values'])
 
 const valuesRequest = useAdminRead('catalog.get_attribute_values', {
@@ -36,6 +51,7 @@ watch(
 
 // A value the owner types lives only in this picker until the product is created, so it is held here.
 const addedValues = ref([])
+const query = ref('')
 
 watch(
   () => props.attribute,
@@ -60,18 +76,20 @@ function canAdd(query) {
   return Boolean(typed) && !options.value.some((option) => option.value.toLowerCase() === typed.toLowerCase())
 }
 
-function addTypedValue(query, setQuery) {
-  const typed = query.trim()
+function addTypedValue() {
+  const typed = query.value.trim()
   addedValues.value.push(typed)
   selected.value = [...selected.value, typed]
-  setQuery('')
+  query.value = ''
 }
 </script>
 
 <template>
   <MultiSelect
+    ref="picker"
     v-model="selected"
     v-model:open="open"
+    v-model:query="query"
     :label="props.label"
     :placeholder="props.placeholder"
     :description="props.description"
@@ -85,14 +103,19 @@ function addTypedValue(query, setQuery) {
     <template #item-prefix="{ item }">
       <SwatchDot v-if="item.color || item.image" :color="item.color" :image="item.image" size="sm" />
     </template>
-    <template #search-suffix="{ query, setQuery }">
-      <Button
-        v-if="canAdd(query)"
-        variant="ghost"
-        icon="lucide-plus"
-        :aria-label="__('Add {0}', [query.trim()])"
-        @click="addTypedValue(query, setQuery)"
-      />
+    <!-- Replaces frappe-ui's Clear All / Select All row: a size list is picked, never bulk-selected. -->
+    <template #footer="{ clear }">
+      <div v-if="canAdd(query) || selected.length" class="border-t border-outline-gray-1 p-1.5">
+        <Button
+          v-if="canAdd(query)"
+          class="w-full justify-start"
+          variant="ghost"
+          icon-left="lucide-plus"
+          :label="__('Add “{0}”', [query.trim()])"
+          @click="addTypedValue"
+        />
+        <Button v-else variant="ghost" size="sm" :label="__('Clear')" @click="clear" />
+      </div>
     </template>
   </MultiSelect>
 </template>

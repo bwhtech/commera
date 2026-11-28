@@ -22,7 +22,15 @@ export const shell = {
 }
 
 export function mount(component) {
-  function node(type, text = '') { return { type, text, children: [], props: {} } }
+  // querySelector matches a tag name only, enough for a component that finds an element it rendered;
+  // focus() marks the node, so a test can see where a component sent focus.
+  function node(type, text = '') {
+    return {
+      type, text, children: [], props: {}, focused: false,
+      querySelector(tag) { return findNode(this, (each) => each !== this && each.type === tag) ?? null },
+      focus() { this.focused = true },
+    }
+  }
   const renderer = Vue.createRenderer({
     createElement: node, createText: (text) => node('text', text), createComment: () => node('comment'),
     setText: (element, text) => { element.text = text },

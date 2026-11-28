@@ -1,0 +1,54 @@
+<script setup>
+import { computed, ref } from 'vue'
+import { Button } from 'frappe-ui'
+import PriceFields from '../PriceFields.vue'
+import { stockLabel } from '../../data/product'
+import ProductSection from './ProductSection.vue'
+import ReceiveStockDialog from './ReceiveStockDialog.vue'
+
+// Price and stock for a product sold as one item, edited here instead of through a variant
+// dialog naming the placeholder variant. The prices are part of the page's draft and save with
+// Save; stock is added straight away, as everywhere else.
+const props = defineProps({
+  // Bumped by the page each time the draft is reset (Discard) or saved.
+  draftVersion: { type: Number, default: 0 },
+  product: { type: Object, required: true },
+  draft: { type: Object, required: true },
+  priceError: { type: String, default: '' },
+  originalPriceError: { type: String, default: '' },
+})
+const emit = defineEmits(['received'])
+
+const receiveOpen = ref(false)
+
+const size = computed(() => props.product.variants[0].sizes[0])
+const stockRows = computed(() => [{ id: size.value.item_code, title: props.product.title, onHand: size.value.stock ?? 0 }])
+</script>
+
+<template>
+  <ProductSection id="product-pricing" :title="__('Price and stock')">
+    <!-- Keyed on the draft's version: an Original price revealed with "+ Add original price" but left
+         empty is local state, so Discard (which changes no value) would otherwise leave it showing. -->
+    <PriceFields
+      :key="draftVersion"
+      v-model:price="draft.price"
+      v-model:original-price="draft.originalPrice"
+      :price-error="priceError"
+      :original-price-error="originalPriceError"
+    />
+
+    <!-- -mx-4 px-4 runs the rule over ProductSection's px-4, edge to edge like the rules in the
+         Photos, Options and Variants cards. -->
+    <div class="-mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-outline-gray-1 px-4 pt-4">
+      <div>
+        <p class="text-base text-ink-gray-8 tabular-nums">{{ stockLabel(size.stock) }}</p>
+        <p v-if="size.committed" class="mt-0.5 text-sm text-ink-gray-6 tabular-nums">
+          {{ __('{0} ordered, not shipped', [size.committed]) }}
+        </p>
+      </div>
+      <Button :label="__('Add stock')" icon-left="lucide-package-plus" @click="receiveOpen = true" />
+    </div>
+
+    <ReceiveStockDialog v-model:open="receiveOpen" :rows="stockRows" @received="emit('received')" />
+  </ProductSection>
+</template>

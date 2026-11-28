@@ -222,11 +222,7 @@ class TestErpnextImport(ProductOnboardingTestCase):
 
 	def test_products_list_shows_imports_with_price_and_stock(self):
 		plain = self.make_plain_item()
-		item_price = frappe.new_doc("Item Price")
-		item_price.item_code = plain
-		item_price.price_list = self.default_price_list
-		item_price.price_list_rate = 499
-		item_price.insert()
+		self.price_item(plain)
 		make_stock_entry(item_code=plain, qty=3, to_warehouse=self.warehouse, rate=100)
 
 		self.run_import([plain])
@@ -257,22 +253,69 @@ class TestErpnextImport(ProductOnboardingTestCase):
 			_log, status = self.run_import([good, bad])
 
 		self.assertEqual(status["created"], 1)
-		self.assertEqual(status["failed"], [{"item_code": bad, "error": "Broken template"}])
+		item_name = frappe.db.get_value("Item", bad, "item_name")
+		self.assertEqual(
+			status["failed"], [{"item_code": bad, "item_name": item_name, "error": "Broken template"}]
+		)
 		self.assertTrue(frappe.db.exists("Style Attribute Configurator", {"item_template": good}))
 		self.assertFalse(frappe.db.exists("Style Attribute Configurator", {"item_template": bad}))
+
+	def test_an_unexpected_failure_is_logged_and_told_in_plain_words(self):
+		bad = self.make_plain_item()
+
+		def crash(plan):
+			raise AttributeError("'NoneType' object has no attribute 'name'")
+
+		with (
+			patch.object(erpnext_import, "add_product", crash),
+			patch.object(erpnext_import.frappe, "log_error") as log_error,
+		):
+			_log, status = self.run_import([bad])
+
+		self.assertEqual(
+			status["failed"][0]["error"],
+			"Something went wrong with this item. Run the import again to retry it.",
+		)
+		log_error.assert_called_once()
+
+	def price_item(self, item_code, rate=499):
+		item_price = frappe.new_doc("Item Price")
+		item_price.item_code = item_code
+		item_price.price_list = self.default_price_list
+		item_price.price_list_rate = rate
+		item_price.insert()
 
 	def test_publish_all_publishes_products_with_and_without_a_photo(self):
 		with_photo = self.make_plain_item()
 		frappe.db.set_value("Item", with_photo, "image", self.make_file())
 		without_photo = self.make_plain_item()
+		for item_code in (with_photo, without_photo):
+			self.price_item(item_code)
 		log, _status = self.run_import([with_photo, without_photo])
 
 		result = publish_imported_products(log)
 
 		self.assertEqual(result["published"], 2)
-		self.assertEqual(result["needs_size"], [])
+		self.assertEqual(result["not_published"], [])
 		self.assertEqual(
 			frappe.db.get_value("Style Attribute Variant", {"item_style": without_photo}, "is_published"), 1
+		)
+
+	def test_publish_all_leaves_an_unpriced_item_as_a_draft_and_says_why(self):
+		"""Publish all goes through catalog.get_publish_blockers, like every other publish path."""
+		priced, unpriced = self.make_plain_item(), self.make_plain_item()
+		self.price_item(priced)
+		log, _status = self.run_import([priced, unpriced])
+
+		result = publish_imported_products(log)
+
+		self.assertEqual(result["published"], 1)
+		self.assertEqual(
+			result["not_published"],
+			[{"item_template": unpriced, "title": unpriced, "reasons": ["Add a price before publishing"]}],
+		)
+		self.assertEqual(
+			frappe.db.get_value("Style Attribute Variant", {"item_style": unpriced}, "is_published"), 0
 		)
 
 	def test_an_imported_plain_item_reaches_checkout(self):
@@ -283,17 +326,63 @@ class TestErpnextImport(ProductOnboardingTestCase):
 
 		self.assertEqual([(line.item_code, line.size) for line in lines], [(plain, DEFAULT_SIZE_VALUE)])
 
-	def test_starting_while_an_import_runs_answers_with_the_running_one(self):
-		item_code = self.make_plain_item()
+	def queue_running_import(self, item_codes, status="queued"):
+		"""An import of `item_codes` the worker has not finished, as queue_import leaves it."""
 		erpnext_import.set_status(
-			erpnext_import.JOB_ID, erpnext_import.get_new_progress("running", "RUNNING-LOG")
+			erpnext_import.JOB_ID,
+			erpnext_import.get_new_progress(
+				status, "RUNNING-LOG", selection=erpnext_import.get_selection_key(item_codes)
+			),
 		)
 		self.addCleanup(frappe.cache.delete_value, erpnext_import.status_key(erpnext_import.JOB_ID))
 
-		with patch.object(erpnext_import, "is_job_enqueued", return_value=True):
-			started = start_erpnext_import([item_code])
+	def test_starting_the_same_items_while_they_import_picks_up_that_import(self):
+		"""A page reloaded during an import starts it again for the same items, in any order."""
+		first, second = self.make_plain_item(), self.make_plain_item()
+		for status in ("queued", "running"):
+			self.queue_running_import([first, second], status)
 
-		self.assertEqual(started, {"job_id": erpnext_import.JOB_ID, "log": "RUNNING-LOG"})
+			with patch.object(erpnext_import, "is_job_enqueued", return_value=True):
+				started = start_erpnext_import([second, first])
+
+			self.assertEqual(started, {"job_id": erpnext_import.JOB_ID, "log": "RUNNING-LOG"})
+
+	def test_starting_other_items_while_an_import_runs_is_refused(self):
+		"""Answering with the running import showed its result as the result of the new selection."""
+		running, other = self.make_plain_item(), self.make_plain_item()
+		for selection in ([running], None):
+			self.queue_running_import(selection)
+
+			with patch.object(erpnext_import, "is_job_enqueued", return_value=True):
+				with self.assertRaisesRegex(
+					erpnext_import.ImportAlreadyRunningError, "An import is already running"
+				):
+					start_erpnext_import([other])
+
+	def test_after_an_import_finishes_other_items_start_their_own(self):
+		running, other = self.make_plain_item(), self.make_plain_item()
+		self.queue_running_import([running], "done")
+
+		with (
+			patch.object(erpnext_import, "is_job_enqueued", return_value=False),
+			patch.object(frappe, "enqueue") as enqueue,
+		):
+			started = start_erpnext_import([other])
+
+		self.assertNotEqual(started["log"], "RUNNING-LOG")
+		self.assertEqual(enqueue.call_args.kwargs["item_codes"], [other])
+		status = erpnext_import.get_status(erpnext_import.JOB_ID)
+		self.assertEqual(
+			(status["log"], status["selection"]),
+			(started["log"], erpnext_import.get_selection_key([other])),
+		)
+
+	def test_the_running_status_keeps_the_selection(self):
+		"""import_items rewrites the status when it starts; a reload after that must still resume."""
+		plain = self.make_plain_item()
+		_log, status = self.run_import([plain])
+
+		self.assertEqual(status["selection"], erpnext_import.get_selection_key([plain]))
 
 	def test_a_dead_job_reads_as_failed(self):
 		erpnext_import.set_status(f"dead-{self.suffix}", erpnext_import.get_new_progress("running", "LOG"))

@@ -15,6 +15,7 @@ from commera.api.admin.catalog import (
 	create_product,
 	get_attribute_values,
 	get_product,
+	get_publish_blockers,
 	get_size_prices,
 	set_product_published,
 	set_variant_price,
@@ -26,6 +27,9 @@ from commera.api.admin.orders import get_overview
 from commera.api.utils import get_stock_for_items
 from commera.api.variant_pricing import set_variant_prices
 from commera.card_prices import get_card_price
+from commera.commera_ecommerce.doctype.bulk_publish_variants.bulk_publish_variants import (
+	set_variants_published,
+)
 
 # "L" is deliberately unused by the variant under test, leaving a second leaf SKU available.
 ATTRIBUTE_VALUES = ["S", "M", "L"]
@@ -189,7 +193,9 @@ class TestVariantImages(ProductOnboardingTestCase):
 		self.variant.reload()
 		self.assertEqual(self.variant.images, [])
 
-	def test_a_variant_with_sizes_publishes_without_images(self):
+	def test_a_priced_variant_with_sizes_publishes_without_images(self):
+		set_variant_price(self.variant.name, sale_rate=100)
+
 		set_variant_published(self.variant.name, 1)
 
 		self.assertEqual(frappe.db.get_value("Style Attribute Variant", self.variant.name, "is_published"), 1)
@@ -210,6 +216,59 @@ class TestVariantImages(ProductOnboardingTestCase):
 		self.variant.save()
 
 		self.assertEqual(frappe.db.get_value("Style Attribute Variant", self.variant.name, "is_published"), 0)
+
+
+class TestPublishReadiness(ProductOnboardingTestCase):
+	"""A color goes live only when a shopper can pay for every size of it."""
+
+	def make_second_variant(self):
+		item_code = self.make_size_item("L")
+		return self.make_style_attribute_variant({"L": item_code})
+
+	def test_an_unpriced_variant_cannot_be_published(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Add a price before publishing"):
+			set_variant_published(self.variant.name, 1)
+
+		self.assertFalse(frappe.db.get_value("Style Attribute Variant", self.variant.name, "is_published"))
+
+	def test_the_product_page_names_the_missing_price(self):
+		blockers = get_product(self.item_template)["variants"][0]["blockers"]
+
+		self.assertEqual(blockers, ["Add a price before publishing"])
+
+	def test_one_unpriced_size_blocks_its_color(self):
+		set_variant_price(self.variant.name, sale_rate=100)
+		frappe.db.delete("Item Price", {"item_code": self.size_item_codes[1]})
+
+		self.assertEqual(
+			get_publish_blockers([self.variant.name]), {self.variant.name: ["Add a price before publishing"]}
+		)
+
+	def test_a_default_list_price_alone_is_a_price(self):
+		set_variant_price(self.variant.name, default_rate=120)
+
+		self.assertEqual(get_publish_blockers([self.variant.name]), {self.variant.name: []})
+
+	def test_publishing_the_product_skips_the_unpriced_color_and_says_why(self):
+		set_variant_price(self.variant.name, sale_rate=100)
+		unpriced = self.make_second_variant()
+
+		result = set_product_published(self.item_template, 1)
+
+		self.assertEqual(result["updated"], [self.variant.attribute_value])
+		self.assertEqual(
+			result["skipped"],
+			[{"option": unpriced.attribute_value, "blockers": ["Add a price before publishing"]}],
+		)
+
+	def test_bulk_publishing_skips_the_unpriced_color(self):
+		set_variant_price(self.variant.name, sale_rate=100)
+		unpriced = self.make_second_variant()
+
+		set_variants_published(1, [self.variant.name, unpriced.name])
+
+		self.assertTrue(frappe.db.get_value("Style Attribute Variant", self.variant.name, "is_published"))
+		self.assertFalse(frappe.db.get_value("Style Attribute Variant", unpriced.name, "is_published"))
 
 
 class TestSizePrices(ProductOnboardingTestCase):
@@ -602,6 +661,7 @@ class TestCreateSingleItemProduct(ProductOnboardingTestCase):
 	def add_book(self, **kwargs):
 		kwargs.setdefault("title", f"Onboarding Book {frappe.generate_hash(length=6).upper()}")
 		kwargs.setdefault("collection", self.item_group)
+		kwargs.setdefault("sale_price", 100)
 		return create_product(**kwargs)
 
 	def test_a_book_sold_in_two_formats_gets_one_hidden_size_per_format(self):

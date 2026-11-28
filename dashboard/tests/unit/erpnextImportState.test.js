@@ -5,6 +5,7 @@ import {
   itemCodesToImport,
   preselectedCodes,
   runPercent,
+  toggledSelection,
   selectedAfter,
   selectionOnPage,
 } from '../../src/data/erpnextImportState.js'
@@ -46,4 +47,22 @@ test('progress is a whole percent and never divides by zero', () => {
   assert.equal(runPercent({ done: 0, total: 0 }), 0)
   assert.equal(runPercent({ done: 1, total: 3 }), 33)
   assert.equal(runPercent({ done: 5, total: 3 }), 100)
+})
+
+test('select all while searching picks only the items shown', () => {
+  const allCodes = ['LAMP', 'MUG', 'VASE']
+  const selected = toggledSelection({ selected: [], allCodes, shownCodes: ['MUG'], isSearching: true })
+  assert.deepEqual(selected, ['MUG'])
+  assert.deepEqual(itemCodesToImport(selected, allCodes.length), ['MUG'])
+})
+
+test('clearing while searching keeps items picked outside the search', () => {
+  const selected = toggledSelection({ selected: ['LAMP', 'MUG'], allCodes: ['LAMP', 'MUG', 'VASE'], shownCodes: ['MUG'], isSearching: true })
+  assert.deepEqual(selected, ['LAMP'])
+})
+
+test('without a search the toggle selects and clears everything', () => {
+  const allCodes = ['LAMP', 'MUG']
+  assert.deepEqual(toggledSelection({ selected: ['LAMP'], allCodes, shownCodes: ['LAMP'], isSearching: false }), allCodes)
+  assert.deepEqual(toggledSelection({ selected: allCodes, allCodes, shownCodes: ['LAMP'], isSearching: false }), [])
 })
