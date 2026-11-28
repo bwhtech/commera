@@ -7,12 +7,14 @@ from unittest.mock import patch
 
 import frappe
 from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry
+from frappe.utils.nestedset import get_root_of
 
 from commera.api.admin.catalog import (
 	DEFAULT_OPTION_ATTRIBUTE,
 	DEFAULT_OPTION_VALUE,
 	DEFAULT_SIZE_VALUE,
 	add_products_to_collection,
+	create_collection,
 	create_product,
 	delete_product,
 	get_collection_product_counts,
@@ -20,11 +22,13 @@ from commera.api.admin.catalog import (
 	get_product,
 	get_product_chain,
 	get_products,
+	list_collections,
 	remove_products_from_collection,
 	save_product_options,
 	update_product,
 )
-from commera.patches import add_products_to_their_collection
+from commera.patches import add_products_to_their_collection, move_collections_under_store_collections
+from commera.product_collections import STORE_COLLECTIONS, add_store_collections_parent
 from commera.tests.test_product_onboarding import ProductOnboardingTestCase
 
 
@@ -212,7 +216,7 @@ class TestProductCollection(DeleteProductTestCase):
 	def make_item_group(self):
 		item_group = frappe.new_doc("Item Group")
 		item_group.item_group_name = f"Deletion Group {frappe.generate_hash(length=6).upper()}"
-		item_group.parent_item_group = "All Item Groups"
+		item_group.parent_item_group = add_store_collections_parent()
 		item_group.is_group = 0
 		item_group.custom_displayname = item_group.item_group_name
 		item_group.insert()
@@ -540,3 +544,66 @@ class TestFirstOption(DeleteProductTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			save_product_options(self.book, add=[{"option": "S", "size": "S"}], option_attribute="Size")
 		self.assertEqual(get_product(self.book)["option_attribute"], DEFAULT_OPTION_ATTRIBUTE)
+
+
+class TestStoreCollections(DeleteProductTestCase):
+	def add_item_group(self, name, parent=None, is_group=0):
+		if frappe.db.exists("Item Group", name):
+			return name
+		item_group = frappe.new_doc("Item Group")
+		item_group.item_group_name = name
+		item_group.parent_item_group = parent or get_root_of("Item Group")
+		item_group.is_group = is_group
+		item_group.insert()
+		return item_group.name
+
+	def get_parent(self, item_group):
+		return frappe.db.get_value("Item Group", item_group, "parent_item_group")
+
+	def get_listed(self, search):
+		return [row["name"] for row in list_collections(search=search)["collections"]]
+
+	def test_a_new_collection_is_filed_under_store_collections(self):
+		title = f"Store Collection {self.suffix}"
+
+		create_collection(title)
+
+		self.assertEqual(self.get_parent(title), STORE_COLLECTIONS)
+		self.assertEqual(get_collections(search_text=title), [title])
+		self.assertEqual(self.get_listed(title), [title])
+
+	def test_the_picker_and_the_list_leave_out_groups_outside_store_collections(self):
+		raw_material = self.add_item_group("Raw Material")
+		create_collection(f"Store Collection {self.suffix}")
+
+		for item_group in (raw_material, self.item_group, STORE_COLLECTIONS):
+			self.assertNotIn(item_group, get_collections(search_text=item_group))
+			self.assertNotIn(item_group, self.get_listed(item_group))
+
+	def test_the_patch_moves_product_groups_and_leaves_erpnext_groups(self):
+		self.add_product()
+		branch = self.add_item_group(f"Patch Branch {self.suffix}", is_group=1)
+		leaf = self.add_item_group(f"Patch Leaf {self.suffix}", parent=branch)
+		products = self.add_item_group("Products")
+		products_parent = self.get_parent(products)
+		for collection in (leaf, products):
+			create_product(
+				title=f"Patch Product {frappe.generate_hash(length=6).upper()}", collection=collection
+			)
+
+		move_collections_under_store_collections.execute()
+		moved = frappe.get_all(
+			"Item Group", fields=["name", "parent_item_group", "lft", "rgt"], order_by="name"
+		)
+		move_collections_under_store_collections.execute()
+
+		self.assertEqual(self.get_parent(self.item_group), STORE_COLLECTIONS)
+		self.assertEqual(self.get_parent(branch), STORE_COLLECTIONS)
+		self.assertEqual(self.get_parent(leaf), branch)
+		self.assertEqual(self.get_parent(products), products_parent)
+		self.assertEqual(
+			frappe.get_all("Item Group", fields=["name", "parent_item_group", "lft", "rgt"], order_by="name"),
+			moved,
+		)
+		self.assertIn(leaf, get_collections(search_text=leaf))
+		self.assertNotIn(products, get_collections(search_text=products))

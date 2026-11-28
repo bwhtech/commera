@@ -14,7 +14,7 @@ from frappe.utils.csvutils import read_csv_content
 from frappe.utils.data import cint, cstr, flt
 from frappe.utils.xlsxutils import build_xlsx_response, read_xlsx_file_from_attached_file
 
-from commera.api.admin.catalog import create_product
+from commera.api.admin.catalog import create_product, get_store_collections_query
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
 TEMPLATE_HEADERS = [
@@ -56,7 +56,11 @@ def download_product_template():
 	"""A ready-to-fill spreadsheet whose header row matches parse_and_validate() column for column."""
 	frappe.has_permission("Item", ptype="create", throw=True)
 
-	example_collection = frappe.db.get_value("Item Group", {"is_group": 0}) or "Apparel"
+	item_group = frappe.qb.DocType("Item Group")
+	example_collection = next(
+		iter(get_store_collections_query(item_group).select(item_group.name).limit(1).run(pluck=True)),
+		"Apparel",
+	)
 	example_rows = [
 		["Cotton Oversized Tee", example_collection, "Black", "M", 1299, 999, 24],
 		["Cotton Oversized Tee", example_collection, "Black", "L", 1299, 999, 18],

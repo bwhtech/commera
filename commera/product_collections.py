@@ -2,13 +2,17 @@
 because ERPNext requires it and breadcrumbs, size charts and page item_group read it."""
 
 import frappe
+from frappe import _
 from frappe.query_builder import DocType
 from frappe.utils import create_batch
+from frappe.utils.nestedset import get_root_of
 
 from commera.utils import IN_CLAUSE_CHUNK_SIZE
 
 PRODUCT_COLLECTION = "Product Collection"
 COLLECTIONS_FIELD = "custom_collections"
+STORE_COLLECTIONS = "Store Collections"
+ERPNEXT_ITEM_GROUPS = ("Products", "Raw Material", "Services", "Sub Assemblies", "Consumable")
 
 
 def sync_collections(doc, method=None):
@@ -94,3 +98,43 @@ def variant_in_collections(variant, collections):
 	"""Criterion: a Style Attribute Variant page whose product sits in any of `collections`."""
 	# The page's own item_group still counts: the Item Group Map can file a page apart from its product.
 	return variant.item_group.isin(collections) | variant.item_style.isin(products_in(collections))
+
+
+def add_store_collections_parent() -> str:
+	if not frappe.db.exists("Item Group", STORE_COLLECTIONS):
+		frappe.get_doc(
+			{
+				"doctype": "Item Group",
+				"item_group_name": STORE_COLLECTIONS,
+				"parent_item_group": get_root_of("Item Group"),
+				"is_group": 1,
+			}
+		).insert(ignore_permissions=True)
+	return STORE_COLLECTIONS
+
+
+def add_to_store_collections(item_groups):
+	"""Move each group's top branch under Store Collections. ERPNext's own groups stay where they are."""
+	parent = add_store_collections_parent()
+	for name in get_branches_outside_store_collections(item_groups):
+		branch = frappe.get_doc("Item Group", name)
+		branch.parent_item_group = parent
+		branch.save()
+
+
+def get_branches_outside_store_collections(item_groups) -> list[str]:
+	parent_by_group = dict(frappe.get_all("Item Group", fields=["name", "parent_item_group"], as_list=True))
+	# The setup wizard names its groups in the site language.
+	fixed = {get_root_of("Item Group"), STORE_COLLECTIONS, *ERPNEXT_ITEM_GROUPS}
+	fixed.update(_(name) for name in ERPNEXT_ITEM_GROUPS)
+
+	branches = []
+	for item_group in dict.fromkeys(item_groups):
+		if item_group not in parent_by_group or item_group in fixed:
+			continue
+		branch, parent = item_group, parent_by_group[item_group]
+		while parent not in fixed and parent in parent_by_group:
+			branch, parent = parent, parent_by_group[parent]
+		if parent != STORE_COLLECTIONS and branch not in branches:
+			branches.append(branch)
+	return branches
